@@ -20,7 +20,7 @@ from .enhance import DEFAULT_BACKEND, EnhancerError, enhance
 from .enhancer import (PRESETS, AUTH_MODES, EnhancerConfig, KEYCHAIN_SERVICE,
                        FALLBACK_KEYCHAIN_SERVICE, keychain_set, preset as find_preset)
 from .guides import GuideCache, Model, load_registry, save_registry
-from .store import CONTEXTS, DEFAULT_CONTEXT, FormatError, Library, Seed
+from .store import CONTEXTS, DEFAULT_CONTEXT, FormatError, Library, Render, Seed
 from .usage import Usage
 from .variables import History, fill as fill_variables, find as find_variables
 
@@ -568,6 +568,83 @@ def cmd_guides(args, lib: Library, models: dict, cache: GuideCache) -> int:
     return 0
 
 
+def cmd_rename(args, lib: Library, models: dict, cache: GuideCache) -> int:
+    """Give a prompt a different id, and take everything named after it along.
+
+    A prompt's id is its filename, the `id` in its own frontmatter, the filename
+    of every render, the `seed` in each of those renders' provenance, the name of
+    its comparison summary, and its key in the local usage counts. Six places, so
+    renaming by hand means renaming five of them and discovering the sixth later.
+    Until this existed there was no rename at all: a seed scaffolded as
+    `new-prompt-3` and titled "Loop" kept that id permanently, and three of them
+    had accumulated seven uses between them.
+
+    Deliberately not a re-render. The id is not an input to the enhancer — only
+    the body, the guidance and the context are, and `seed_hash` is computed from
+    the seed's content — so every render stays valid and current across a rename.
+    Re-rendering here would spend an LLM call per model to produce the same text.
+    """
+    old, new = args.id, args.new_id
+
+    # ID_RE, not a second rule of my own: an id this module would refuse to
+    # create is one it should refuse to rename to.
+    if not ID_RE.match(new):
+        return _fail(f"{new!r} is not a usable id: lowercase letters, digits and "
+                     "hyphens, starting with a letter or digit")
+    source = lib.prompts / f"{old}.md"
+    if not source.is_file():
+        return _fail(f"no prompt named {old!r}")
+    target = lib.prompts / f"{new}.md"
+    if target.exists():
+        return _fail(f"{new!r} already exists — pick another id or remove that one")
+
+    # Every move is computed before any is made. A rename that half-happens
+    # leaves renders orphaned under a name nothing points at, and the library
+    # then reports them as missing rather than as stranded.
+    moves: list[tuple[Path, Path]] = [(source, target)]
+    for model_id in models:
+        render = lib.render_path(old, model_id)
+        if render.is_file():
+            moves.append((render, lib.render_path(new, model_id)))
+    summary = args.root / "comparisons" / f"{old}.md"
+    if summary.is_file():
+        moves.append((summary, args.root / "comparisons" / f"{new}.md"))
+
+    clashes = [dst for _, dst in moves if dst.exists()]
+    if clashes:
+        return _fail("refusing to overwrite: "
+                     + ", ".join(str(c.relative_to(args.root)) for c in clashes))
+
+    for src, dst in moves:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        src.rename(dst)
+
+    # The id lives inside the files too, not only in their names.
+    seed = Seed.load(target)
+    seed.id = new
+    seed.write(target)
+    for _, dst in moves[1:]:
+        if dst.parent.name == "comparisons":
+            continue
+        render = Render.load(dst)
+        # `seed_id`, not `seed`. The frontmatter key is "seed" and the field is
+        # not, and Render is a plain dataclass — assigning `render.seed` creates
+        # a new attribute, write() ignores it, and the rename reports success
+        # having changed nothing inside the file. Caught by the test, not by
+        # reading this.
+        render.seed_id = new
+        render.write(dst)
+
+    usage = Usage(args.root)
+    usage.load()
+    if old in usage.data:
+        usage.data[new] = usage.data.pop(old)
+        usage.save()
+
+    print(f"{old} → {new} ({len(moves)} file{'s' if len(moves) != 1 else ''} moved)")
+    return 0
+
+
 def cmd_new(args, lib: Library, models: dict, cache: GuideCache) -> int:
     path = lib.prompts / f"{args.id}.md"
     if path.exists():
@@ -713,6 +790,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("action", choices=["fetch"])
     p.add_argument("--model")
     p.set_defaults(func=cmd_guides)
+
+    p = sub.add_parser("rename", help="give a prompt a different id")
+    p.add_argument("id")
+    p.add_argument("new_id", metavar="new-id")
+    p.set_defaults(func=cmd_rename)
 
     p = sub.add_parser("new", help="scaffold a seed")
     p.add_argument("id")
