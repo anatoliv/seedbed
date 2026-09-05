@@ -139,10 +139,23 @@ fi
 #     A warning rather than a refusal, because there is no publish step here
 #     that a wrong answer would corrupt.
 COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
-if [[ -n "$(git status --porcelain 2>/dev/null)" && "${ALLOW_DIRTY:-}" != "1" ]]; then
+DIRTY=0
+[[ -n "$(git status --porcelain 2>/dev/null)" ]] && DIRTY=1
+if [[ "$DIRTY" == "1" && "${ALLOW_DIRTY:-}" != "1" ]]; then
     echo "WARNING: the working tree is dirty, so this DMG is not reproducible from" >&2
     echo "         commit ${COMMIT}. Commit first if this build is going anywhere" >&2
     echo "         you will later have to reason about." >&2
+fi
+
+# 0e2. A tag that already exists means this version has already been released,
+#      and the artifact under that name is somewhere it cannot be recalled from.
+#      The DMG-overwrite guard only sees this machine's dist/; this sees history.
+if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null 2>&1 \
+   && [[ "${FORCE_REBUILD:-}" != "1" ]]; then
+    echo "error: tag v${VERSION} already exists — that version has shipped." >&2
+    echo "       Bump CFBundleShortVersionString and CFBundleVersion, or if you" >&2
+    echo "       really mean to rebuild it: FORCE_REBUILD=1 Scripts/release.sh" >&2
+    exit 1
 fi
 
 # 0f. If this build can report crashes, it must also be able to symbolicate
@@ -155,7 +168,14 @@ if [[ -z "${SENTRY_AUTH_TOKEN:-}" ]]; then
     SENTRY_AUTH_TOKEN="$(security find-generic-password -s sentry-release-token -w 2>/dev/null || true)"
     export SENTRY_AUTH_TOKEN
 fi
+# The org slug is an identifier, so it is not written into this tracked file —
+# it comes from the environment or, failing that, a gitignored local file, which
+# is exactly how the DSN beside it works. Absent, the gate below fails loudly
+# rather than shipping a reporting build with no symbolication.
 SENTRY_ORG="${SENTRY_ORG:-}"
+if [[ -z "$SENTRY_ORG" && -f Packaging/sentry-org.local ]]; then
+    SENTRY_ORG="$(tr -d ' \t\r\n' < Packaging/sentry-org.local)"
+fi
 if [[ "$HAS_DSN" == "1" && ( -z "${SENTRY_AUTH_TOKEN:-}" || -z "$(command -v sentry-cli)" || -z "$SENTRY_ORG" ) ]]; then
     if [[ "${ALLOW_NO_SYMBOLS:-}" != "1" ]]; then
         cat >&2 <<'MSG'
@@ -278,6 +298,30 @@ Scripts/check-release.sh || {
     echo "       anyone until the above is fixed." >&2
     exit 1
 }
+
+# 6. Tag, last, and only when there is something a tag can honestly point at.
+#    Nothing tagged releases before this, which is why check-release.sh's
+#    "build number must increase" check had been a no-op since it was written:
+#    it compares against the last v* tag and there were none. A tag is also the
+#    only thing that makes "which build is that Mac running?" answerable, and
+#    five DMGs were built in one afternoon all calling themselves 0.1.0 (1).
+#
+#    A dirty tree gets no tag. A tag on uncommitted work points at a commit that
+#    does not contain what shipped, which is worse than no tag at all: it looks
+#    like an answer.
+if [[ "$DIRTY" == "1" ]]; then
+    echo "==> Not tagging: the tree is dirty, so v${VERSION} would point at $COMMIT,"
+    echo "    which is not what this DMG was built from. Commit, then tag by hand:"
+    echo "      git tag -a v${VERSION} -m 'Seedbed ${VERSION} (${BUILD_NUM})' && git push origin v${VERSION}"
+elif git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+    echo "==> Tag v${VERSION} already exists (rebuild) — left alone."
+else
+    echo "==> Tagging v${VERSION}"
+    git tag -a "v${VERSION}" -m "Seedbed ${VERSION} (${BUILD_NUM})"
+    git push -q origin "v${VERSION}" 2>/dev/null \
+        && echo "    pushed v${VERSION} to origin" \
+        || echo "    tagged locally; push it when the remote is reachable"
+fi
 
 SHA="$(shasum -a 256 "$DMG" | awk '{print $1}')"
 SIZE="$(du -h "$DMG" | awk '{print $1}')"

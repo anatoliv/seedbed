@@ -2,33 +2,28 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleName</key>
-	<string>Seedbed</string>
 	<key>CFBundleDisplayName</key>
 	<string>Seedbed</string>
-	<key>CFBundleIdentifier</key>
-	<string>net.amnesia.seedbed</string>
 	<key>CFBundleExecutable</key>
 	<string>Seedbed</string>
 	<key>CFBundleIconFile</key>
 	<string>Seedbed</string>
+	<key>CFBundleIdentifier</key>
+	<string>net.amnesia.seedbed</string>
+	<key>CFBundleName</key>
+	<string>Seedbed</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>0.1.1</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>2</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
-	<!-- Menu-bar only: no Dock tile, no window until summoned. -->
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>Personal tool.</string>
-	<!-- Deliberately empty in the tracked file. make-app.sh writes the real DSN
-	     into the BUNDLE's copy from Packaging/sentry-dsn.local (gitignored) or
-	     $SEEDBED_SENTRY_DSN. Empty means crash reporting cannot start at all,
-	     which is what a locally built copy should be. -->
 	<key>SentryDSN</key>
 	<string></string>
 </dict>

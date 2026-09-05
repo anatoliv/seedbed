@@ -55,6 +55,37 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.1",
+            date: "5 September 2026",
+            highlight: "Seedbed can be installed on a Mac that did not build it, and it "
+                + "says what is wrong when it cannot read your library.",
+            changes: [
+                WhatsNewChange(kind: .added,
+                               text: "A signed, notarized disk image. Copy it to another Mac, "
+                                   + "drag Seedbed to Applications, and it launches — no Swift "
+                                   + "toolchain, no rebuild. It still needs a checkout of the "
+                                   + "library and Python 3.11 or newer, and the image says so."),
+                WhatsNewChange(kind: .added,
+                               text: "Crash reporting, off by default and off again unless you "
+                                   + "turn it on in Settings, under Diagnostics. It never sends "
+                                   + "a prompt, a render, a value you filled in, or an access "
+                                   + "token."),
+                WhatsNewChange(kind: .fixed,
+                               text: "The menu used to say \"0 prompts · 0 models\" when it "
+                                   + "could not read the library at all, which looks exactly "
+                                   + "like an empty one. It now says why — most usefully, that "
+                                   + "no Python 3.11 or newer was found."),
+                WhatsNewChange(kind: .fixed,
+                               text: "Running the library from the command line on an older "
+                                   + "Python printed a traceback about a missing module. It now "
+                                   + "names the version it needs and how to install one."),
+                WhatsNewChange(kind: .improved,
+                               text: "Check for Updates gives the right instructions for how "
+                                   + "this copy was obtained: a copy built from the checkout is "
+                                   + "told to rebuild, an installed one is not, since it has no "
+                                   + "toolchain to rebuild with."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.0",
             date: "5 September 2026",
             highlight: "Agents can now ask the library for a prompt, and every prompt "
