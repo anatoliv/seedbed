@@ -1,12 +1,18 @@
 import AppKit
 import ServiceManagement
 
-/// "Check for Updates…" for an app you build yourself.
+/// "Check for Updates…" for a copy you built yourself.
 ///
-/// There is no Sparkle feed and no notarized download, because this is compiled
-/// on the machine it runs on. What "an update" actually means here is that the
-/// git repository has commits this build does not, so that is what it checks —
-/// and it says exactly how to take them.
+/// There IS a Sparkle feed now, and `Updater` serves the copies installed from
+/// it. This half answers for a copy built out of the checkout, where an update
+/// means the repository has commits this build does not — Sparkle would offer
+/// such a copy the last shipped release and quietly replace the work in
+/// progress. `AppController.checkForUpdates` routes between the two.
+///
+/// It stays reachable for installed copies too, through the same result text,
+/// because Sparkle updates an `.app` and this app is a front end: the prompts,
+/// the renders and the Python that reads them are in a checkout no updater
+/// touches.
 @MainActor
 enum Updates {
     struct Result {
@@ -65,7 +71,7 @@ enum Updates {
     /// whether the app is in /Applications: the distinguishing fact is whether
     /// the binary came out of THIS checkout, and someone can keep a built copy
     /// anywhere.
-    private static func wasBuiltFrom(_ root: URL) -> Bool {
+    static func wasBuiltFrom(_ root: URL) -> Bool {
         let bundle = Bundle.main.bundleURL.resolvingSymlinksInPath().path
         let checkout = root.resolvingSymlinksInPath().path
         return bundle.hasPrefix(checkout.hasSuffix("/") ? checkout : checkout + "/")

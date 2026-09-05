@@ -36,6 +36,12 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var menuIsOpen = false
     /// Which settings pane is showing, for the same reason as `infoModel`.
     private let settingsModel = SettingsModel()
+    /// Held for the process lifetime, not built on demand: Sparkle's scheduled
+    /// background checks belong to the controller, and a controller created
+    /// inside the menu action would be deallocated the moment the check
+    /// finished, so an installed copy would only ever update when someone
+    /// remembered to ask.
+    private lazy var updater = Updater()
 
     private static let rootKey = "LibraryRoot"
     static let mcpEnabledKey = "MCPEnabled"
@@ -595,9 +601,21 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    /// No Sparkle feed: this app is compiled where it runs, so "an update" means
-    /// the repository has commits this build does not.
+    /// Two kinds of copy, two meanings of "update", and the menu item routes.
+    ///
+    /// A copy built out of the checkout gets the git answer: the repository has
+    /// commits this build does not, here they are, rebuild. Offering that copy a
+    /// signed release from the feed would replace the build under development
+    /// with whatever last shipped.
+    ///
+    /// An installed copy gets Sparkle, because it has no toolchain and no
+    /// checkout of its own to compare against — `Updates.check` would tell it
+    /// only that some directory it does not own is behind.
     @objc private func checkForUpdates() {
+        if !Updates.wasBuiltFrom(root), updater.canCheck {
+            updater.checkForUpdates()
+            return
+        }
         let result = Updates.check(root: root)
         let alert = NSAlert()
         alert.messageText = result.title

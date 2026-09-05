@@ -20,7 +20,7 @@ cd "$(dirname "$0")/.."
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Packaging/Info.plist)"
 BUILD_NUM="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Packaging/Info.plist)"
 APP="build/Seedbed.app"
-DMG="dist/Seedbed_${VERSION}_aarch64.dmg"
+DMG="dist/Seedbed_${VERSION}_universal.dmg"
 
 # --- The test suite -----------------------------------------------------------
 # The Python core owns the library: staleness, guidance, the enhancer, the
@@ -86,9 +86,10 @@ fi
 # check here that looks outside the working tree. Everything else compares the
 # release against itself and cannot see a repeated version.
 #
-# Today this no-ops: nothing tags releases yet, because there is no feed and no
-# download page, so `release.sh` does not tag. It starts working the moment a
-# `v*` tag exists, which is why it is written now rather than remembered later.
+# Sparkle decides whether an update exists by comparing sparkle:version — the
+# BUILD number — and ignores the short version entirely. Two releases sharing a
+# build number are invisible to each other: no update offered, no error shown,
+# and the feed looks perfectly correct. Live since v0.1.1, the first tag.
 PREV_TAG="$(git tag --list 'v*' --sort=-v:refname 2>/dev/null | grep -v "^v${VERSION}\$" | head -1 || true)"
 if [[ -n "$PREV_TAG" ]]; then
     PREV_PLIST="$(mktemp -t seedbed-prevplist)"
@@ -165,5 +166,33 @@ if [[ -n "${SEEDBED_SENTRY_DSN:-}" || -f Packaging/sentry-dsn.local ]]; then
     fi
 fi
 
+# --- The feed ------------------------------------------------------------------
+# A release nobody is offered is a release that did not happen. The appcast is
+# generated from every DMG in dist/, so the failure to catch here is a feed whose
+# newest entry is not this build: installed copies keep being told they are
+# current while a newer version sits on the server.
+APPCAST="dist/appcast.xml"
+if [[ ! -f "$APPCAST" ]]; then
+    echo "error: missing $APPCAST — installed copies would never hear about this." >&2
+    exit 1
+fi
+APPCAST_BUILD="$(perl -0ne 'if (/<sparkle:version>(\d+)<\/sparkle:version>/) { print $1; exit }' "$APPCAST")"
+APPCAST_VERSION="$(perl -0ne 'if (/<sparkle:shortVersionString>([^<]+)<\/sparkle:shortVersionString>/) { print $1; exit }' "$APPCAST")"
+if [[ -z "$APPCAST_BUILD" || "$APPCAST_BUILD" -lt "$BUILD_NUM" ]]; then
+    echo "error: the appcast's newest build (${APPCAST_BUILD:-missing}) is older than $BUILD_NUM." >&2
+    exit 1
+fi
+if [[ -n "$APPCAST_VERSION" && "$APPCAST_VERSION" != "$VERSION" ]]; then
+    echo "error: the appcast's newest version ($APPCAST_VERSION) is not $VERSION." >&2
+    exit 1
+fi
+# An unsigned enclosure is one every installed copy refuses, silently.
+if ! grep -q 'sparkle:edSignature' "$APPCAST"; then
+    echo "error: $APPCAST carries no EdDSA signature — every installed copy would" >&2
+    echo "       reject the update without showing anyone why." >&2
+    exit 1
+fi
+
 echo "release ok: $VERSION ($BUILD_NUM)"
-echo "  app and DMG both stapled, Gatekeeper accepts the app, bundle matches the plist"
+echo "  app and DMG stapled, Gatekeeper accepts the app, bundle matches the plist"
+echo "  appcast offers $APPCAST_VERSION ($APPCAST_BUILD), EdDSA signed"

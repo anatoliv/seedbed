@@ -46,7 +46,10 @@ discover_identity() {
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Packaging/Info.plist)"
 BUILD_NUM="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Packaging/Info.plist)"
-DMG="${DIST}/${APP_NAME}_${VERSION}_aarch64.dmg"
+DMG="${DIST}/${APP_NAME}_${VERSION}_universal.dmg"
+# Where the feed says the downloads live. The enclosure URLs in appcast.xml are
+# built from this, so it must be the host that actually serves them.
+APPCAST_BASE="${APPCAST_BASE:-https://seedbed.dev}"
 
 # 0a. A Developer ID identity is not optional here. An ad-hoc signature is fine
 #     for a copy that never leaves this Mac and cannot be notarized at all, so
@@ -114,6 +117,50 @@ if [[ -n "$REPO_RUNNERS" ]]; then
     echo "       It can hold files open under build/, which corrupts the DMG that" >&2
     echo "       hdiutil creates, which then hangs notarization with no error." >&2
     exit 1
+fi
+
+# 0c2. The Sparkle signing key must match the SUPublicEDKey baked into shipped
+#      builds. If it does not, generate_appcast still produces a perfectly
+#      well-formed, EdDSA-signed feed — and every installed copy REJECTS the
+#      signature and silently stops updating. No error is shown to anyone: the
+#      feed looks correct, the DMG downloads, the release appears to succeed.
+#      Nothing downstream can see it either, which is why it is checked here
+#      rather than discovered by users going quiet.
+GK_BIN="${GK_BIN:-$(find "$HOME/Library/Developer" "$HOME/Library/Caches/org.swift.swiftpm" \
+    ./.build "$HOME/Projects" -type f -name generate_keys -path '*Sparkle*' 2>/dev/null | head -1)}"
+PLIST_ED_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' Packaging/Info.plist 2>/dev/null || true)"
+if [[ -n "${GK_BIN:-}" && -x "$GK_BIN" && -n "$PLIST_ED_KEY" ]]; then
+    KEYCHAIN_ED_KEY="$("$GK_BIN" -p 2>/dev/null | tr -d '[:space:]' || true)"
+    if [[ -z "$KEYCHAIN_ED_KEY" ]]; then
+        echo "error: no Sparkle signing key in the keychain — the appcast could not be signed." >&2
+        echo "       This key is shared with the other Mac apps here; restore it rather" >&2
+        echo "       than generating a new one, which would break their updates too." >&2
+        exit 1
+    fi
+    if [[ "$KEYCHAIN_ED_KEY" != "$PLIST_ED_KEY" ]]; then
+        if [[ "${ALLOW_KEY_MISMATCH:-}" != "1" ]]; then
+            cat >&2 <<MSG
+error: the Sparkle signing key does not match SUPublicEDKey in Packaging/Info.plist.
+
+  keychain  : $KEYCHAIN_ED_KEY
+  Info.plist: $PLIST_ED_KEY
+
+  Shipping this produces a valid-looking feed that EVERY installed copy rejects.
+  Auto-update stops silently, with nothing shown to the user.
+
+  Restore the original key, or — if rotating deliberately — set SUPublicEDKey to
+  the new public key and re-run with ALLOW_KEY_MISMATCH=1. Note a rotation only
+  reaches people through a build signed with the OLD key, so ship the key change
+  before relying on it.
+MSG
+            exit 1
+        fi
+        echo "WARNING: ALLOW_KEY_MISMATCH=1 — signing key differs from SUPublicEDKey" >&2
+    fi
+    echo "==> Sparkle key matches SUPublicEDKey"
+else
+    echo "WARNING: generate_keys not found — cannot verify the Sparkle key matches" >&2
+    echo "         SUPublicEDKey. A mismatch would break updates silently." >&2
 fi
 
 # 0d. Never clobber an already-packaged DMG for this version. That artifact may
@@ -220,7 +267,9 @@ IDENTITY="$IDENTITY" NOTARY_PROFILE="$NOTARY_PROFILE" ./Scripts/make-app.sh
 if [[ "$HAS_DSN" == "1" && -n "${SENTRY_AUTH_TOKEN:-}" ]] && command -v sentry-cli >/dev/null 2>&1; then
     echo "==> Uploading debug symbols to Sentry"
     UPLOAD_PATHS=("$APP")
-    RELEASE_DSYM="$(swift build -c release --build-system native --show-bin-path 2>/dev/null)/Seedbed.dSYM"
+    # Same flags make-app.sh used, or this resolves a different build directory
+    # and silently uploads nothing.
+    RELEASE_DSYM="$(swift build -c release --build-system native --arch arm64 --arch x86_64 --show-bin-path 2>/dev/null)/Seedbed.dSYM"
     [[ -d "$RELEASE_DSYM" ]] && UPLOAD_PATHS+=("$RELEASE_DSYM")
     sentry-cli debug-files upload \
         --org "$SENTRY_ORG" \
@@ -289,7 +338,28 @@ echo "==> Stapling"
 xcrun stapler staple "$DMG"
 xcrun stapler validate "$DMG" && echo "    staple validated"
 
-# 5. The other half of the gate, now that there are artifacts to check: the
+# 5. The appcast. generate_appcast EdDSA-signs every DMG in dist/ from the
+#     keychain key and writes dist/appcast.xml — the whole feed, not one item,
+#     so a copy on an older version can still find a path forward.
+GA_BIN="${GA_BIN:-$(find "$HOME/Library/Developer" "$HOME/Library/Caches/org.swift.swiftpm" \
+    ./.build "$HOME/Projects" -type f -name generate_appcast -path '*Sparkle*' 2>/dev/null | head -1)}"
+if [[ -n "${GA_BIN:-}" && -x "$GA_BIN" ]]; then
+    echo "==> Generating the appcast"
+    "$GA_BIN" "$DIST" --download-url-prefix "${APPCAST_BASE}/" -o "$DIST/appcast.xml" >/dev/null
+    APPCAST_BUILD="$(perl -0ne 'if (/<sparkle:version>(\d+)<\/sparkle:version>/) { print $1; exit }' "$DIST/appcast.xml")"
+    if [[ -z "$APPCAST_BUILD" || "$APPCAST_BUILD" -lt "$BUILD_NUM" ]]; then
+        echo "error: the appcast's newest build (${APPCAST_BUILD:-missing}) is older than" >&2
+        echo "       this bundle's $BUILD_NUM — nobody would be offered this release." >&2
+        exit 1
+    fi
+    echo "    appcast.xml written, newest build $APPCAST_BUILD"
+else
+    echo "error: generate_appcast not found — refusing to ship a release with no feed." >&2
+    echo "       Installed copies would never hear about it. Set GA_BIN to override." >&2
+    exit 1
+fi
+
+# 6. The other half of the gate, now that there are artifacts to check: the
 #    bundle matches the plist, both tickets staple, Gatekeeper accepts the app,
 #    and a configured DSN actually made it into the bundle.
 echo "==> Release gate (Scripts/check-release.sh)"
@@ -299,7 +369,7 @@ Scripts/check-release.sh || {
     exit 1
 }
 
-# 6. Tag, last, and only when there is something a tag can honestly point at.
+# 7. Tag, last, and only when there is something a tag can honestly point at.
 #    Nothing tagged releases before this, which is why check-release.sh's
 #    "build number must increase" check had been a no-op since it was written:
 #    it compares against the last v* tag and there were none. A tag is also the

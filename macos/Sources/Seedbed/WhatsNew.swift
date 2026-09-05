@@ -55,6 +55,29 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.2",
+            date: "5 September 2026",
+            highlight: "Seedbed can update itself now, and it runs on Intel Macs.",
+            changes: [
+                WhatsNewChange(kind: .added,
+                               text: "Automatic updates. A copy installed from a release "
+                                   + "checks for new versions and offers to install them. A "
+                                   + "copy you built from the checkout is left alone, because "
+                                   + "replacing it would throw away whatever you are working "
+                                   + "on; that one still tells you to pull and rebuild."),
+                WhatsNewChange(kind: .fixed,
+                               text: "The disk image was Apple silicon only. It now carries "
+                                   + "both architectures, so an Intel Mac can run it. Nothing "
+                                   + "in the signing or notarization checks could have caught "
+                                   + "that: the bundle was valid, it just had no code those "
+                                   + "machines could execute."),
+                WhatsNewChange(kind: .improved,
+                               text: "Updating the app does not update your library. The "
+                                   + "prompts live in a git checkout, so Check for Updates "
+                                   + "still has something to say after an automatic update "
+                                   + "has run."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.1",
             date: "5 September 2026",
             highlight: "Seedbed can be installed on a Mac that did not build it, and it "

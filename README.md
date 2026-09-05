@@ -65,7 +65,7 @@ staleness, guidance and the enhancer have one implementation. See `macos/README.
 
     macos/Scripts/release.sh
 
-builds a Developer ID signed, notarized, stapled `Seedbed_<version>_aarch64.dmg`
+builds a Developer ID signed, notarized, stapled `Seedbed_<version>_universal.dmg`
 in `macos/dist/`. Copy it across, drag the app to Applications, and that Mac
 needs no Swift toolchain — which was previously the only way to get the app onto
 one. It still needs what the app is a front end *to*: a clone of this repository

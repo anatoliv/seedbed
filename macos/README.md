@@ -266,7 +266,8 @@ Builds, signs, notarizes and staples the `.app`, packages it into a DMG with an
 sha256. It discovers the Developer ID identity and the notarytool profile from
 the keychain; the notarytool credential is per Apple account rather than per
 app, so an existing profile from another project is the right one to use. The
-result is `dist/Seedbed_<version>_aarch64.dmg`.
+result is `dist/Seedbed_<version>_universal.dmg`, Intel and Apple silicon in one
+bundle.
 
 The `.app` is stapled as well as the DMG, deliberately. Stapling only the image
 leaves the copy dragged into `/Applications` needing to reach Apple to be

@@ -59,12 +59,19 @@ if [[ -z "$IDENTITY" ]]; then
     esac
 fi
 
-echo "==> Building release binary"
+echo "==> Building release binary (universal)"
 # -Xswiftc -g emits DWARF so dsymutil can produce a real dSYM. Without it the
 # binary carries only symtab and unwind info: Sentry can resolve function names
 # but never file and line, which is most of what a crash report is worth.
-swift build -c release --build-system native -Xswiftc -g
-BIN="$(swift build -c release --build-system native --show-bin-path)/Seedbed"
+#
+# Both architectures, because a DMG is handed to a Mac whose CPU you do not
+# choose. This shipped arm64-only until 2026-09-05, which means every Intel Mac
+# would have downloaded a notarized, stapled, Gatekeeper-approved image and then
+# failed to launch — the one failure mode all the signing work cannot catch,
+# since the bundle is perfectly valid and simply has no code the machine can run.
+ARCHS=(--arch arm64 --arch x86_64)
+swift build -c release --build-system native -Xswiftc -g "${ARCHS[@]}"
+BIN="$(swift build -c release --build-system native "${ARCHS[@]}" --show-bin-path)/Seedbed"
 
 # The dSYM is built next to the binary inside .build, which is where release.sh
 # points `sentry-cli debug-files upload`. It is deliberately NOT copied into the
@@ -74,6 +81,22 @@ if command -v dsymutil >/dev/null 2>&1; then
     dsymutil "$BIN" -o "$BIN.dSYM" 2>/dev/null \
         || echo "    dsymutil failed (non-fatal; crash reports lose file and line)"
 fi
+
+# Sparkle's nested code is signed deepest-first and explicitly, never with
+# --deep, which mis-signs its XPC services. An outer signature over unsigned
+# nested code passes ordinary verification and then fails notarization — or
+# worse, fails at update time on someone else's Mac.
+sign_sparkle() {
+    local sign="$1" fw="$APP/Contents/Frameworks/Sparkle.framework"
+    [[ -d "$fw" ]] || return 0
+    local opts=(--force --options runtime --timestamp)
+    [[ "$sign" == "-" ]] && opts=(--force)
+    local v="$fw/Versions/B"
+    for x in "$v/XPCServices/Downloader.xpc" "$v/XPCServices/Installer.xpc" \
+             "$v/Autoupdate" "$v/Updater.app" "$fw"; do
+        [[ -e "$x" ]] && codesign "${opts[@]}" --sign "$sign" "$x"
+    done
+}
 
 echo "==> Assembling $APP"
 rm -rf "$APP"
@@ -99,19 +122,35 @@ else
     echo "==> No Sentry DSN: this build cannot report crashes, whatever the toggle says"
 fi
 
+# Bundle Sparkle.framework, which the app links and needs at runtime. The rpath
+# in Package.swift points here; without the copy the bundle links fine and dies
+# on launch, which only ever happens in the packaged app.
+SPARKLE_FW="$(find .build -type d -name 'Sparkle.framework' -path '*macos*' 2>/dev/null | head -1)"
+if [[ -n "$SPARKLE_FW" ]]; then
+    echo "==> Bundling Sparkle.framework"
+    mkdir -p "$APP/Contents/Frameworks"
+    cp -R "$SPARKLE_FW" "$APP/Contents/Frameworks/"
+else
+    echo "error: Sparkle.framework not found in .build — the app links it and" >&2
+    echo "       would not launch. Run 'swift package resolve' and rebuild." >&2
+    exit 1
+fi
+
 if [[ "$IDENTITY" == "-" ]]; then
     echo "==> Ad-hoc signing (no identity found)"
     echo "    Accessibility permission will need re-granting after every rebuild."
+    sign_sparkle -
     codesign --force --sign - "$APP"
 else
     echo "==> Signing as: $IDENTITY"
     # --timestamp is required for notarization; --options runtime is the
     # hardened runtime, likewise required.
+    sign_sparkle "$IDENTITY"
     codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
 fi
 # --strict, because the default verification is lenient enough to pass a bundle
 # that then fails notarization.
-codesign --verify --strict --verbose=1 "$APP" 2>&1 | sed 's/^/    /'
+codesign --verify --strict --deep --verbose=1 "$APP" 2>&1 | sed 's/^/    /'
 
 if [[ -n "${NOTARY_PROFILE:-}" ]]; then
     if [[ "$IDENTITY" == "-" ]]; then
