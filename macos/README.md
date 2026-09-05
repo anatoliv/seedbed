@@ -300,6 +300,38 @@ Reference after they earned their place there:
   line numbers are most of the way to no crash reports at all, and you find out
   months later on the one that mattered.
 
+## Publishing a release
+
+    Scripts/release.sh          build, notarize, staple, appcast, tag
+    Scripts/publish.sh          put it on seedbed.dev
+
+`publish.sh` deliberately cannot build. A script that can do both is one that can
+publish something the release gate never saw, so this one re-runs the gate and
+refuses if it does not pass.
+
+The order is **DMG first, then appcast**, each landed atomically through a temp
+path and `install` (the document root is root-owned). Two failure modes close
+that way: a half-written DMG being served while the copy is still streaming, and
+a run that dies between the two files leaving a feed that advertises a download
+which 404s. In this order the worst interruption leaves the feed pointing at the
+previous good release.
+
+Then it verifies **what the server serves**, not what is on this disk: it
+re-downloads the DMG and compares sha256, checks the served feed advertises this
+build, and reports `cf-cache-status`, because Cloudflare sits in front and a
+cached feed is the failure that looks exactly like a successful publish — the
+origin is right and every client keeps being told it is current.
+
+The document root is an nginx bind mount, so publishing is copying files in:
+nothing is rebuilt and nothing restarts. `publish.sh` itself is not in this
+repository — it names the host and path this particular site is served from, and
+that is the only part of releasing which is nobody else's business. Set
+`PUBLISH_HOST` and `PUBLISH_DIR` for your own.
+
+**The first Sparkle build cannot arrive through Sparkle.** 0.1.1 and earlier have
+no updater in them, so any copy on those has to be replaced by hand once. The
+same is true of a key rotation, for the same reason.
+
 ## Crash reports
 
 Off. Two gates have to be open before anything leaves the Mac: the user turns
