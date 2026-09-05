@@ -435,12 +435,33 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// The disabled lines at the top of the menu: what the app is doing right
     /// now. Built here rather than inline so an open menu can be corrected
     /// against the same list it was drawn from.
+    /// The lead sentence of an error, for a menu item that has one line.
+    ///
+    /// Split on ". " rather than "." — the message this exists for is
+    /// "No Python 3.11+ found. Install one (brew install python)…", and a split
+    /// on the bare period cuts it at "No Python 3". The full text stays in the
+    /// panel's status bar, which has room for the remedy.
+    private static func firstSentence(of message: String) -> String {
+        let lead = message.range(of: ". ").map { String(message[..<$0.lowerBound]) + "." }
+                   ?? message
+        return lead.count <= 64 ? lead : String(lead.prefix(63)) + "…"
+    }
+
     private func statusLines() -> [String] {
         var lines: [String] = []
         let prompts = model.prompts.count
         let models = model.allModels.count
         lines.append("Seedbed — \(prompts) prompt\(prompts == 1 ? "" : "s") · "
                      + "\(models) model\(models == 1 ? "" : "s")")
+        // A library that could not be READ counts as zero of everything, and
+        // "0 prompts · 0 models" is indistinguishable from an empty one. On a
+        // Mac with no Python 3.11+ that is the entire diagnosis the menu offers,
+        // while the CLI on the same machine says exactly what is wrong. Found by
+        // installing the DMG on a second Mac on 2026-09-05, which is what §4 of
+        // the learning log had been asking for.
+        if model.statusIsError, !model.status.isEmpty {
+            lines.append("⚠︎ \(Self.firstSentence(of: model.status))")
+        }
         if let summary = enhancerSummary {
             lines.append("Builds with: \(summary)")
         }
