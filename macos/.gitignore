@@ -1,0 +1,6 @@
+.build/
+build/
+*.xcodeproj
+
+# Release artifacts: DMGs are built here, never committed.
+dist/

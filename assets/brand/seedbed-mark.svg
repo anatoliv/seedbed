@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Seedbed mark</title>
+  <desc id="desc">An asymmetric two-leaf sprout growing from a bed made of three ordered text rows.</desc>
+  <g fill="#C7693D">
+    <path d="M522 486c22-139 121-236 274-254-4 132-84 221-213 240-24 4-43 14-61 35Z"/>
+    <path d="M498 531c-19-89-89-145-186-151 8 88 65 143 151 148 14 1 26 7 36 18Z"/>
+    <path fill="none" stroke="#C7693D" stroke-width="48" stroke-linecap="round"
+          d="M532 442c-9 39-20 74-24 111-3 26-1 50 4 76"/>
+    <path fill-rule="evenodd" d="M244 584h536a44 44 0 0 1 44 44v138a44 44 0 0 1-44 44H244a44 44 0 0 1-44-44V628a44 44 0 0 1 44-44Zm38 44a14 14 0 0 0 0 28h460a14 14 0 0 0 0-28Zm0 55a14 14 0 0 0 0 28h460a14 14 0 0 0 0-28Zm0 55a14 14 0 0 0 0 28h460a14 14 0 0 0 0-28Z" clip-rule="evenodd"/>
+  </g>
+</svg>

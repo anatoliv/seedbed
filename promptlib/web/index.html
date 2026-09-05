@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seedbed — prompt library</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #faf9f7; --card: #fff; --ink: #1a1a19; --dim: #6b6a67;
+    --line: #e4e2dd; --accent: #c7693d; --ok: #4a7c59; --warn: #b8860b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#17171a; --card:#1f1f23; --ink:#eceae6; --dim:#98968f;
+            --line:#32323a; --accent:#e08a5c; --ok:#7fb08d; --warn:#d9a441; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 28px 20px 80px; }
+  h1 { font-size:19px; margin:0; letter-spacing:-0.01em; }
+  header { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+  .brand-mark { width:30px; height:30px; flex:0 0 auto; }
+  .brand-copy { display:flex; align-items:baseline; gap:12px; min-width:0; }
+  .sub { color:var(--dim); font-size:13px; margin:0 0 22px; }
+  .bar { display:flex; gap:8px; align-items:center; margin-bottom:18px; }
+  button { font:inherit; font-size:13px; padding:6px 12px; border:1px solid var(--line);
+           background:var(--card); color:var(--ink); border-radius:6px; cursor:pointer; }
+  button:hover:not(:disabled) { border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .row { display:flex; align-items:center; gap:14px; padding:12px 14px; background:var(--card);
+         border:1px solid var(--line); border-radius:8px; margin-bottom:8px; }
+  .row .text { flex:1; min-width:0; }
+  .row .title { font-weight:590; }
+  .row .body { color:var(--dim); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  select { font:inherit; font-size:13px; padding:6px 8px; border:1px solid var(--line);
+           border-radius:6px; background:var(--card); color:var(--ink); width:270px; flex:0 0 auto; }
+  .flash { font-size:12px; color:var(--ok); min-width:96px; text-align:right; }
+  .flash.err { color:var(--accent); }
+  .job { font-size:13px; color:var(--dim); margin-bottom:14px; min-height:20px; }
+  .job b { color:var(--ink); font-weight:590; }
+  form { background:var(--card); border:1px solid var(--line); border-radius:8px;
+         padding:14px; margin-top:22px; display:none; }
+  form.open { display:block; }
+  label { display:block; font-size:12px; color:var(--dim); margin:10px 0 4px; }
+  input[type=text], textarea { width:100%; font:inherit; padding:8px 10px; border:1px solid var(--line);
+                               border-radius:6px; background:var(--bg); color:var(--ink); }
+  textarea { min-height:64px; resize:vertical; }
+  .checks { display:flex; flex-wrap:wrap; gap:12px; font-size:13px; margin-top:6px; }
+  .checks label { display:flex; align-items:center; gap:5px; margin:0; color:var(--ink); }
+  .empty { color:var(--dim); padding:30px 0; }
+  .errors { color:var(--accent); font-size:12px; margin-top:6px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img class="brand-mark" src="/seedbed-mark.svg" alt="">
+    <div class="brand-copy">
+      <h1>Seedbed</h1>
+      <span class="sub" style="margin:0">pick a model — the tailored prompt goes to your clipboard</span>
+    </div>
+  </header>
+
+  <div class="bar">
+    <button class="primary" id="add-toggle">New prompt</button>
+    <button id="refresh">Refresh guidance</button>
+  </div>
+
+  <div class="job" id="job"></div>
+  <div id="list"></div>
+
+  <form id="add">
+    <label for="f-title">Title</label>
+    <input type="text" id="f-title" placeholder="Fix this bug and test">
+    <label for="f-body">The prompt, as short as you like</label>
+    <textarea id="f-body" placeholder="fix this bug and test"></textarea>
+    <label>Build for</label>
+    <div class="checks" id="f-targets"></div>
+    <div style="margin-top:14px; display:flex; gap:8px;">
+      <button class="primary" type="submit">Add and build</button>
+      <button type="button" id="cancel">Cancel</button>
+    </div>
+    <div class="errors" id="f-error"></div>
+  </form>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let models = [];
+let polling = null;
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+function stateLabel(t) {
+  if (t.state === "missing") return "not built";
+  if (t.state === "stale") return "stale";
+  return `${t.words} words`;
+}
+
+function render(data) {
+  models = data.models;
+  const list = $("#list");
+  if (!data.seeds.length) {
+    list.innerHTML = '<div class="empty">No prompts yet. Add one above.</div>';
+  } else {
+    list.innerHTML = "";
+    for (const seed of data.seeds) {
+      const row = document.createElement("div");
+      row.className = "row";
+
+      const text = document.createElement("div");
+      text.className = "text";
+      text.innerHTML = `<div class="title"></div><div class="body"></div>`;
+      text.querySelector(".title").textContent = seed.title;
+      text.querySelector(".body").textContent = seed.body;
+
+      const select = document.createElement("select");
+      select.innerHTML = `<option value="">Copy for…</option>`;
+      for (const t of seed.targets) {
+        const opt = document.createElement("option");
+        opt.value = t.model;
+        opt.textContent = `${t.name} — ${stateLabel(t)}`;
+        opt.disabled = t.state === "missing";
+        select.appendChild(opt);
+      }
+
+      const flash = document.createElement("div");
+      flash.className = "flash";
+
+      select.addEventListener("change", async () => {
+        const model = select.value;
+        if (!model) return;
+        try {
+          const r = await api(`/api/render?id=${encodeURIComponent(seed.id)}&model=${encodeURIComponent(model)}`);
+          await copyText(seed.id, model, r.body);
+          flash.className = "flash";
+          flash.textContent = `copied · ${r.body.split(/\s+/).length} words`;
+        } catch (err) {
+          flash.className = "flash err";
+          flash.textContent = err.message.slice(0, 40);
+        }
+        select.value = "";
+        setTimeout(() => { flash.textContent = ""; }, 2600);
+      });
+
+      row.append(text, select, flash);
+      list.appendChild(row);
+    }
+  }
+
+  const job = data.job;
+  const el = $("#job");
+  if (job.running) {
+    el.innerHTML = `<b>Building ${job.done + 1} of ${job.total}</b> — ${job.current} · this takes about a minute per prompt`;
+  } else if (job.errors.length) {
+    el.innerHTML = `<span style="color:var(--accent)">${job.errors.length} failed</span>: ${job.errors[0]}`;
+  } else {
+    el.textContent = "";
+  }
+  $("#refresh").disabled = job.running;
+  polling = job.running ? 2000 : 0;
+}
+
+// navigator.clipboard.writeText can HANG rather than reject — it waits on a
+// permission or focus decision that may never arrive, and an await guarded only
+// by a catch then never returns: no copy, no error, nothing on screen. Measured
+// on this page, so the write is raced against a timeout and any failure,
+// silence included, falls through to the server running pbcopy.
+const CLIPBOARD_TIMEOUT_MS = 1200;
+
+async function copyText(id, model, body) {
+  try {
+    await Promise.race([
+      navigator.clipboard.writeText(body),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("clipboard timed out")), CLIPBOARD_TIMEOUT_MS)),
+    ]);
+    return "browser";
+  } catch {
+    await api("/api/copy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, model }),
+    });
+    return "pbcopy";
+  }
+}
+
+async function load() {
+  try {
+    render(await api("/api/library"));
+  } catch (err) {
+    $("#job").innerHTML = `<span style="color:var(--accent)">${err.message}</span>`;
+  }
+}
+
+$("#add-toggle").addEventListener("click", () => {
+  const form = $("#add");
+  form.classList.toggle("open");
+  if (form.classList.contains("open")) {
+    $("#f-targets").innerHTML = "";
+    for (const m of models) {
+      const label = document.createElement("label");
+      label.innerHTML = `<input type="checkbox" value="${m.id}" checked> ${m.name}`;
+      $("#f-targets").appendChild(label);
+    }
+    $("#f-body").focus();
+  }
+});
+
+$("#cancel").addEventListener("click", () => $("#add").classList.remove("open"));
+
+$("#add").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const targets = [...document.querySelectorAll("#f-targets input:checked")].map((c) => c.value);
+  $("#f-error").textContent = "";
+  try {
+    await api("/api/seeds", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: $("#f-title").value, body: $("#f-body").value, targets }),
+    });
+    $("#f-title").value = ""; $("#f-body").value = "";
+    $("#add").classList.remove("open");
+    await load();
+  } catch (err) {
+    $("#f-error").textContent = err.message;
+  }
+});
+
+$("#refresh").addEventListener("click", async () => {
+  $("#refresh").disabled = true;
+  try { await api("/api/refresh", { method: "POST" }); } catch (err) {
+    $("#job").innerHTML = `<span style="color:var(--accent)">${err.message}</span>`;
+  }
+  await load();
+});
+
+load();
+setInterval(() => { if (polling) load(); }, 2000);
+</script>
+</body>
+</html>

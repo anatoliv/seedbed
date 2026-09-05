@@ -1,0 +1,12 @@
+# Which model builds your prompts, and how it authenticates.
+#
+# API keys are NOT here — they live in the login Keychain under
+#   promptlib-enhancer / promptlib-enhancer-fallback
+# so this file is safe to commit and to sync between machines.
+
+[enhancer]
+auth     = "cli"
+endpoint = ""
+model    = "opus"
+preset   = "claude-cli"
+timeout  = 300

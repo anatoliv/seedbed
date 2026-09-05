@@ -1,0 +1,48 @@
+# Target models: the models prompts are written FOR.
+#
+# This is data, not provider configuration. A target here does not mean the tool
+# calls that vendor — it means renders are shaped by that model's prompting
+# guidance. The model that DOES the rewriting is the enhancer (see PLAN.md).
+#
+# `guides` may be https URLs or paths on this machine. Local files are there
+# because vendor guides are HTML that moves, and because some of the best
+# guidance already sits on disk.
+
+[models."claude-opus-5"]
+name    = "Claude Opus 5"
+family  = "claude"
+guides  = [
+  "https://docs.claude.com/en/docs/build-with-claude/prompt-engineering/overview",
+  "https://docs.claude.com/en/docs/build-with-claude/prompt-engineering/be-clear-and-direct",
+]
+notes   = "Adaptive thinking is on by default. Over-prescriptive prompts written for older models reduce output quality — say what done looks like, not every step."
+
+[models."claude-sonnet-5"]
+name    = "Claude Sonnet 5"
+family  = "claude"
+guides  = [
+  "https://docs.claude.com/en/docs/build-with-claude/prompt-engineering/overview",
+]
+notes   = "Cheaper worker tier. Benefits from more explicit acceptance criteria than Opus."
+
+[models."gpt-5.4-mini"]
+name    = "GPT-5.4 mini (ChatGPT / Codex)"
+family  = "openai"
+guides  = [
+  "https://platform.openai.com/docs/guides/prompt-engineering",
+]
+notes   = "Reached via the ChatGPT OAuth path, not a paid API key."
+
+[models."llama-3.3-70b"]
+name    = "Llama 3.3 70B (local)"
+family  = "llama"
+guides  = []
+notes   = "Local/offline. Open-weight models need the most explicit structure: numbered steps, an output format, and an example."
+
+[models."qwen3-vl-30b"]
+name    = "Qwen3-VL 30B (local)"
+family  = "qwen"
+guides  = [
+  "https://qwen.readthedocs.io/en/latest/getting_started/concepts.html",
+]
+notes   = "Open-weight 30B served by vLLM on a local host. Like other open-weight models it needs explicit structure rather than trusted judgement: numbered steps, a stated output format, and a worked example where the format is unusual. It is a vision-language model being used for text, so keep instructions literal and avoid asking it to infer intent. No system-prompt persona games; state the task and the done condition."
