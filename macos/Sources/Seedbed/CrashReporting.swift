@@ -29,6 +29,40 @@ enum CrashReporting {
 
     static var isEnabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
 
+    /// How many events one launch may send, ever.
+    ///
+    /// Sentry's own per-project quota allocation is a paid-plan feature, and the
+    /// organization this reports to is on the free plan: a `rateLimit` PUT to
+    /// the project key API returns 200 and is silently discarded. So the only
+    /// place a cap can exist is here, in the client.
+    ///
+    /// It is not a nicety. In the seven days before this was written one Mac app
+    /// in the same organization sent **14,232 error events** — 5,768 accepted
+    /// and 8,464 rejected — which is roughly three times the entire monthly
+    /// allowance the whole estate shares, and every other project's crash
+    /// reporting silently stopped working as a result. Sentry keeps counting and
+    /// discarding, so the symptom is not an error anywhere; it is reports that
+    /// never arrive.
+    ///
+    /// Twenty is chosen to be useless for a crash loop and sufficient for a
+    /// crash: the first fault of a session is what gets diagnosed, and the
+    /// two-thousandth repetition of it says nothing the first did not.
+    static let perLaunchBudget = 20
+
+    private static let budgetLock = NSLock()
+    private static var sentThisLaunch = 0
+
+    /// True while there is budget left, counting this event. `beforeSend` is
+    /// called off the main thread and from more than one of them, so the
+    /// counter is locked rather than hoped about.
+    private static func withinBudget() -> Bool {
+        budgetLock.lock()
+        defer { budgetLock.unlock() }
+        guard sentThisLaunch < perLaunchBudget else { return false }
+        sentThisLaunch += 1
+        return true
+    }
+
     /// Whether this build could report at all — i.e. whether a DSN is baked in.
     /// The Settings pane says so, because a toggle that does nothing is worse
     /// than an absent one.
@@ -74,6 +108,9 @@ enum CrashReporting {
             #endif
             options.tracesSampleRate = 0.0          // crashes and errors only
             options.beforeSend = { event in
+                // Budget first: an event dropped here costs nothing, and the
+                // scrubbing below is wasted work on something nobody will read.
+                guard withinBudget() else { return nil }
                 event.user = nil
                 event.serverName = nil
                 event.request = nil
