@@ -15,7 +15,13 @@ guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDeskto
 for w in list {
     guard let owner = w[kCGWindowOwnerName as String] as? String, owner == target,
           let b = w[kCGWindowBounds as String] as? [String: CGFloat],
-          let layer = w[kCGWindowLayer as String] as? Int, layer == 0,
+          // Layer 0 is an ordinary window. The ⌥⌘P panel is an NSPanel and
+          // floats above that, so filtering to 0 silently skipped the one
+          // surface people touch most — a sweep of "every screen" that quietly
+          // omits the main one is worse than no sweep. Anything at or below the
+          // floating-window level counts; the menu bar and the Dock live far
+          // higher and are not this app's to photograph.
+          let layer = w[kCGWindowLayer as String] as? Int, layer <= 3,
           let width = b["Width"], let height = b["Height"], width > 200, height > 200
     else { continue }
     // The window NUMBER, not its rect. `screencapture -R` grabs a region of

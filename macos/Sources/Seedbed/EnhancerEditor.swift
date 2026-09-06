@@ -135,7 +135,7 @@ final class EnhancerEditorModel: ObservableObject {
     func codexLogin() {
         guard !busy else { return }
         busy = true
-        status = "Opening your browser — finish signing in there…"
+        status = "Opening your browser. Finish signing in there…"
         statusIsError = false
         Task.detached { [client] in
             do {
@@ -223,7 +223,7 @@ struct EnhancerEditor: View {
             HStack {
                 VStack(alignment: .leading, spacing: Tokens.Space.row) {
                     Text("Build with").font(.system(size: Tokens.ReadingSize.heading, weight: .semibold))
-                    Text("The model that writes your prompts — the only thing here that spends money")
+                    Text("The model that writes your prompts. The only thing here that spends money")
                         .font(.system(size: Tokens.ReadingSize.label)).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -234,7 +234,7 @@ struct EnhancerEditor: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: Tokens.Space.field) {
-                    FormField("Provider preset — fills the rest in") {
+                    FormField("Provider preset, which fills the rest in") {
                         Menu {
                             ForEach(model.data?.presets ?? []) { preset in
                                 Button(preset.name) { model.apply(preset: preset) }
@@ -249,7 +249,7 @@ struct EnhancerEditor: View {
 
                     FormField("Authentication") {
                         Picker("", selection: $model.auth) {
-                            Text("Claude Code CLI — no key").tag("cli")
+                            Text("Claude Code CLI (no key)").tag("cli")
                             Text("Anthropic SDK").tag("sdk")
                             Text("API key / local server").tag("api_key")
                             Text("Azure OpenAI (api-key header)").tag("azure_api_key")
@@ -283,7 +283,7 @@ struct EnhancerEditor: View {
                     }
 
                     if model.needsEndpoint {
-                        FormField("Endpoint — https, or http only to localhost or your LAN") {
+                        FormField("Endpoint: https, or http only to localhost or your LAN") {
                             TextField("https://api.openai.com/v1/chat/completions",
                                       text: $model.endpoint)
                                 .textFieldStyle(.roundedBorder)
@@ -302,15 +302,15 @@ struct EnhancerEditor: View {
 
                     if model.needsKey {
                         FormField(model.data?.hasKey == true
-                              ? "API key — one is stored; type to replace it"
-                              : "API key — stored in the login Keychain, never in a file") {
+                              ? "API key: one is stored, type to replace it"
+                              : "API key, stored in the login Keychain and never in a file") {
                             SecureField(model.data?.hasKey == true ? "••••••••" : "sk-…",
                                         text: $model.key)
                                 .textFieldStyle(.roundedBorder).frame(maxWidth: 360)
                         }
                     }
 
-                    DisclosureGroup("Fallback — tried once if the primary fails retryably") {
+                    DisclosureGroup("Fallback, tried once if the primary fails retryably") {
                         VStack(alignment: .leading, spacing: Tokens.Space.group) {
                             TextField("Fallback endpoint", text: $model.fallbackEndpoint)
                                 .textFieldStyle(.roundedBorder)
@@ -330,7 +330,7 @@ struct EnhancerEditor: View {
                     }
                     .font(.system(size: Tokens.ReadingSize.meta))
 
-                    FormField("Timeout (seconds) — a build is one long request") {
+                    FormField("Timeout in seconds. A build is one long request") {
                         TextField("300", value: $model.timeout, format: .number)
                             .textFieldStyle(.roundedBorder).frame(maxWidth: 90)
                     }

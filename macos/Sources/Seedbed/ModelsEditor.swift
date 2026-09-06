@@ -192,7 +192,7 @@ struct ModelsEditor: View {
     private var form: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Tokens.Space.field) {
-                FormField("Model id — used in file paths and on the chips") {
+                FormField("Model id, used in file paths and on the chips") {
                     TextField("claude-opus-5", text: $model.draftID)
                         .textFieldStyle(.roundedBorder)
                         .disabled(!model.isNew)
@@ -202,11 +202,11 @@ struct ModelsEditor: View {
                     TextField("Claude Opus 5", text: $model.draftName)
                         .textFieldStyle(.roundedBorder)
                 }
-                FormField("Family — free text, groups related models") {
+                FormField("Family: free text that groups related models") {
                     TextField("claude", text: $model.draftFamily)
                         .textFieldStyle(.roundedBorder).frame(maxWidth: Tokens.Width.list)
                 }
-                FormField("Prompting guidance — one URL or file path per line") {
+                FormField("Prompting guidance: one URL or file path per line") {
                     TextEditor(text: $model.draftGuides)
                         .font(.system(size: Tokens.ReadingSize.meta, design: .monospaced))
                         .frame(height: 70)
@@ -214,7 +214,7 @@ struct ModelsEditor: View {
                         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card)
                             .stroke(Color.secondary.opacity(0.3), lineWidth: 1))
                 }
-                FormField("Notes — always part of this model's guidance") {
+                FormField("Notes, always part of this model's guidance") {
                     TextEditor(text: $model.draftNotes)
                         .font(.system(size: Tokens.ReadingSize.meta))
                         .frame(height: 60)

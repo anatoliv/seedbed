@@ -36,12 +36,12 @@ def _fail(message: str) -> int:
 def cmd_list(args, lib: Library, models: dict, cache: GuideCache) -> int:
     seeds = lib.seeds()
     if not seeds:
-        print(f"no seeds yet — add one with: python3 -m promptlib new <id>")
+        print(f"no seeds yet. Add one with: python3 -m promptlib new <id>")
         return 0
     hashes = {}
     for seed in seeds:
         context = "" if seed.context == DEFAULT_CONTEXT else f"  [{seed.context}]"
-        print(f"{seed.id}  —  {seed.title or seed.body[:48]}{context}")
+        print(f"{seed.id}  ·  {seed.title or seed.body[:48]}{context}")
         for model in builder.targets_for(seed, models):
             if model not in hashes:
                 hashes[model] = cache.guidance_for(models[model])[1]
@@ -53,10 +53,10 @@ def cmd_list(args, lib: Library, models: dict, cache: GuideCache) -> int:
             elif render.context != seed.context:
                 # Name the specific cause. "Stale" alone sends you looking at the
                 # seed text when nothing about the text changed.
-                state = (f"STALE — built for {render.context}, "
+                state = (f"STALE: built for {render.context}, "
                          f"prompt now says {seed.context}")
             else:
-                state = "STALE — seed or guidance changed"
+                state = "STALE: seed or guidance changed"
             print(f"    {model:<22} {state}")
     return 0
 
@@ -73,7 +73,7 @@ def cmd_show(args, lib: Library, models: dict, cache: GuideCache) -> int:
     if args.model:
         render = lib.render(args.id, args.model)
         if render is None:
-            return _fail(f"{args.id} has no render for {args.model} — build it first")
+            return _fail(f"{args.id} has no render for {args.model}. Build it first")
         print(render.body)
         # --record folds the usage bump into the same process as the read, so a
         # copy is one spawn rather than two.
@@ -110,7 +110,7 @@ def cmd_copy(args, lib: Library, models: dict, cache: GuideCache) -> int:
 
 def cmd_build(args, lib: Library, models: dict, cache: GuideCache) -> int:
     if args.model and args.model not in models:
-        return _fail(f"unknown model {args.model!r} — see models.toml")
+        return _fail(f"unknown model {args.model!r}. See models.toml")
     problems: list[str] = []
     pairs = builder.pending(
         lib, models, cache,
@@ -158,7 +158,7 @@ def cmd_fill(args, lib: Library, models: dict, cache: GuideCache) -> int:
     """
     render = lib.render(args.id, args.model)
     if render is None:
-        return _fail(f"{args.id} has no render for {args.model} — build it first")
+        return _fail(f"{args.id} has no render for {args.model}. Build it first")
 
     values: dict[str, str] = {}
     for pair in args.set or []:
@@ -234,7 +234,7 @@ def cmd_save(args, lib: Library, models: dict, cache: GuideCache) -> int:
     # leaving the caller to discover it from a "stale" badge later.
     changed = existing is None or existing.body != seed.body
     print(f"{seed.id}: {'created' if existing is None else 'updated'}"
-          f"{' — renders are now stale' if changed and existing else ''}")
+          f"{'. Renders are now stale' if changed and existing else ''}")
     return 0
 
 
@@ -261,7 +261,7 @@ def cmd_match(args, lib: Library, models: dict, cache: GuideCache) -> int:
     render_state = ""
     if args.model and result.best:
         if args.model not in models:
-            return _fail(f"unknown model {args.model!r} — see models.toml")
+            return _fail(f"unknown model {args.model!r}. See models.toml")
         render = lib.render(result.best.seed.id, args.model)
         if render is None:
             render_state = "not built"
@@ -365,7 +365,7 @@ def cmd_enhancer(args, lib: Library, models: dict, cache: GuideCache) -> int:
         if args.preset:
             chosen = find_preset(args.preset)
             if chosen is None:
-                return _fail(f"unknown preset {args.preset!r} — see `enhancer presets`")
+                return _fail(f"unknown preset {args.preset!r}. See `enhancer presets`")
             config.preset = chosen.id
             config.auth = chosen.auth
             config.endpoint = chosen.endpoint
@@ -407,7 +407,7 @@ def cmd_enhancer(args, lib: Library, models: dict, cache: GuideCache) -> int:
                           config=config)
         except EnhancerError as exc:
             return _fail(str(exc))
-        print(f"ok — {config.describe()}")
+        print(f"ok: {config.describe()}")
         print(f"  replied: {out.splitlines()[0][:80] if out else '(empty)'}")
         return 0
 
@@ -433,7 +433,7 @@ def _codex_action(args) -> int:
     if args.action == "whoami":
         state = codex_oauth.status()
         if not state["signed_in"]:
-            print("not signed in — run: python3 -m promptlib enhancer login")
+            print("not signed in. Run: python3 -m promptlib enhancer login")
             return 1
         who = state["email"] or "(no email in the token)"
         plan = f", {state['plan']} plan" if state["plan"] else ""
@@ -444,7 +444,7 @@ def _codex_action(args) -> int:
     if not codex_oauth.port_is_free():
         return _fail(
             f"port {codex_oauth.CALLBACK_PORT} is in use. The authorization "
-            "server allow-lists that exact port, so it cannot be changed — "
+            "server allow-lists that exact port, so it cannot be changed. "
             "close whatever is holding it and try again.")
 
     print("Opening your browser to sign in to ChatGPT.")
@@ -477,9 +477,9 @@ def cmd_model(args, lib: Library, models: dict, cache: GuideCache) -> int:
         return 0
 
     if args.action == "add" and args.id in models:
-        return _fail(f"{args.id} already exists — use `model set`")
+        return _fail(f"{args.id} already exists. Use `model set`")
     if args.action == "set" and args.id not in models:
-        return _fail(f"no model named {args.id!r} — use `model add`")
+        return _fail(f"no model named {args.id!r}. Use `model add`")
 
     existing = models.get(args.id)
     models[args.id] = Model(
@@ -596,7 +596,7 @@ def cmd_rename(args, lib: Library, models: dict, cache: GuideCache) -> int:
         return _fail(f"no prompt named {old!r}")
     target = lib.prompts / f"{new}.md"
     if target.exists():
-        return _fail(f"{new!r} already exists — pick another id or remove that one")
+        return _fail(f"{new!r} already exists. Pick another id, or remove that one")
 
     # Every move is computed before any is made. A rename that half-happens
     # leaves renders orphaned under a name nothing points at, and the library
@@ -658,7 +658,7 @@ def cmd_new(args, lib: Library, models: dict, cache: GuideCache) -> int:
         body=args.body or "describe the task in one line",
         context=args.context,
     ).write(path)
-    print(f"created {path.relative_to(ROOT)} — edit it, then build")
+    print(f"created {path.relative_to(ROOT)}. Edit it, then build")
     return 0
 
 
@@ -810,7 +810,7 @@ def main(argv: list[str] | None = None) -> int:
     except FileNotFoundError:
         return _fail(f"no models.toml in {root}")
     if args.command in {"copy", "show"} and getattr(args, "model", None) and args.model not in models:
-        return _fail(f"unknown model {args.model!r} — see models.toml")
+        return _fail(f"unknown model {args.model!r}. See models.toml")
     try:
         return args.func(args, Library(root), models, GuideCache(root))
     except (FormatError, FileNotFoundError) as exc:

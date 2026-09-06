@@ -45,6 +45,19 @@ if [[ ${#WINDOWS[@]} -eq 0 ]]; then
     exit 1
 fi
 
+# The MCP settings pane renders both bearer tokens in cleartext, deliberately —
+# you have to be able to read one to paste it into a client. That makes a
+# screenshot of it a screenshot of a credential, and screenshots get pasted into
+# issues, chats and transcripts. Found by capturing every screen and looking at
+# the result: the pane came back with two live tokens in it.
+#
+# Not a refusal, because photographing that pane on purpose is legitimate. A
+# warning, so nobody does it by accident while sweeping every window.
+if [[ "${SEEDBED_SHOT_QUIET:-}" != "1" ]]; then
+    echo "note: if one of these is Settings → MCP, it will contain live access" >&2
+    echo "      tokens in cleartext. Delete the file, or regenerate the tokens." >&2
+fi
+
 mkdir -p "$OUT"
 n=0
 for entry in "${WINDOWS[@]}"; do

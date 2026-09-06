@@ -175,7 +175,7 @@ final class HUDModel: ObservableObject {
         pendingPaste = paste
         busy = true
         let needsBuild = !target.isUsable
-        show(needsBuild ? "Building \(target.name) — about a minute…" : "Copying…")
+        show(needsBuild ? "Building \(target.name), about a minute…" : "Copying…")
 
         Task.detached { [client] in
             do {
@@ -707,7 +707,7 @@ struct PromptRow: View {
         .padding(.horizontal, 6).padding(.vertical, 3)
         .background(Capsule().fill(Color.secondary.opacity(target.isUsable ? 0.14 : 0.06)))
         .opacity(target.isUsable ? 1 : 0.7)
-        .help("\(target.name) — \(target.label). ⌘\(shortcut) copies, ⌥⌘\(shortcut) rebuilds.")
+        .help("\(target.name): \(target.label). ⌘\(shortcut) copies, ⌥⌘\(shortcut) rebuilds.")
         .onTapGesture { model.copy(prompt, target: target) }
     }
 }

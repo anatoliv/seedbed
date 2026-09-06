@@ -60,7 +60,7 @@ struct PromptRowActions: View {
             }
             if let onRebuild {
                 button("arrow.clockwise",
-                       "Rebuild this prompt for every model — minutes of LLM calls (⌘R)",
+                       "Rebuild this prompt for every model. Minutes of LLM calls (⌘R)",
                        action: onRebuild)
             }
             if let onEdit {
@@ -70,8 +70,8 @@ struct PromptRowActions: View {
                 // The pin glyph reads high in its box, as it does in Reference;
                 // the half-point nudge puts it on the other icons' centre line.
                 button(pinned ? "pin.slash" : "pin",
-                       pinned ? "Unpin — stop sorting it first (⌘D)"
-                              : "Pin — sorts first whatever the sort order (⌘D)",
+                       pinned ? "Unpin: stop sorting it first (⌘D)"
+                              : "Pin: sorts first whatever the sort order (⌘D)",
                        size: Tokens.CompactSize.meta, offset: 0.5, action: onPin)
             }
             if let onDelete {

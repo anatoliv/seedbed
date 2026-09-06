@@ -200,7 +200,7 @@ def run_prompt(system: str, message: str, backend: str | None = None, config=Non
         raise EnhancerError(f"unknown enhancer {auth!r}")
 
     if config is None:
-        raise EnhancerError("this enhancer needs configuration — run: promptlib enhancer set")
+        raise EnhancerError("this enhancer needs configuration. Run: promptlib enhancer set")
 
     try:
         return _via_http(message, config.endpoint, config.model, config.api_key,

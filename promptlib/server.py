@@ -126,7 +126,7 @@ class Handler(BaseHTTPRequestHandler):
         render = self.state.lib.render(seed_id, model)
         if render is None:
             return self._error(
-                404, f"no render yet for {seed_id} / {model} — it may still be building"
+                404, f"no render yet for {seed_id} / {model}. It may still be building"
             )
         self._json({"id": seed_id, "model": model, "body": render.body})
 

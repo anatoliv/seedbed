@@ -109,7 +109,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hotKey = GlobalHotKey { [weak self] in self?.toggle() }
         if hotKey == nil {
             // Another app owns ⌥⌘P. Say so rather than looking broken.
-            statusItem.button?.toolTip = "Seedbed — ⌥⌘P is taken by another app; use the menu"
+            statusItem.button?.toolTip = "Seedbed: ⌥⌘P is taken by another app, use the menu"
         }
         // Off the main thread, before the first library call needs it: the
         // probe is up to seven process spawns and the first caller pays for
@@ -221,6 +221,16 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             infoModel.query = ProcessInfo.processInfo.environment["SEEDBED_MANUAL_QUERY"] ?? "token"
             openHelp()
             infoModel.open(.faq)
+        // A guide page, which the cases above cannot reach: they name the five
+        // built-in pages and the guide is thirty five more. Without this the
+        // only way to look at the new content is to click, and the whole point
+        // of these hooks is that clicking is not a thing this project verifies
+        // with.
+        case "guide":
+            let id = ProcessInfo.processInfo.environment["SEEDBED_GUIDE_ID"]
+                ?? Guide.pages.first?.id ?? ""
+            infoModel.open(guide: id)
+            openInfo(.help)
         case "gettingstarted": openInfo(.gettingStarted)
         case "about":        openInfo(.about)
         // Opens Settings → Building, then swaps the library out from under it
@@ -337,6 +347,22 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard self.panel.attachedSheet == nil,
                       self.model.filling == nil,
                       self.model.pendingDelete == nil else { return }
+                // The panel closes when it stops being key, which is the whole
+                // point of it: you summon it, take a prompt, it is gone. It also
+                // means the panel cannot be photographed, because anything that
+                // captures it takes focus first. Every other surface here has a
+                // launch hook letting it be looked at without driving the
+                // keyboard; this is that hook, for the one surface people touch
+                // most and the only one never checked visually because of it.
+                //
+                // It keeps the panel KEY, so every keystroke goes into its
+                // search field. The first capture came back with "ex" already
+                // typed, from a terminal in another window. Use it to take a
+                // picture and quit, never while working, and never near the
+                // keyboard: this project stopped driving synthetic keystrokes
+                // after they reached a different session's prompt.
+                guard ProcessInfo.processInfo.environment["SEEDBED_PANEL_STAYS"] != "1"
+                else { return }
                 self.hide()
             }
         }
@@ -396,7 +422,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.show()
                 Paster.requestPermission()
             case .noTarget:
-                self.model.show("Copied — no app to paste into.", isError: true)
+                self.model.show("Copied. No app to paste into.", isError: true)
             }
         }
     }
@@ -457,7 +483,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         var lines: [String] = []
         let prompts = model.prompts.count
         let models = model.allModels.count
-        lines.append("Seedbed — \(prompts) prompt\(prompts == 1 ? "" : "s") · "
+        lines.append("Seedbed · \(prompts) prompt\(prompts == 1 ? "" : "s") · "
                      + "\(models) model\(models == 1 ? "" : "s")")
         // A library that could not be READ counts as zero of everything, and
         // "0 prompts · 0 models" is indistinguishable from an empty one. On a

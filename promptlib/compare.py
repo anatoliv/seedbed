@@ -83,7 +83,7 @@ def build(lib: Library, seed_id: str, models: dict, config=None, force: bool = F
     """Return (summary, regenerated). Cached unless the renders moved."""
     sources = _sources(lib, seed_id, models)
     if len(sources) < 2:
-        return ("Only one model has been built for this prompt — "
+        return ("Only one model has been built for this prompt. "
                 "build another to compare them.", False)
 
     mark = fingerprint(sources)

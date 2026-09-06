@@ -32,7 +32,7 @@ enum MCPToolCatalog {
             "name": "find_prompt",
             "description": """
             Find the prompt that serves a described task, when you do not know \
-            what it is called. Give the ask in your own words — "reviewing a \
+            what it is called. Give the ask in your own words, such as "reviewing a \
             diff before I merge", "the one for explaining code". Matches on \
             meaning, not just wording, and returns the best candidate first \
             with the evidence for it plus the alternatives. Pass `model` to get \
@@ -49,7 +49,7 @@ enum MCPToolCatalog {
                     ],
                     "model": [
                         "type": "string",
-                        "description": "Optional model id — returns that model's render "
+                        "description": "Optional model id. Returns that model's render "
                             + "of the winning prompt alongside the match. See list_models.",
                     ],
                     "limit": [
@@ -140,7 +140,7 @@ enum MCPToolCatalog {
         data.seeds.map { seed in
             [
                 "name": seed.id,
-                "description": seed.title.isEmpty ? seed.body : "\(seed.title) — \(seed.body)",
+                "description": seed.title.isEmpty ? seed.body : "\(seed.title): \(seed.body)",
                 "arguments": [[
                     "name": "model",
                     "description": "Which model's tailored version to return. "
@@ -175,7 +175,7 @@ enum MCPToolCatalog {
         }
         let body = try await detached(client) { try $0.render(id: name, model: model, record: true) }
         return RenderedPrompt(
-            description: "\(seed.title.isEmpty ? seed.id : seed.title) — tailored for \(model)",
+            description: "\(seed.title.isEmpty ? seed.id : seed.title), tailored for \(model)",
             text: body)
     }
 
@@ -244,7 +244,7 @@ enum MCPToolCatalog {
         }
         guard target.isUsable else {
             return .failed("\(id) has no render for \(model) yet. Call build_prompt to "
-                + "generate it — that spends an LLM call and takes about a minute.")
+                + "generate it, which spends an LLM call and takes about a minute.")
         }
         let body = try await detached(client) { try $0.render(id: id, model: model, record: true) }
         return .ok(encode([

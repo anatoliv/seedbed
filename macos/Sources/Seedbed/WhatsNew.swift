@@ -55,6 +55,21 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.4",
+            date: "6 September 2026",
+            highlight: "The wording is cleaner in a few dozen places.",
+            changes: [
+                WhatsNewChange(kind: .improved,
+                               text: "Labels, buttons, status lines and error messages across "
+                                   + "the app were punctuated with dashes where a colon, a "
+                                   + "period or a pair of brackets reads better. Forty six of "
+                                   + "them, found by looking at every screen rather than by "
+                                   + "reading the code."),
+                WhatsNewChange(kind: .fixed,
+                               text: "The Building pane in Settings was the worst of it, with "
+                                   + "six on a single screen."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.3",
             date: "5 September 2026",
             highlight: "A real manual, and windows you can resize and read.",
@@ -110,7 +125,7 @@ struct WhatsNewRelease: Identifiable {
             changes: [
                 WhatsNewChange(kind: .added,
                                text: "A signed, notarized disk image. Copy it to another Mac, "
-                                   + "drag Seedbed to Applications, and it launches — no Swift "
+                                   + "drag Seedbed to Applications, and it launches. No Swift "
                                    + "toolchain, no rebuild. It still needs a checkout of the "
                                    + "library and Python 3.11 or newer, and the image says so."),
                 WhatsNewChange(kind: .added,
@@ -121,7 +136,7 @@ struct WhatsNewRelease: Identifiable {
                 WhatsNewChange(kind: .fixed,
                                text: "The menu used to say \"0 prompts · 0 models\" when it "
                                    + "could not read the library at all, which looks exactly "
-                                   + "like an empty one. It now says why — most usefully, that "
+                                   + "like an empty one. It now says why, and most usefully that "
                                    + "no Python 3.11 or newer was found."),
                 WhatsNewChange(kind: .fixed,
                                text: "Running the library from the command line on an older "

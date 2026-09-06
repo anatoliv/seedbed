@@ -30,7 +30,7 @@ def _split(text: str, source: str) -> tuple[dict, str]:
     try:
         meta = tomllib.loads("\n".join(lines[1:close]))
     except tomllib.TOMLDecodeError as exc:
-        raise FormatError(f"{source}: frontmatter is not valid TOML — {exc}") from None
+        raise FormatError(f"{source}: frontmatter is not valid TOML. {exc}") from None
     return meta, "\n".join(lines[close + 1 :]).strip()
 
 
@@ -68,7 +68,7 @@ def normalise_context(value) -> str:
     text = str(value).strip().lower()
     if text not in CONTEXTS:
         known = ", ".join(sorted(CONTEXTS))
-        raise FormatError(f"unknown context {value!r} — expected one of: {known}")
+        raise FormatError(f"unknown context {value!r}. Expected one of: {known}")
     return text
 
 

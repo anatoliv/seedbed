@@ -164,7 +164,7 @@ final class LibraryModel: ObservableObject {
                                     category: "", targets: [], context: "agent")
                 await MainActor.run {
                     self.busy = false
-                    self.report("Created — edit it, then Save")
+                    self.report("Created. Edit it, then Save")
                     self.search = ""
                     self.categoryFilter = nil
                     self.reload()
@@ -226,7 +226,7 @@ final class LibraryModel: ObservableObject {
     /// per-column Copy is the deliberate choice of a model; this is the quick one.
     func copyDefault(_ prompt: Prompt) {
         guard let target = prompt.defaultTarget, target.isUsable else {
-            report("Nothing built for \(prompt.title) yet — rebuild it first", isError: true)
+            report("Nothing built for \(prompt.title) yet. Rebuild it first", isError: true)
             return
         }
         Task.detached { [client] in
@@ -235,7 +235,7 @@ final class LibraryModel: ObservableObject {
                 await MainActor.run {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(body, forType: .string)
-                    self.report("Copied \(target.shortName) — placeholders left unfilled")
+                    self.report("Copied \(target.shortName) with placeholders left unfilled")
                     self.reload()
                 }
             } catch {
@@ -266,7 +266,7 @@ final class LibraryModel: ObservableObject {
         guard !busy else { return }
         guard prompt.id != selection else { return rebuild(model: nil) }
         busy = true
-        report("Rebuilding \(prompt.title) — \(prompt.targets.count) models…")
+        report("Rebuilding \(prompt.title), \(prompt.targets.count) models…")
         Task.detached { [client] in
             do {
                 try client.rebuild(id: prompt.id, model: nil)
@@ -403,7 +403,7 @@ final class LibraryModel: ObservableObject {
                 await MainActor.run {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(body, forType: .string)
-                    self.report("Copied \(target.shortName) — placeholders left unfilled")
+                    self.report("Copied \(target.shortName) with placeholders left unfilled")
                     self.reload()
                 }
             } catch {
@@ -597,7 +597,7 @@ struct LibraryView: View {
                       ?? "Rebuild all models", systemImage: "arrow.clockwise")
             }
             .disabled(model.busy || model.selection == nil)
-            .help("Every model this prompt is built for — minutes of LLM calls")
+            .help("Every model this prompt is built for. Minutes of LLM calls")
 
             if tab == .edit {
                 Button("Save") { model.save() }
@@ -638,7 +638,7 @@ struct EditPane: View {
                         .textFieldStyle(.roundedBorder)
                 }
 
-                FormField("The prompt — keep it short, the enhancer expands it") {
+                FormField("The prompt: keep it short, the enhancer expands it") {
                     TextEditor(text: $model.draftBody)
                     .font(.system(size: Tokens.ReadingSize.body, design: .monospaced))
                     .frame(minHeight: 90)
@@ -647,7 +647,7 @@ struct EditPane: View {
                         .stroke(Color.secondary.opacity(0.3), lineWidth: 1))
                 }
 
-                FormField("Category — groups the list and narrows search") {
+                FormField("Category: groups the list and narrows search") {
                     HStack(spacing: Tokens.Space.control) {
                         TextField("e.g. Coding", text: $model.draftCategory)
                             .textFieldStyle(.roundedBorder)
@@ -671,7 +671,7 @@ struct EditPane: View {
                     }
                 }
 
-                FormField("Where you paste it — this changes what gets built") {
+                FormField("Where you paste it, which changes what gets built") {
                     VStack(alignment: .leading, spacing: Tokens.Space.row) {
                         Picker("", selection: $model.draftContext) {
                             ForEach(model.contexts) { context in
@@ -685,7 +685,7 @@ struct EditPane: View {
                             Caption(chosen.description)
                         }
                         if let prompt = model.current, prompt.context != model.draftContext {
-                            Label("Changing this makes every render of it stale — "
+                            Label("Changing this makes every render of it stale. "
                                   + "rebuild after saving.",
                                   systemImage: "exclamationmark.triangle")
                                 .font(.system(size: Tokens.ReadingSize.meta))
@@ -710,7 +710,7 @@ struct EditPane: View {
                 }
 
                 if let prompt = model.current, prompt.body != model.draftBody {
-                    Label("Changing the text makes every render of it stale — rebuild after saving.",
+                    Label("Changing the text makes every render of it stale. Rebuild after saving.",
                           systemImage: "exclamationmark.triangle")
                         .font(.system(size: Tokens.ReadingSize.meta)).foregroundStyle(.orange)
                 }
@@ -741,7 +741,7 @@ struct ComparePane: View {
 
     var body: some View {
         if columns.isEmpty {
-            Text("Every model for this prompt is hidden — see the Models menu.")
+            Text("Every model for this prompt is hidden. See the Models menu.")
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -778,7 +778,7 @@ struct ComparePane: View {
                     }
                     .controlSize(.small)
                     .disabled(model.comparisonBusy)
-                    .help("Asks the enhancer to describe the differences — one LLM call")
+                    .help("Asks the enhancer to describe the differences. One LLM call")
                 }
                 if let text = model.comparison?.summary, !text.isEmpty {
                     ScrollView {
@@ -789,7 +789,7 @@ struct ComparePane: View {
                     }
                     .frame(maxHeight: 150)
                 } else if !model.comparisonBusy {
-                    Text("Not written yet — press Summarise.")
+                    Text("Not written yet. Press Summarise.")
                         .font(.system(size: Tokens.ReadingSize.meta)).foregroundStyle(.secondary)
                 }
             }

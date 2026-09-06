@@ -158,7 +158,7 @@ enum CrashReporting {
     /// Driven by `SEEDBED_TEST_SENTRY=1`, the same way the menu dump is.
     static func captureTestEvent() {
         guard isConfigured else {
-            print("SEEDBED_TEST_SENTRY: no DSN baked into this build — nothing sent.")
+            print("SEEDBED_TEST_SENTRY: no DSN baked into this build, nothing sent.")
             return
         }
         // Show the scrubber doing its job on the two things that must never

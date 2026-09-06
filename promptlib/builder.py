@@ -166,7 +166,7 @@ class Builder:
                     self._job.errors.append(f"{pair.key}: {exc}")
             except OSError as exc:
                 with self._lock:
-                    self._job.errors.append(f"{pair.key}: could not write render — {exc}")
+                    self._job.errors.append(f"{pair.key}: could not write render. {exc}")
             finally:
                 with self._lock:
                     self._job.done += 1

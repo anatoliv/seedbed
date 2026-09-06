@@ -39,7 +39,7 @@ class Preset:
 PRESETS: list[Preset] = [
     Preset("claude-cli", "Claude Code CLI (no key, uses your subscription)", "", "opus", "cli"),
     Preset("anthropic-sdk", "Anthropic SDK (ANTHROPIC_API_KEY or ant login)", "", "claude-opus-5", "sdk"),
-    Preset("openai-chatgpt", "ChatGPT Plus/Pro (sign in — no API key)",
+    Preset("openai-chatgpt", "ChatGPT Plus/Pro (sign in, no API key)",
            "https://chatgpt.com/backend-api/codex/responses", "gpt-5.4-mini", "chatgpt_oauth"),
     Preset("openai", "OpenAI (paid)",
            "https://api.openai.com/v1/chat/completions", "gpt-4o-mini"),
@@ -163,7 +163,7 @@ class EnhancerConfig:
         lines = [
             "# Which model builds your prompts, and how it authenticates.",
             "#",
-            "# API keys are NOT here — they live in the login Keychain under",
+            "# API keys are NOT here. They live in the login Keychain under",
             f"#   {KEYCHAIN_SERVICE} / {FALLBACK_KEYCHAIN_SERVICE}",
             "# so this file is safe to commit and to sync between machines.",
             "",
@@ -193,7 +193,7 @@ class EnhancerConfig:
                 issues.append("no endpoint set")
             elif not endpoint_is_acceptable(self.endpoint):
                 issues.append(
-                    f"{self.endpoint} is not an acceptable endpoint — https, or http "
+                    f"{self.endpoint} is not an acceptable endpoint: https, or http "
                     "only to localhost or a private address")
             if not self.model:
                 issues.append("no model set")
@@ -202,7 +202,7 @@ class EnhancerConfig:
         if self.auth == "azure_api_key" and not self.api_key:
             issues.append("Azure needs an api-key in the Keychain")
         if self.auth == "chatgpt_oauth" and not self._codex_signed_in():
-            issues.append("not signed in to ChatGPT — run: "
+            issues.append("not signed in to ChatGPT. Run: "
                           "python3 -m promptlib enhancer login")
         if self.has_fallback and not endpoint_is_acceptable(self.fallback_endpoint):
             issues.append(f"fallback endpoint {self.fallback_endpoint} is not acceptable")
@@ -229,7 +229,7 @@ class EnhancerConfig:
 
     def describe(self) -> str:
         if self.auth == "cli":
-            return f"Claude Code CLI (model {self.model or 'opus'}) — no key needed"
+            return f"Claude Code CLI (model {self.model or 'opus'}) needs no key"
         if self.auth == "sdk":
             return f"Anthropic SDK ({self.model})"
         where = self.endpoint or "no endpoint"
