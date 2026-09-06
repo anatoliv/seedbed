@@ -14,6 +14,32 @@ tailored expansion. Copying is then a file read.
 
     seed  +  that model's prompting guidance  +  an enhancer  =  a prompt to paste
 
+## Install
+
+Download the signed DMG from [seedbed.dev](https://seedbed.dev), or use Homebrew:
+
+```sh
+brew tap anatoliv/seedbed https://github.com/anatoliv/seedbed
+brew trust anatoliv/seedbed        # Homebrew 6+ requires this for third-party taps
+brew install --cask seedbed
+```
+
+The `brew trust` step is not optional on Homebrew 6 and later: without it the
+install stops with *"Refusing to load cask … from untrusted tap"*. If Seedbed is
+already in `/Applications` from a DMG, add `--force` to let the cask take it
+over, since otherwise Homebrew refuses rather than overwrite an app it did not
+install.
+
+**Installing the app is half the job.** Seedbed is a front end and does not carry
+the prompts: it also needs a checkout of this repository and Python 3.11 or
+newer. The cask says so in its caveats and the DMG says so in *Before you start.txt*
+— both generated from the same file — and a copy with neither reports an empty
+library rather than pretending it has one.
+
+macOS 14 (Sonoma) or later, Apple Silicon or Intel. The cask is marked
+`auto_updates`, so Seedbed keeps itself current through Sparkle rather than
+through `brew upgrade`.
+
 ## Use
 
     macos/Scripts/make-app.sh                            the Seedbed menu-bar app (⌥⌘P)
@@ -61,15 +87,16 @@ client you have not decided to trust cannot spend an LLM call.
 copy. It shells out to this package rather than parsing the files itself, so
 staleness, guidance and the enhancer have one implementation. See `macos/README.md`.
 
-## On a second Mac
+## Building a release
 
     macos/Scripts/release.sh
 
 builds a Developer ID signed, notarized, stapled `Seedbed_<version>_universal.dmg`
-in `macos/dist/`. Copy it across, drag the app to Applications, and that Mac
-needs no Swift toolchain — which was previously the only way to get the app onto
-one. It still needs what the app is a front end *to*: a clone of this repository
-and Python 3.11+. The DMG carries those two instructions inside it.
+in `macos/dist/`, generates the Sparkle appcast, and points `Casks/seedbed.rb` at
+what it just built. A Mac installing that DMG needs no Swift toolchain — which
+was previously the only way to get the app onto one. It still needs what the app
+is a front end *to*: a clone of this repository and Python 3.11+. The DMG carries
+those two instructions inside it, in the same words the cask uses.
 
 The app's own **Check for Updates** is `git fetch` against the library checkout,
 so a copy installed from a DMG is told that pulling updates the prompts and that

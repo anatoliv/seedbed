@@ -124,8 +124,14 @@ enum Tokens {
     /// second half of that sentence never arrived here. Put the two Help windows
     /// side by side and the difference is not subtle: 11pt body against 13.
     ///
-    /// Same values as Reference's reading scale, and the same reason for CGFloat
-    /// rather than `Font` — call sites keep their own `weight:` and `design:`.
+    /// Same values as Reference's reading scale. **The `Font` wrappers below
+    /// are the part that was missing**, and this comment used to claim their
+    /// absence was Reference's choice too: "the same reason for CGFloat rather
+    /// than `Font` — call sites keep their own `weight:` and `design:`". That
+    /// reason is real but it belongs to `CompactSize`, where Reference says it
+    /// in so many words. Reference declares its READING ramp as `Font`, weight
+    /// and design included. Sizes matching while the type did not is why every
+    /// audit of this file passed and the two windows still did not match.
     enum ReadingSize {
         static let display: CGFloat = 21  // the app's own name, in SF Rounded
         static let title: CGFloat = 20    // the page's own title, in its header
@@ -134,6 +140,35 @@ enum Tokens {
         static let meta: CGFloat = 12     // captions, secondary lines
         static let label: CGFloat = 11    // eyebrows, key caps, code
         static let badge: CGFloat = 9     // the uppercase capsule under a title
+    }
+
+    /// The reading ramp as `Font` values — Reference's `Tokens.FontScale`,
+    /// name for name, weight for weight.
+    ///
+    /// Sizes come from `ReadingSize` above so there is exactly one place a
+    /// number lives. What this adds is the half a bare `CGFloat` cannot carry:
+    /// **the weight and the design are part of the role**, not a decision each
+    /// call site makes again. Two roles had no Seedbed equivalent at all and so
+    /// were being improvised per call site, which is precisely where the drift
+    /// got in:
+    ///
+    /// - `bodyStrong` — 13 medium. Without it, "body but emphasised" was written
+    ///   as `.semibold` in some places and `.medium` in others.
+    /// - `micro` — 9 **bold**. `CompactSize.badge` is 9 too, so a chip reached
+    ///   for it and landed on 9 `.medium`, which is a different-looking chip
+    ///   that no size comparison can see.
+    ///
+    /// Prefer these on reading surfaces. `ReadingSize` stays for the places that
+    /// genuinely need a bare number — an SF Symbol sized to sit beside text.
+    enum FontScale {
+        static let display: Font = .system(size: ReadingSize.display, weight: .semibold, design: .rounded)
+        static let title: Font = .system(size: ReadingSize.title, weight: .semibold)
+        static let sectionHeader: Font = .system(size: ReadingSize.heading, weight: .semibold)
+        static let body: Font = .system(size: ReadingSize.body)
+        static let bodyStrong: Font = .system(size: ReadingSize.body, weight: .medium)
+        static let small: Font = .system(size: ReadingSize.meta)
+        static let tiny: Font = .system(size: ReadingSize.label)
+        static let micro: Font = .system(size: ReadingSize.badge, weight: .bold)
     }
 
     enum CompactSize {
@@ -330,11 +365,11 @@ struct PageHeader<Content: View>: View {
                         .font(.system(size: Tokens.IconSize.regular, weight: .medium))
                         .foregroundStyle(Tokens.accent)
                     Text(title)
-                        .font(.system(size: Tokens.ReadingSize.title, weight: .semibold))
+                        .font(Tokens.FontScale.title)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Text(badge.uppercased())
-                    .font(.system(size: Tokens.ReadingSize.badge, weight: .bold))
+                    .font(Tokens.FontScale.micro)
                     .tracking(0.5)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, Tokens.ChipPadding.h)

@@ -222,9 +222,9 @@ struct EnhancerEditor: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: Tokens.Space.row) {
-                    Text("Build with").font(.system(size: Tokens.ReadingSize.heading, weight: .semibold))
+                    Text("Build with").font(Tokens.FontScale.sectionHeader)
                     Text("The model that writes your prompts. The only thing here that spends money")
-                        .font(.system(size: Tokens.ReadingSize.label)).foregroundStyle(.secondary)
+                        .font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
                 }
                 Spacer()
                 if let onDone { Button("Done", action: onDone).keyboardShortcut(.defaultAction) }
@@ -262,7 +262,7 @@ struct EnhancerEditor: View {
                         FormField("ChatGPT account") {
                             VStack(alignment: .leading, spacing: Tokens.Space.row) {
                                 Text(model.codexAccount ?? "Not signed in")
-                                    .font(.system(size: Tokens.ReadingSize.body))
+                                    .font(Tokens.FontScale.body)
                                     .foregroundStyle(model.codexAccount == nil
                                                      ? Color.secondary : .primary)
                                 HStack(spacing: Tokens.Space.control) {
@@ -287,7 +287,7 @@ struct EnhancerEditor: View {
                             TextField("https://api.openai.com/v1/chat/completions",
                                       text: $model.endpoint)
                                 .textFieldStyle(.roundedBorder)
-                                .font(.system(size: Tokens.ReadingSize.meta, design: .monospaced))
+                                .font(Tokens.FontScale.small.monospaced())
                         }
                         FormField("Model") {
                             TextField("gpt-4o-mini", text: $model.model)
@@ -314,7 +314,7 @@ struct EnhancerEditor: View {
                         VStack(alignment: .leading, spacing: Tokens.Space.group) {
                             TextField("Fallback endpoint", text: $model.fallbackEndpoint)
                                 .textFieldStyle(.roundedBorder)
-                                .font(.system(size: Tokens.ReadingSize.meta, design: .monospaced))
+                                .font(Tokens.FontScale.small.monospaced())
                             HStack(spacing: Tokens.Space.control) {
                                 TextField("Fallback model", text: $model.fallbackModel)
                                     .textFieldStyle(.roundedBorder).frame(maxWidth: 220)
@@ -324,11 +324,11 @@ struct EnhancerEditor: View {
                             }
                             Text("A rate limit or a 5xx moves to the fallback; a 401 or 404 does not, "
                                  + "because the same body would fail there too.")
-                                .font(.system(size: Tokens.ReadingSize.label)).foregroundStyle(.secondary)
+                                .font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
                         }
                         .padding(.top, Tokens.Space.control)
                     }
-                    .font(.system(size: Tokens.ReadingSize.meta))
+                    .font(Tokens.FontScale.small)
 
                     FormField("Timeout in seconds. A build is one long request") {
                         TextField("300", value: $model.timeout, format: .number)
@@ -341,7 +341,7 @@ struct EnhancerEditor: View {
             Divider()
             HStack(spacing: Tokens.Space.control) {
                 if model.busy { ProgressView().controlSize(.small) }
-                Text(model.status).font(.system(size: Tokens.ReadingSize.meta))
+                Text(model.status).font(Tokens.FontScale.small)
                     .foregroundStyle(model.statusIsError ? Color.red : .secondary)
                     .lineLimit(2)
                 Spacer()

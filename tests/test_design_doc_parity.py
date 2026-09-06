@@ -41,10 +41,29 @@ DOC = REPO / "docs" / "design" / "DESIGN_SYSTEM.md"
 #: 2026-09-05 and the suite stayed green, because a group absent from here is a
 #: group this test cannot see — the same "a table nothing verifies" failure the
 #: file exists to prevent, one level up. Adding a group to Theme.swift means
-#: adding it here, and the only thing that catches a forgotten one is somebody
-#: noticing. Nothing yet checks that GROUPS covers every enum in Tokens.
-GROUPS = ("Radius", "CompactSize", "ReadingSize", "IconSize", "ChipPadding",
-          "Space", "Width", "Size", "Motion", "OnTint")
+#: adding it here, and a forgotten one used to be caught only by somebody
+#: noticing.
+#:
+#: **It happened again on 2026-09-06.** `FontScale` was added to Theme.swift and
+#: the suite stayed green, because a group absent from this tuple is a group
+#: this test cannot see. `test_GROUPS_covers_every_token_enum` below now closes
+#: that: the tuple is checked against the enums actually declared in the file,
+#: so a new group fails here instead of going undocumented.
+GROUPS = ("Radius", "CompactSize", "ReadingSize", "FontScale", "IconSize",
+          "ChipPadding", "Space", "Width", "Size", "Motion", "OnTint")
+
+#: Enums in Theme.swift that are not token groups, each with why. Anything
+#: declared in that file and absent from both this set and GROUPS fails the
+#: coverage test rather than being silently unguarded.
+NOT_TOKEN_GROUPS = {
+    # The light/dark/system appearance enum: behaviour, not a value table.
+    "AppTheme",
+    # The reading-vs-compact switch itself, whose members are computed
+    # properties resolving to tokens rather than tokens of their own.
+    "TextScale",
+    # `Tokens` is the namespace the groups live in, not a group.
+    "Tokens",
+}
 
 #: Declarations that are machinery rather than design tokens, so the document
 #: has no table row for them. Each one is listed with why, because an unexplained
@@ -111,6 +130,26 @@ class DesignDocNamesEveryToken(unittest.TestCase):
                     f"no members parsed out of `enum {group}`; the declaration "
                     "shape changed and this test is now blind to that group")
         self.assertTrue(top_level_colours(self.theme), "no colour tokens parsed")
+
+    def test_GROUPS_covers_every_token_enum(self):
+        """A group this tuple does not name is a group nothing here can see.
+
+        This is the failure one level up from the one the file was written for:
+        not a token missing from the document, but a whole GROUP missing from
+        the list of things checked against the document. `ReadingSize` fell in
+        on 2026-09-05 and `FontScale` on 2026-09-06, both silently, because the
+        tuple was maintained by hand and nothing compared it to the file.
+        """
+        declared = {
+            name for name in re.findall(r"enum (\w+)[^\n]*\{", self.theme)
+            if group_members(self.theme, name)
+        }
+        unseen = sorted(declared - set(GROUPS) - NOT_TOKEN_GROUPS)
+        self.assertEqual(
+            unseen, [],
+            f"these enums declare tokens in Theme.swift and no test looks at "
+            f"them: {unseen}. Add each to GROUPS (and give it a table in "
+            f"DESIGN_SYSTEM.md), or to NOT_TOKEN_GROUPS with the reason.")
 
     def test_every_token_in_the_code_is_named_in_the_document(self):
         """The failure that has happened twice: a card lands a token, the doc lags."""

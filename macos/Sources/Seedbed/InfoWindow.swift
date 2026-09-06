@@ -114,7 +114,7 @@ struct InfoWindowView: View {
 
     private func row(_ page: InfoPage) -> some View {
         Label(page.title, systemImage: page.symbol)
-            .font(.system(size: Tokens.ReadingSize.body))
+            .font(Tokens.FontScale.body)
             .tag(page.rawValue)
     }
 
@@ -158,7 +158,7 @@ struct InfoWindowView: View {
                         Section(category.name) {
                             ForEach(Guide.pages(in: category.name)) { page in
                                 Label(page.title, systemImage: category.symbol)
-                                    .font(.system(size: Tokens.ReadingSize.body))
+                                    .font(Tokens.FontScale.body)
                                     .tag(page.id)
                             }
                         }
@@ -273,11 +273,11 @@ struct GettingStartedPage: View {
     private func step(_ number: Int, _ title: String, _ body: String) -> some View {
         HStack(alignment: .top, spacing: Tokens.Space.control) {
             Text("\(number)")
-                .font(.system(size: Tokens.ReadingSize.meta, weight: .bold))
+                .font(Tokens.FontScale.bodyStrong)
                 .frame(width: 20, height: 20)
                 .background(Circle().fill(Tokens.accent.opacity(0.18)))
             VStack(alignment: .leading, spacing: Tokens.Space.row) {
-                Text(title).font(.system(size: Tokens.ReadingSize.body, weight: .semibold))
+                Text(title).font(Tokens.FontScale.bodyStrong)
                 Caption(body)
             }
         }
@@ -293,17 +293,16 @@ struct AboutPage: View {
             Image(systemName: "text.badge.star")
                 .font(.system(size: Tokens.CompactSize.hero)).foregroundStyle(Tokens.accent)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Seedbed").font(.system(size: Tokens.ReadingSize.display,
-                                             weight: .semibold, design: .rounded))
+                Text("Seedbed").font(Tokens.FontScale.display)
                 Text("Version \(InfoWindows.version)")
-                    .font(.system(size: Tokens.ReadingSize.meta)).foregroundStyle(.secondary)
+                    .font(Tokens.FontScale.small).foregroundStyle(.secondary)
             }
             Spacer()
         }
         Text("A prompt library that keeps a short seed and generates the long, model-tailored "
              + "version of it. The app is a front end; the library itself is plain markdown in "
              + "a git repository.")
-            .font(.system(size: Tokens.ReadingSize.body))
+            .font(Tokens.FontScale.body)
             .fixedSize(horizontal: false, vertical: true)
         Divider()
         VStack(alignment: .leading, spacing: Tokens.Space.group) {
@@ -318,9 +317,9 @@ struct AboutPage: View {
 
     private func row(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top, spacing: Tokens.Space.control) {
-            Text(label).font(.system(size: Tokens.ReadingSize.meta, weight: .medium))
+            Text(label).font(Tokens.FontScale.small)
                 .foregroundStyle(.secondary).frame(width: 78, alignment: .leading)
-            Text(value).font(.system(size: Tokens.ReadingSize.meta)).textSelection(.enabled)
+            Text(value).font(Tokens.FontScale.small).textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

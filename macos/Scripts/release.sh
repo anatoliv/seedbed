@@ -14,9 +14,14 @@
 #   ALLOW_DIRTY=1       skip the "which commit is this?" warning
 #   SKIP_TESTS=1        package without running the suite (prints loudly)
 #
-# What this deliberately does NOT do: publish, tag, or update a feed. Seedbed
-# has no download site and no Sparkle feed, so the artifact is the release and
-# copying it across is the distribution. See macos/README.md.
+# This builds, generates the Sparkle appcast, syncs the Homebrew cask and tags.
+# What it deliberately does NOT do is put anything where a stranger can reach it:
+# Scripts/publish.sh uploads the DMG and the feed, and ../Scripts/publish-repo.sh
+# pushes the cask to the public tap. See macos/README.md.
+#
+# (This comment said Seedbed had no download site and no Sparkle feed until
+# 2026-09-06. Both have existed since 0.1.1, and the script had grown an appcast
+# step and a tag step while still claiming to do neither.)
 
 set -euo pipefail
 
@@ -359,6 +364,20 @@ else
     exit 1
 fi
 
+# 5b. Sync the Homebrew cask to this release, BEFORE the gate, so the gate
+#     validates what will actually be published rather than a file the next step
+#     is about to rewrite. The cask pins a version and a sha256, so without this
+#     it rots to a DMG that is no longer served and `brew install` 404s — the
+#     same way a landing page goes stale, and just as invisibly, because nothing
+#     the owner runs day to day ever reads it.
+#
+#     The caveats come from Packaging/dmg-readme.txt rather than being written
+#     twice. Seedbed is a front end to a checkout and an interpreter, so both
+#     install paths have to say so, and the one nobody uses is the one that
+#     would go stale.
+echo "==> Syncing the Homebrew cask"
+Scripts/sync-cask.sh
+
 # 6. The other half of the gate, now that there are artifacts to check: the
 #    bundle matches the plist, both tickets staple, Gatekeeper accepts the app,
 #    and a configured DSN actually made it into the bundle.
@@ -410,4 +429,10 @@ needs a checkout of this repository and Python 3.11+ to do anything.
 
 Verify it arrived intact, on that Mac, before installing:
   shasum -a 256 ~/Downloads/$(basename "$DMG")
+
+Casks/seedbed.rb now pins $VERSION,$BUILD_NUM — commit it with the version bump.
+Homebrew keeps offering the PREVIOUS release until the public tap is updated,
+which is a separate step on its own schedule:
+  Scripts/publish.sh          put the DMG and the feed on the download host
+  ../Scripts/publish-repo.sh  push the sanitized snapshot, cask included
 SUMMARY

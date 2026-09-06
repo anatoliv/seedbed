@@ -213,6 +213,53 @@ values as Reference's reading scale.
 | `ReadingSize.label` | 11 | Eyebrows, key caps, quoted code |
 | `ReadingSize.badge` | 9 | The uppercase capsule under a page title |
 
+### `FontScale` — the reading ramp as fonts, and the reason it exists
+
+`ReadingSize` is a table of **numbers**. `FontScale` is the same table as
+**`Font` values**, carrying the weight and the typeface design as part of the
+role. Reference declares its reading ramp this way and reserves bare `CGFloat`
+for `CompactSize`, where its own comment says why: the dense surfaces vary the
+weight per call site, and the reading surfaces do not.
+
+Seedbed had only the numbers until 2026-09-06, and Theme.swift claimed that
+matched Reference "for the same reason" — borrowing `CompactSize`'s rationale
+for a ramp it was never about. **The sizes did match: 21/20/15/13/12/11/9 in
+both apps.** What did not match was everything a number cannot hold, and two
+roles had no Seedbed equivalent at all, so call sites invented them:
+
+- `bodyStrong` was written as `.semibold` in some places and `.medium` in others.
+- `micro` is 9 **bold**. `CompactSize.badge` is also 9, so the What's New chips
+  reached for it and rendered 9 `.medium` — a visibly different chip at an
+  identical size, which no size comparison can detect.
+
+| Token | Value | Used for |
+|---|---|---|
+| `FontScale.display` | 21 semibold, SF Rounded | The app's own name (About) |
+| `FontScale.title` | 20 semibold | A page's own title, in its header |
+| `FontScale.sectionHeader` | 15 semibold | Card and group headers |
+| `FontScale.body` | 13 | Paragraphs, definition terms |
+| `FontScale.bodyStrong` | 13 medium | A paragraph line that carries emphasis |
+| `FontScale.small` | 12 | Metadata, captions, secondary rows |
+| `FontScale.tiny` | 11 | Eyebrow labels, shortcut chips |
+| `FontScale.micro` | 9 bold | Badge text, always with tracking |
+
+**Prefer `FontScale` on reading surfaces.** `ReadingSize` stays for the places
+that genuinely need a bare number, such as sizing an SF Symbol to sit beside
+text at a weight the glyph chooses for itself.
+
+Reading surfaces must not reconstruct a font from `ReadingSize` and choose a
+weight locally. That was the remaining escape hatch after `FontScale` arrived:
+the app contained regular, medium, semibold and bold variants of the same 12pt
+role, none named by the design system. Use the nearest existing role instead.
+For code, paths, model IDs and tokens, apply `.monospaced()` to that role; the
+face describes the content while the role still owns size and weight.
+
+`tests/test_Reference_parity.py` holds this table against
+`macos/Design/Reference-tokens.json`, a spec extracted from Reference's own
+`Theme.swift`. That test is the one this project did not have: every other guard
+here compares Seedbed to Seedbed, which is why seven cards could each honestly
+report convergence while the two apps kept looking unlike each other.
+
 **A surface picks a ramp once, not per label.** `TextScale` is a SwiftUI
 environment value, `.compact` by default, and the manual window sets `.reading`
 on its root. The shared components — `SectionHeader`, `Caption`,

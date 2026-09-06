@@ -122,7 +122,7 @@ struct MCPSettings: View {
 
     private var header: some View {
         HStack {
-            Text("MCP Server").font(.system(size: Tokens.ReadingSize.title, weight: .semibold))
+            Text("MCP Server").font(Tokens.FontScale.title)
             Spacer()
             if let onDone { Button("Done", action: onDone).keyboardShortcut(.defaultAction) }
         }
@@ -134,13 +134,13 @@ struct MCPSettings: View {
             Image(systemName: "info.circle.fill").foregroundStyle(Tokens.accent)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Let an agent ask for a prompt")
-                    .font(.system(size: Tokens.ReadingSize.body, weight: .medium))
+                    .font(Tokens.FontScale.bodyStrong)
                 Text("Claude Code, Cursor and Claude Desktop can search this library by "
                      + "description and read a prompt's tailored version, instead of you "
                      + "copying one out of the panel. The server binds to this Mac only, "
                      + "and every request has to carry the access token below. Both, not "
                      + "either.")
-                    .font(.system(size: Tokens.ReadingSize.meta)).foregroundStyle(.secondary)
+                    .font(Tokens.FontScale.small).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -151,7 +151,7 @@ struct MCPSettings: View {
             Toggle("Run the MCP server", isOn: $enabled)
                 .onChange(of: enabled) { _, _ in onChange() }
             HStack(spacing: 8) {
-                Text("Port").font(.system(size: Tokens.ReadingSize.body))
+                Text("Port").font(Tokens.FontScale.body)
                 TextField("Port", value: $port, format: .number.grouping(.never))
                     .frame(width: 80).multilineTextAlignment(.trailing)
                     .onSubmit { onChange() }
@@ -167,11 +167,11 @@ struct MCPSettings: View {
                 .fill(server.isRunning ? Tokens.positive : Color.secondary.opacity(0.5))
                 .frame(width: 7, height: 7)
             if server.isRunning {
-                Text("Running at \(url)").font(.system(size: Tokens.ReadingSize.meta))
+                Text("Running at \(url)").font(Tokens.FontScale.small)
             } else if let error = server.lastError {
-                Text(error).font(.system(size: Tokens.ReadingSize.meta)).foregroundStyle(.red)
+                Text(error).font(Tokens.FontScale.small).foregroundStyle(.red)
             } else {
-                Text("Not running").font(.system(size: Tokens.ReadingSize.meta))
+                Text("Not running").font(Tokens.FontScale.small)
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -212,7 +212,7 @@ struct MCPSettings: View {
             note("For a client on this Mac. There is no remote access and no tunnel: an "
                  + "agent that needs this library runs here.")
             Text(MCPClientSnippet.entry(name: "seedbed", url: url, token: token))
-                .font(.system(size: Tokens.ReadingSize.meta, design: .monospaced))
+                .font(Tokens.FontScale.small.monospaced())
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(8)
@@ -235,7 +235,7 @@ struct MCPSettings: View {
     private var footer: some View {
         HStack {
             Text(copied.isEmpty ? " " : "Copied the \(copied).")
-                .font(.system(size: Tokens.ReadingSize.meta)).foregroundStyle(.secondary)
+                .font(Tokens.FontScale.small).foregroundStyle(.secondary)
             Spacer()
         }
         .padding(.horizontal, Tokens.Space.page).padding(.vertical, 8)
@@ -248,7 +248,7 @@ struct MCPSettings: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: Tokens.Space.group) {
             Text(title.uppercased())
-                .font(.system(size: Tokens.ReadingSize.label, weight: .semibold))
+                .font(Tokens.FontScale.tiny)
                 .foregroundStyle(.secondary)
             content()
         }
@@ -256,7 +256,7 @@ struct MCPSettings: View {
 
     private func secretRow(_ value: String) -> some View {
         Text(value.isEmpty ? "No token yet" : value)
-            .font(.system(size: Tokens.ReadingSize.meta, design: .monospaced))
+            .font(Tokens.FontScale.small.monospaced())
             .textSelection(.enabled)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -266,7 +266,7 @@ struct MCPSettings: View {
     }
 
     private func note(_ text: String) -> some View {
-        Text(text).font(.system(size: Tokens.ReadingSize.meta)).foregroundStyle(.secondary)
+        Text(text).font(Tokens.FontScale.small).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 

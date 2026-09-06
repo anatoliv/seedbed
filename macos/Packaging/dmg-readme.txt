@@ -1,16 +1,16 @@
 Seedbed
 =======
 
-Drag Seedbed to Applications, then read this. The app is a front end; it does
-not carry the prompts.
+Drag Seedbed to Applications, then read this.
 
-Two things it needs on this Mac:
+The app is a front end; it does not carry the prompts. Two things it needs on
+this Mac:
 
 1. The library. Seedbed reads and writes a git checkout of the seedbed
    repository, and it runs the Python package inside that checkout to do the
    work. Clone it wherever you keep code:
 
-       git clone <your seedbed remote> ~/Projects/seedbed
+       git clone https://github.com/anatoliv/seedbed ~/Projects/seedbed
 
    Seedbed looks in ~/Projects/seedbed by default. Anywhere else is fine:
    menu bar icon, Settings, General, Choose. A folder without a promptlib

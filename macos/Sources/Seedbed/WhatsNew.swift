@@ -55,6 +55,24 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.5",
+            date: "6 September 2026",
+            highlight: "Type across the app now matches its sibling exactly, and a test keeps it that way.",
+            changes: [
+                WhatsNewChange(kind: .fixed, text:
+                    "Release-note labels were sentence case in a rounded box at the wrong weight. "
+                    + "They are uppercase, bold and in a capsule now, and the summary line above "
+                    + "them is the smaller secondary size it was always meant to be."),
+                WhatsNewChange(kind: .improved, text:
+                    "The reading type scale carries its own weight and typeface, so a heading, an "
+                    + "emphasised line and a badge are named roles rather than a size somebody "
+                    + "picked a weight for. Fifty six places now say which role they mean."),
+                WhatsNewChange(kind: .added, text:
+                    "A test holds this app's design tokens against the sibling app they were "
+                    + "copied from. Every earlier check compared the app to its own document, "
+                    + "which is why the two could drift apart while everything looked correct."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.4",
             date: "6 September 2026",
             highlight: "The wording is cleaner in a few dozen places.",
@@ -256,24 +274,28 @@ struct WhatsNewPage: View {
             VStack(alignment: .leading, spacing: Tokens.Space.group) {
                 HStack(spacing: 7) {
                     Text(release.version)
-                        .font(.system(size: Tokens.ReadingSize.heading, weight: .semibold))
+                        .font(Tokens.FontScale.sectionHeader)
                     Text(release.date)
-                        .font(.system(size: Tokens.ReadingSize.label))
+                        .font(Tokens.FontScale.small)
                         .foregroundStyle(.secondary)
                 }
                 Text(release.highlight)
-                    .font(.system(size: Tokens.ReadingSize.body))
+                    .font(Tokens.FontScale.small)
+                    .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                Divider()
                 VStack(alignment: .leading, spacing: Tokens.Space.group) {
                     ForEach(release.changes) { change in
                         DefinitionRow(detail: change.text) {
-                            Text(change.kind.label)
-                                .font(.system(size: Tokens.CompactSize.badge, weight: .medium))
+                            Text(change.kind.label.uppercased())
+                                .font(Tokens.FontScale.micro)
+                                .tracking(0.4)
                                 .foregroundStyle(change.kind.ink)
-                                .padding(.horizontal, 5).padding(.vertical, 2)
-                                .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip)
-                                    .fill(change.kind.tint.opacity(0.14)))
-                                .frame(width: 62, alignment: .leading)
+                                .padding(.horizontal, Tokens.ChipPadding.h)
+                                .padding(.vertical, Tokens.ChipPadding.v)
+                                .fixedSize()
+                                .background(change.kind.tint.opacity(0.14), in: Capsule())
+                                .frame(width: 68, alignment: .leading)
                         }
                     }
                 }

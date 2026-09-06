@@ -55,7 +55,7 @@ struct SettingsWindowView: View {
                                     set: { model.page = $0 ?? .general })) {
                 ForEach(SettingsPage.allCases) { page in
                     Label(page.title, systemImage: page.symbol)
-                        .font(.system(size: Tokens.ReadingSize.body))
+                        .font(Tokens.FontScale.body)
                         .tag(page)
                 }
             }
@@ -126,7 +126,7 @@ struct GeneralSettings: View {
                                 .foregroundStyle(Tokens.warning)
                             VStack(alignment: .leading, spacing: Tokens.Space.row) {
                                 Text("Accessibility permission is not granted")
-                                    .font(.system(size: Tokens.ReadingSize.meta, weight: .medium))
+                                    .font(Tokens.FontScale.small)
                                 Caption("Sending ⌘V to another app is exactly what that "
                                         + "permission governs. Until it is granted, Seedbed "
                                         + "copies and tells you why it did not paste.")
@@ -150,7 +150,7 @@ struct GeneralSettings: View {
                         }
                     if !launchProblem.isEmpty {
                         Text(launchProblem)
-                            .font(.system(size: Tokens.ReadingSize.meta))
+                            .font(Tokens.FontScale.small)
                             .foregroundStyle(.red)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -158,7 +158,7 @@ struct GeneralSettings: View {
 
                 SettingsGroup("Library folder") {
                     Text(libraryPath)
-                        .font(.system(size: Tokens.ReadingSize.meta, design: .monospaced))
+                        .font(Tokens.FontScale.small.monospaced())
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(6)

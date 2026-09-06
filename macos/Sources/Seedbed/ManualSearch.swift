@@ -203,7 +203,7 @@ struct ManualSearchField: View {
     var body: some View {
         HStack(spacing: Tokens.Space.control - 2) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: Tokens.ReadingSize.meta))
+                .font(Tokens.FontScale.small)
                 .foregroundStyle(.secondary)
             // Short enough for the sidebar it now lives in. "Search Help and the
             // FAQ" fit the 560pt reading column and truncates to "Search Help
@@ -212,7 +212,7 @@ struct ManualSearchField: View {
             // the same reason.
             TextField("Search help", text: $query)
                 .textFieldStyle(.plain)
-                .font(.system(size: Tokens.ReadingSize.body))
+                .font(Tokens.FontScale.body)
                 .focused($focused)
                 // Return goes back to the results rather than only dropping
                 // focus: it is the obvious way back once you have read the hit
@@ -238,7 +238,7 @@ struct ManualSearchField: View {
                     focused = true
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: Tokens.ReadingSize.meta))
+                        .font(Tokens.FontScale.small)
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
@@ -283,11 +283,11 @@ struct ManualSearchResults: View {
                                     .font(.system(size: Tokens.CompactSize.badge))
                                     .foregroundStyle(Tokens.accent)
                                 Text("\(hit.topic.page.title) · \(hit.topic.section)")
-                                    .font(.system(size: Tokens.ReadingSize.label))
+                                    .font(Tokens.FontScale.tiny)
                                     .foregroundStyle(.secondary)
                             }
                             Text(hit.topic.term)
-                                .font(.system(size: Tokens.ReadingSize.meta, weight: .semibold))
+                                .font(Tokens.FontScale.small)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             Caption(Self.snippet(hit.topic.detail))

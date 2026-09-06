@@ -208,6 +208,55 @@ if ! grep -q 'sparkle:edSignature' "$APPCAST"; then
     exit 1
 fi
 
+# --- The Homebrew cask ---------------------------------------------------------
+# A version-pinned surface, and the one nobody here installs from — which is
+# exactly why it goes stale unnoticed. Every failure below is silent at the
+# moment it is introduced and only shows up on a stranger's Mac:
+#   * a stale version/sha256  -> `brew install --cask seedbed` 404s or refuses
+#   * pinned "X" not "X,BUILD" -> `brew audit --online` fails, autobump breaks
+#   * caveats drifted from the DMG readme -> two install paths, two stories,
+#     and the app that "installs fine and shows 0 prompts" is nobody's fault
+# All three are mechanically checkable, so check them rather than remembering.
+CASK="../Casks/seedbed.rb"
+if [[ ! -f "$CASK" ]]; then
+    echo "error: missing $CASK — the public repo is a Homebrew tap and the cask is" >&2
+    echo "       what makes it one. A guard aimed at an absent file passes forever." >&2
+    exit 1
+fi
+CASK_VERSION="$(sed -nE 's/^  version "([^"]+)".*/\1/p' "$CASK" | head -1)"
+CASK_SHA="$(sed -nE 's/^  sha256 "([0-9a-f]{64})".*/\1/p' "$CASK" | head -1)"
+WANT_VERSION="${VERSION},${BUILD_NUM}"
+if [[ "$CASK_VERSION" != "$WANT_VERSION" ]]; then
+    echo "error: cask version '${CASK_VERSION:-missing}' != '$WANT_VERSION'." >&2
+    echo "       The appcast carries both shortVersionString and version, so Homebrew's" >&2
+    echo "       Sparkle livecheck reports them joined; pin '<short>,<build>'." >&2
+    echo "       Scripts/release.sh syncs this in step 5b — run Scripts/sync-cask.sh." >&2
+    exit 1
+fi
+DMG_SHA="$(shasum -a 256 "$DMG" | awk '{print $1}')"
+if [[ "$CASK_SHA" != "$DMG_SHA" ]]; then
+    echo "error: the cask's sha256 is not this DMG's." >&2
+    echo "       cask: ${CASK_SHA:-missing}" >&2
+    echo "       dmg : $DMG_SHA" >&2
+    echo "       Run Scripts/sync-cask.sh." >&2
+    exit 1
+fi
+# The caveats are generated from Packaging/dmg-readme.txt. Ask whether the cask
+# on disk IS what this release generates, rather than trusting that the sync
+# ran: a hand-edited caveats block is the normal way this drifts, and it looks
+# entirely correct in review. --check writes nothing and prints the diff.
+if ! python3 Scripts/support/cask.py "$VERSION" "$BUILD_NUM" "$DMG_SHA" --check; then
+    exit 1
+fi
+# Homebrew 6+ refuses a third-party tap that has not been trusted, so install
+# instructions that omit the step do not work. Found the hard way on Reference.
+if ! grep -q 'brew trust' ../README.md 2>/dev/null; then
+    echo "error: the README install steps omit 'brew trust' — Homebrew 6+ refuses" >&2
+    echo "       third-party taps without it, so the instructions do not work." >&2
+    exit 1
+fi
+
 echo "release ok: $VERSION ($BUILD_NUM)"
 echo "  app and DMG stapled, Gatekeeper accepts the app, bundle matches the plist"
 echo "  appcast offers $APPCAST_VERSION ($APPCAST_BUILD), EdDSA signed"
+echo "  cask pins $WANT_VERSION and this DMG's sha256, caveats match the DMG readme"
