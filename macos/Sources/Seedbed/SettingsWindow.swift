@@ -55,7 +55,7 @@ struct SettingsWindowView: View {
                                     set: { model.page = $0 ?? .general })) {
                 ForEach(SettingsPage.allCases) { page in
                     Label(page.title, systemImage: page.symbol)
-                        .font(.system(size: Tokens.CompactSize.rowText))
+                        .font(.system(size: Tokens.ReadingSize.body))
                         .tag(page)
                 }
             }
@@ -64,7 +64,10 @@ struct SettingsWindowView: View {
             Divider()
             detail.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: Tokens.Size.settings.width, height: Tokens.Size.settings.height)
+        .frame(minWidth: Tokens.Size.settingsMin.width, idealWidth: Tokens.Size.settings.width,
+               maxWidth: .infinity,
+               minHeight: Tokens.Size.settingsMin.height, idealHeight: Tokens.Size.settings.height,
+               maxHeight: .infinity)
     }
 
     @ViewBuilder private var detail: some View {
@@ -123,7 +126,7 @@ struct GeneralSettings: View {
                                 .foregroundStyle(Tokens.warning)
                             VStack(alignment: .leading, spacing: Tokens.Space.row) {
                                 Text("Accessibility permission is not granted")
-                                    .font(.system(size: Tokens.CompactSize.meta, weight: .medium))
+                                    .font(.system(size: Tokens.ReadingSize.meta, weight: .medium))
                                 Caption("Sending ⌘V to another app is exactly what that "
                                         + "permission governs. Until it is granted, Seedbed "
                                         + "copies and tells you why it did not paste.")
@@ -147,7 +150,7 @@ struct GeneralSettings: View {
                         }
                     if !launchProblem.isEmpty {
                         Text(launchProblem)
-                            .font(.system(size: Tokens.CompactSize.meta))
+                            .font(.system(size: Tokens.ReadingSize.meta))
                             .foregroundStyle(.red)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -155,7 +158,7 @@ struct GeneralSettings: View {
 
                 SettingsGroup("Library folder") {
                     Text(libraryPath)
-                        .font(.system(size: Tokens.CompactSize.meta, design: .monospaced))
+                        .font(.system(size: Tokens.ReadingSize.meta, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(6)

@@ -555,7 +555,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsModel.page = page
         InfoWindows.shared.show("settings", title: "Seedbed Settings",
                                 size: NSSize(width: Tokens.Size.settings.width,
-                                             height: Tokens.Size.settings.height)) {
+                                             height: Tokens.Size.settings.height),
+                                minSize: NSSize(width: Tokens.Size.settingsMin.width,
+                                                height: Tokens.Size.settingsMin.height)) {
             SettingsWindowView(
                 model: self.settingsModel,
                 server: self.mcp,
@@ -564,6 +566,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 onReloadLibrary: { self.model.reload() },
                 onRevealLibrary: { self.revealRoot() },
                 onChooseLibrary: { self.chooseRoot() })
+                .environment(\.textScale, .reading)
         }
     }
 
@@ -578,11 +581,19 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func openInfo(_ page: InfoPage) {
         infoModel.page = page
         InfoWindows.shared.show("info", title: "Seedbed",
-                                size: NSSize(width: Tokens.Width.paged, height: 640)) {
+                                size: NSSize(width: Tokens.Size.info.width,
+                                             height: Tokens.Size.info.height),
+                                minSize: NSSize(width: Tokens.Size.infoMin.width,
+                                                height: Tokens.Size.infoMin.height)) {
             InfoWindowView(model: self.infoModel,
                            library: self.model,
                            openLibrary: { self.openLibrary() },
                            openSettings: { self.openSettings(.general) })
+                // This window is the one made of prose — the manual, the FAQ,
+                // the release notes, About. Declared once here rather than at
+                // every Text inside it, and it is the only surface that opts
+                // in: the picker and the library stay compact on purpose.
+                .environment(\.textScale, .reading)
         }
     }
 
@@ -692,7 +703,11 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered, defer: false)
         window.title = "Seedbed Library"
-        window.contentView = NSHostingView(rootView: LibraryView(model: libModel))
+        // The library is a working surface — a list beside an editor — so its
+        // rows and model chips stay on the compact ramp while its forms and
+        // prose read at window sizes. See TextScale.
+        window.contentView = NSHostingView(
+            rootView: LibraryView(model: libModel).environment(\.textScale, .reading))
         window.setFrameAutosaveName("PromptLibraryWindow")
         window.isReleasedWhenClosed = false
         if window.frame.origin == .zero { window.center() }

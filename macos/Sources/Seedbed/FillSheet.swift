@@ -66,16 +66,16 @@ struct FillSheet: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.row) {
-            Text(model.prompt.title).font(.system(size: Tokens.CompactSize.rowTitle, weight: .semibold))
+            Text(model.prompt.title).font(.system(size: Tokens.ReadingSize.heading, weight: .semibold))
             Text("\(model.names.count) value\(model.names.count == 1 ? "" : "s") for \(model.target.shortName)")
-                .font(.system(size: Tokens.CompactSize.meta)).foregroundStyle(.secondary)
+                .font(.system(size: Tokens.ReadingSize.meta)).foregroundStyle(.secondary)
         }
         .chromeBar()
     }
 
     private func field(_ name: String) -> some View {
         VStack(alignment: .leading, spacing: Tokens.Space.row) {
-            Text(name).font(.system(size: Tokens.CompactSize.label, weight: .medium, design: .monospaced))
+            Text(name).font(.system(size: Tokens.ReadingSize.label, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
             HStack(spacing: Tokens.Space.control) {
                 TextField("", text: Binding(
@@ -84,7 +84,7 @@ struct FillSheet: View {
                 ), axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(1...6)
-                .font(.system(size: Tokens.CompactSize.rowText))
+                .font(.system(size: Tokens.ReadingSize.body))
 
                 let past = model.history[name] ?? []
                 Menu {
@@ -111,7 +111,7 @@ struct FillSheet: View {
     private var footer: some View {
         HStack(spacing: Tokens.Space.control) {
             Text("Blank values stay as {{NAME}} in the copied prompt")
-                .font(.system(size: Tokens.CompactSize.label)).foregroundStyle(.secondary)
+                .font(.system(size: Tokens.ReadingSize.label)).foregroundStyle(.secondary)
             Spacer()
             Button("Cancel", action: onCancel)
                 .keyboardShortcut(.cancelAction)

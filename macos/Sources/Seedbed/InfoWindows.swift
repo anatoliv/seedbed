@@ -19,6 +19,7 @@ final class InfoWindows {
     }
 
     func show<Content: View>(_ key: String, title: String, size: NSSize,
+                             minSize: NSSize? = nil,
                              @ViewBuilder content: () -> Content) {
         if let existing = windows[key] {
             NSApp.activate(ignoringOtherApps: true)
@@ -31,6 +32,14 @@ final class InfoWindows {
             backing: .buffered, defer: false)
         window.title = title
         window.contentView = NSHostingView(rootView: content())
+        // Say it to the window as well as to the content. The style mask has
+        // always had `.resizable`; what stopped it was content pinned to an
+        // exact frame, and once that is a minimum the window still needs a floor
+        // of its own or it can be dragged smaller than what it is showing.
+        // The floor, not the opening size — those are different numbers and
+        // setting the second as the first is what makes a "resizable" window
+        // refuse to get smaller.
+        window.contentMinSize = minSize ?? size
         window.isReleasedWhenClosed = false
         window.center()
         windows[key] = window

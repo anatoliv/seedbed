@@ -450,11 +450,11 @@ struct LibraryView: View {
                 Divider()
                 if model.prompts.isEmpty {
                     VStack(spacing: 10) {
-                        Text("No prompts yet").font(.system(size: Tokens.CompactSize.rowTitle,
+                        Text("No prompts yet").font(.system(size: Tokens.ReadingSize.heading,
                                                             weight: .medium))
                         Text("A prompt starts as one short line. The library writes the "
                              + "long, model-shaped version.")
-                            .font(.system(size: Tokens.CompactSize.meta))
+                            .font(.system(size: Tokens.ReadingSize.meta))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center).frame(maxWidth: 320)
                         Button("New prompt") { model.newPrompt() }
@@ -512,7 +512,7 @@ struct LibraryView: View {
                 Text(model.visiblePrompts.count == model.prompts.count
                      ? "\(model.prompts.count) prompts"
                      : "\(model.visiblePrompts.count) of \(model.prompts.count)")
-                    .font(.system(size: Tokens.CompactSize.label)).foregroundStyle(.secondary)
+                    .font(.system(size: Tokens.ReadingSize.label)).foregroundStyle(.secondary)
             }
             .buttonStyle(.borderless)
             .chromeBar()
@@ -522,10 +522,10 @@ struct LibraryView: View {
     private var filters: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.group) {
             HStack(spacing: Tokens.Space.control) {
-                Image(systemName: "magnifyingglass").font(.system(size: Tokens.CompactSize.meta))
+                Image(systemName: "magnifyingglass").font(.system(size: Tokens.ReadingSize.meta))
                     .foregroundStyle(.secondary)
                 TextField("Search", text: $model.search)
-                    .textFieldStyle(.plain).font(.system(size: Tokens.CompactSize.rowText))
+                    .textFieldStyle(.plain).font(.system(size: Tokens.ReadingSize.body))
                 if !model.search.isEmpty {
                     Button { model.search = "" } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
@@ -542,7 +542,7 @@ struct LibraryView: View {
                     ForEach(model.categories, id: \.self) { Text($0).tag(String?.some($0)) }
                 }
                 .labelsHidden()
-                .font(.system(size: Tokens.CompactSize.meta))
+                .font(.system(size: Tokens.ReadingSize.meta))
                 .fixedSize()
                 .disabled(model.categories.isEmpty)
                 Spacer(minLength: 0)
@@ -613,12 +613,12 @@ struct LibraryView: View {
         HStack(spacing: Tokens.Space.control) {
             if model.busy { ProgressView().controlSize(.small) }
             Text(model.status.isEmpty ? " " : model.status)
-                .font(.system(size: Tokens.CompactSize.meta))
+                .font(.system(size: Tokens.ReadingSize.meta))
                 .foregroundStyle(model.statusIsError ? Color.red : .secondary)
                 .lineLimit(1)
             Spacer()
             if model.dirty {
-                Text("unsaved changes").font(.system(size: Tokens.CompactSize.meta)).foregroundStyle(.orange)
+                Text("unsaved changes").font(.system(size: Tokens.ReadingSize.meta)).foregroundStyle(.orange)
             }
         }
         .chromeBar()
@@ -640,7 +640,7 @@ struct EditPane: View {
 
                 FormField("The prompt — keep it short, the enhancer expands it") {
                     TextEditor(text: $model.draftBody)
-                    .font(.system(size: Tokens.CompactSize.rowText, design: .monospaced))
+                    .font(.system(size: Tokens.ReadingSize.body, design: .monospaced))
                     .frame(minHeight: 90)
                     .padding(4)
                     .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card)
@@ -688,7 +688,7 @@ struct EditPane: View {
                             Label("Changing this makes every render of it stale — "
                                   + "rebuild after saving.",
                                   systemImage: "exclamationmark.triangle")
-                                .font(.system(size: Tokens.CompactSize.meta))
+                                .font(.system(size: Tokens.ReadingSize.meta))
                                 .foregroundStyle(Tokens.warning)
                         }
                     }
@@ -704,7 +704,7 @@ struct EditPane: View {
                                     if on { model.draftTargets.insert(entry.id) }
                                     else { model.draftTargets.remove(entry.id) }
                                 }))
-                            .font(.system(size: Tokens.CompactSize.rowText))
+                            .font(.system(size: Tokens.ReadingSize.body))
                         }
                     }
                 }
@@ -712,11 +712,11 @@ struct EditPane: View {
                 if let prompt = model.current, prompt.body != model.draftBody {
                     Label("Changing the text makes every render of it stale — rebuild after saving.",
                           systemImage: "exclamationmark.triangle")
-                        .font(.system(size: Tokens.CompactSize.meta)).foregroundStyle(.orange)
+                        .font(.system(size: Tokens.ReadingSize.meta)).foregroundStyle(.orange)
                 }
 
                 Text("Use {{PLACEHOLDER}} for values you fill in at copy time.")
-                    .font(.system(size: Tokens.CompactSize.meta)).foregroundStyle(.secondary)
+                    .font(.system(size: Tokens.ReadingSize.meta)).foregroundStyle(.secondary)
             }
             .padding(Tokens.Space.pane)
         }
@@ -763,9 +763,9 @@ struct ComparePane: View {
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
-                    Image(systemName: "sparkles").font(.system(size: Tokens.CompactSize.label))
+                    Image(systemName: "sparkles").font(.system(size: Tokens.ReadingSize.label))
                         .foregroundStyle(Tokens.accent)
-                    Text("How these differ").font(.system(size: Tokens.CompactSize.meta, weight: .semibold))
+                    Text("How these differ").font(.system(size: Tokens.ReadingSize.meta, weight: .semibold))
                     if state == "stale" {
                         Text("out of date").font(.system(size: Tokens.CompactSize.badge))
                             .padding(.horizontal, 5).padding(.vertical, 1)
@@ -783,14 +783,14 @@ struct ComparePane: View {
                 if let text = model.comparison?.summary, !text.isEmpty {
                     ScrollView {
                         Text(text)
-                            .font(.system(size: Tokens.CompactSize.meta))
+                            .font(.system(size: Tokens.ReadingSize.meta))
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(maxHeight: 150)
                 } else if !model.comparisonBusy {
                     Text("Not written yet — press Summarise.")
-                        .font(.system(size: Tokens.CompactSize.meta)).foregroundStyle(.secondary)
+                        .font(.system(size: Tokens.ReadingSize.meta)).foregroundStyle(.secondary)
                 }
             }
             .chromeBar()

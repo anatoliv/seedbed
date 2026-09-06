@@ -136,6 +136,21 @@ if [[ "$APP_VERSION" != "$VERSION" || "$APP_BUILD" != "$BUILD_NUM" ]]; then
     exit 1
 fi
 
+# The bundle must be built from the CURRENT sources, not merely carry the right
+# version number. `swift build` updates .build; `make-app.sh` assembles the app.
+# Running the first and shipping the second gives you a bundle whose Info.plist
+# is right and whose code is old, which every other check here passes happily.
+# This has now cost two debugging sessions in one day: a fix that looked like it
+# had no effect, and a design comparison reported against a build that predated
+# it. Neither was a wrong change; both were the previous binary.
+NEWEST_SOURCE="$(find Sources -name '*.swift' -newer "$APP/Contents/MacOS/Seedbed" -print -quit 2>/dev/null || true)"
+if [[ -n "$NEWEST_SOURCE" ]]; then
+    echo "error: $NEWEST_SOURCE is newer than the built binary." >&2
+    echo "       The bundle in build/ predates the source it claims to be." >&2
+    echo "       Run Scripts/make-app.sh — 'swift build' alone does not assemble it." >&2
+    exit 1
+fi
+
 # Notarization is the whole point of the exercise: without a stapled ticket on
 # the .app itself, the copy dragged out of the image has to reach Apple to be
 # verified, and fails on a Mac that is offline or behind a filter.

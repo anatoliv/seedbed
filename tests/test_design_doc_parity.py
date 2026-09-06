@@ -36,7 +36,15 @@ DOC = REPO / "docs" / "design" / "DESIGN_SYSTEM.md"
 
 #: Token groups the document is expected to tabulate, as `enum <Name>` blocks
 #: inside `Tokens`. `Motion` is included: it has a table too.
-GROUPS = ("Radius", "CompactSize", "Space", "Width", "Size", "Motion", "OnTint")
+#:
+#: **This list is itself a thing that goes stale.** `ReadingSize` was added on
+#: 2026-09-05 and the suite stayed green, because a group absent from here is a
+#: group this test cannot see — the same "a table nothing verifies" failure the
+#: file exists to prevent, one level up. Adding a group to Theme.swift means
+#: adding it here, and the only thing that catches a forgotten one is somebody
+#: noticing. Nothing yet checks that GROUPS covers every enum in Tokens.
+GROUPS = ("Radius", "CompactSize", "ReadingSize", "IconSize", "ChipPadding",
+          "Space", "Width", "Size", "Motion", "OnTint")
 
 #: Declarations that are machinery rather than design tokens, so the document
 #: has no table row for them. Each one is listed with why, because an unexplained

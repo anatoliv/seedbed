@@ -187,9 +187,42 @@ Crisp scale. Never rounded, never pill, for containers.
 
 ## Type
 
-One compact scale, sized for the panel's density. There is no separate scale for
-the bigger windows: a manual set in panel type reads fine, and a second scale is
-a second thing to keep aligned.
+**Two scales, since 2026-09-05.** This section used to say the opposite — *"There
+is no separate scale for the bigger windows: a manual set in panel type reads
+fine, and a second scale is a second thing to keep aligned."* That was a
+prediction, and it was tested the only way a claim about reading can be: the
+Seedbed manual was put beside Reference's Help window on one screen. It does
+not read fine. Body text was 11pt against 13, and the difference is not subtle.
+
+The mistake is traceable. `CompactSize` was ported from Reference, whose own
+source describes it as *"for the picker — the app's densest surface, which needs
+finer steps than the reading-oriented FontScale"*. The second half of that
+sentence never arrived, so the dense ramp was used on every surface including
+the ones made of paragraphs.
+
+`ReadingSize` is for prose: the manual, the FAQ, release notes, About. Same
+values as Reference's reading scale.
+
+| Token | pt | Used for |
+|---|---|---|
+| `ReadingSize.display` | 21 | The app's own name, in SF Rounded (About) |
+| `ReadingSize.title` | 20 | A page's own title, in its header |
+| `ReadingSize.heading` | 15 | Section headings over prose |
+| `ReadingSize.body` | 13 | Paragraphs, definition terms |
+| `ReadingSize.meta` | 12 | Captions, secondary lines on a page |
+| `ReadingSize.label` | 11 | Eyebrows, key caps, quoted code |
+| `ReadingSize.badge` | 9 | The uppercase capsule under a page title |
+
+**A surface picks a ramp once, not per label.** `TextScale` is a SwiftUI
+environment value, `.compact` by default, and the manual window sets `.reading`
+on its root. The shared components — `SectionHeader`, `Caption`,
+`StackedDefinition`, `KeyCap`, `ExampleBlock` — read it. The alternative was a
+reading-sized copy of each, which is how this file came to say *"Four files had
+four versions of this"* about a component that had already been duplicated once.
+Compact is the default deliberately: the dense surfaces are the majority, and a
+surface that forgets to declare itself should not silently grow.
+
+`CompactSize` keeps the picker, the library rows and the settings panes.
 
 | Token | pt | Used for |
 |---|---|---|
@@ -200,8 +233,30 @@ a second thing to keep aligned.
 | `CompactSize.meta` | 11 | Secondary row text, captions, help body |
 | `CompactSize.rowText` | 12 | Body-ish row text, sidebar labels |
 | `CompactSize.rowTitle` | 13 | Row titles, section headings |
-| `CompactSize.heading` | 17 | Window headings |
 | `CompactSize.hero` | 27 | Empty-state and About glyphs |
+
+## Icons
+
+Geometry, not typography. Ported from Reference on 2026-09-05, where it had
+been missing entirely — every icon here was sized off a font token, which works
+until a symbol and a letter want different sizes at the same weight, and then
+reads as a wrong icon rather than as a missing scale.
+
+| Token | pt | Used for |
+|---|---|---|
+| `IconSize.tiny` | 9 | Disclosure chevrons, eyebrow icons |
+| `IconSize.small` | 11 | Inline meta icons |
+| `IconSize.medium` | 13 | Standard sidebar and toolbar icons |
+| `IconSize.regular` | 18 | A prominent header or action icon |
+
+## Chips
+
+One padding for every pill, so badges do not diverge by a point across the app.
+
+| Token | pt | Used for |
+|---|---|---|
+| `ChipPadding.h` | 6 | Horizontal inset of a chip or badge |
+| `ChipPadding.v` | 2 | Vertical inset of the same |
 
 ## Space
 
@@ -213,9 +268,9 @@ taste.
 | Token | Value | Separates |
 |---|---|---|
 | `Space.page` | 20 | A window's edge from its content |
-| `Space.section` | 18 | Two sections of a page |
-| `Space.group` | 9 | Sibling rows inside one section |
-| `Space.row` | 3 | The lines of a single row: a title from its explanation |
+| `Space.section` | 16 | Two sections of a page |
+| `Space.group` | 10 | Sibling rows inside one section |
+| `Space.row` | 4 | The lines of a single row: a title from its explanation |
 | `Space.control` | 8 | Controls sitting on one line |
 | `Space.pane` | 14 | A **working** surface's edge from its content, and the horizontal inset of a chrome bar |
 | `Space.field` | 12 | Two fields in a form |
@@ -275,6 +330,10 @@ noticed there were four.
 | `Size.panel` | 420×260 | The floating panel, which is a list and nothing else |
 | `Size.info` | `Width.paged` × 640 | A contents list plus one reading column |
 | `Size.settings` | 820×620 | Wider than `info` because the Models pane is a two-column editor rather than prose |
+| `Size.infoMin` | 620×420 | How small the manual may be dragged. Reference's Help minimum |
+| `Size.settingsMin` | 620×460 | The same for Settings |
+
+**A minimum is not the opening size.** Both windows opened at a fixed frame and carried `.resizable` in their style mask, so the resize cursor appeared and the drag did nothing. They now open at `Size.info` / `Size.settings` and go down to the `*Min` pair, which is what lets the manual sit beside the thing it describes on a small screen.
 
 `Size.settings` was the last to arrive, and it arrived last for a reason worth
 knowing: it lived as a raw `820, 620` in **two** files that had to agree, with
@@ -351,6 +410,24 @@ terracotta pair without its argument, one file over.
 says an action does not apply to it, and it does real work: the library sidebar
 hides paste (there is no app you came from) and edit (you are already in the
 editor) rather than showing two dead controls.
+
+## The manual window
+
+Ported from Reference's Help window rather than approximated, because the two
+sat side by side and the differences were all in Seedbed's favour to fix:
+
+- **The page has a header.** A symbol in the accent, the page title at
+  `ReadingSize.title`, an uppercase capsule naming what kind of page it is, and a
+  divider. Without it a page opened straight into its first sub-heading, so
+  "Keyboard" read as the window's title rather than as one section of Help.
+- **The header does not scroll.** It sits above the scroll view, so "where am I"
+  stays on screen while "what does it say" moves.
+- **Search is in the sidebar**, above the contents list. It was over the reading
+  column, which made it look like it searched the page you were on. The sidebar
+  is the column that answers "which page", and searching is the other way of
+  asking that.
+- **The contents list is grouped.** Five items do not need finding, but they do
+  need telling apart: three teach the app, two describe this copy of it.
 
 ## The surfaces
 

@@ -85,6 +85,26 @@ enum Tokens {
 
     // MARK: Radius — crisp scale (never rounded/pill for containers)
 
+    /// SF Symbol sizing for icon-only images — geometry, not typography.
+    ///
+    /// Ported wholesale from Reference. Its absence is why every icon here was
+    /// sized off a font token, which works until a symbol and a letter want
+    /// different sizes at the same weight, and then reads as a wrong icon rather
+    /// than as a missing scale.
+    enum IconSize {
+        static let tiny: CGFloat = 9     // disclosure chevrons, eyebrow icons
+        static let small: CGFloat = 11   // inline meta icons
+        static let medium: CGFloat = 13  // standard sidebar / toolbar icon
+        static let regular: CGFloat = 18 // prominent header / action icon
+    }
+
+    /// Chip and pill padding, kept in lockstep so badges do not diverge by a
+    /// point across the app. Reference's values.
+    enum ChipPadding {
+        static let h: CGFloat = 6
+        static let v: CGFloat = 2
+    }
+
     enum Radius {
         static let chip: CGFloat = 3     // status pills, badges
         static let control: CGFloat = 4  // buttons, text fields, key caps
@@ -94,6 +114,28 @@ enum Tokens {
 
     // MARK: Type — compact scale, matching the picker's density
 
+    /// The reading ramp, for surfaces made of prose: the manual, the FAQ, the
+    /// release notes, About.
+    ///
+    /// **Seedbed ported Reference's `CompactSize` and then used it everywhere**,
+    /// including on pages people read paragraphs from. That ramp is described in
+    /// its own source as being "for the picker — the app's densest surface,
+    /// which needs finer steps than the reading-oriented FontScale", and the
+    /// second half of that sentence never arrived here. Put the two Help windows
+    /// side by side and the difference is not subtle: 11pt body against 13.
+    ///
+    /// Same values as Reference's reading scale, and the same reason for CGFloat
+    /// rather than `Font` — call sites keep their own `weight:` and `design:`.
+    enum ReadingSize {
+        static let display: CGFloat = 21  // the app's own name, in SF Rounded
+        static let title: CGFloat = 20    // the page's own title, in its header
+        static let heading: CGFloat = 15  // section headings over prose
+        static let body: CGFloat = 13     // paragraphs, definitions
+        static let meta: CGFloat = 12     // captions, secondary lines
+        static let label: CGFloat = 11    // eyebrows, key caps, code
+        static let badge: CGFloat = 9     // the uppercase capsule under a title
+    }
+
     enum CompactSize {
         static let mini: CGFloat = 6
         static let tiny: CGFloat = 8
@@ -102,7 +144,6 @@ enum Tokens {
         static let meta: CGFloat = 11     // secondary row text
         static let rowText: CGFloat = 12  // body-ish row text
         static let rowTitle: CGFloat = 13 // titles
-        static let heading: CGFloat = 17  // window headings
         static let hero: CGFloat = 27     // empty-state glyph
     }
 
@@ -134,13 +175,18 @@ extension Tokens {
     /// them is a question about what the gap separates rather than about taste.
     enum Space {
         /// Inset from a window's edge to its content.
-        static let page: CGFloat = 20
+        ///
+        /// 28, which is Reference's `Space.pane` — the padding its Help and
+        /// Settings panes use. This was 20, and once the type ramps matched that
+        /// 8pt was most of what still made the two windows feel unlike each
+        /// other: the same words in the same size, sitting closer to the edge.
+        static let page: CGFloat = 28
         /// Between two sections of a page.
-        static let section: CGFloat = 18
+        static let section: CGFloat = 16
         /// Between sibling rows inside one section.
-        static let group: CGFloat = 9
+        static let group: CGFloat = 10
         /// Between the lines of a single row: a title and its explanation.
-        static let row: CGFloat = 3
+        static let row: CGFloat = 4
         /// Between controls sitting on one line.
         static let control: CGFloat = 8
         /// Inset for a WORKING surface: a form, an editor, and the horizontal
@@ -163,9 +209,9 @@ extension Tokens {
     enum Width {
         /// A column of prose. Wide enough for a paragraph, narrow enough that a
         /// line does not tire the eye.
-        static let reading: CGFloat = 560
+        static let reading: CGFloat = 616
         /// The contents list beside it.
-        static let sidebar: CGFloat = 178
+        static let sidebar: CGFloat = 244
         /// A window that is a sidebar plus a reading column.
         static var paged: CGFloat { sidebar + reading }
         /// A sheet that asks for a few values and goes away.
@@ -200,8 +246,17 @@ extension Tokens {
         static let library = CGSize(width: 900, height: 540)
         /// The floating panel, which is a list and nothing else.
         static let panel = CGSize(width: 420, height: 260)
-        /// A sidebar plus one reading column.
+        /// A sidebar plus one reading column. 860x640 with a 244 sidebar, which
+        /// is Reference's Help window exactly.
         static var info: CGSize { CGSize(width: Width.paged, height: 640) }
+        /// How small those windows may be dragged.
+        ///
+        /// A minimum equal to the opening size is not a minimum — it is a fixed
+        /// window wearing a resize cursor. Reference opens Help at 860x640 and
+        /// lets it go to 620x420, so a reader on a small screen can put it
+        /// beside the thing they are reading about.
+        static let infoMin = CGSize(width: 620, height: 420)
+        static let settingsMin = CGSize(width: 620, height: 460)
         /// Wider than `info` because the Models pane is a two-column editor
         /// rather than prose. It was the one window size still written as a raw
         /// literal, in two files that had to agree and nothing making them.
@@ -210,13 +265,99 @@ extension Tokens {
 }
 
 /// A section heading inside a page of prose: Help, the FAQ, release notes.
+/// Which type ramp the shared components draw at.
+///
+/// The alternative was a reading-sized copy of `SectionHeader`, `Caption`,
+/// `StackedDefinition`, `KeyCap` and `ExampleBlock`, which is how this file
+/// came to say "Four files had four versions of this" about a component that
+/// had been duplicated once. One component, one environment value, set on the
+/// window that reads rather than on every call site inside it.
+enum TextScale {
+    case compact   // rows, chips, the picker: the dense surfaces
+    case reading   // pages of prose: the manual, FAQ, release notes, About
+
+    var heading: CGFloat { self == .reading ? Tokens.ReadingSize.heading : Tokens.CompactSize.rowTitle }
+    var body: CGFloat    { self == .reading ? Tokens.ReadingSize.body    : Tokens.CompactSize.rowText }
+    var meta: CGFloat    { self == .reading ? Tokens.ReadingSize.meta    : Tokens.CompactSize.meta }
+    var label: CGFloat   { self == .reading ? Tokens.ReadingSize.label   : Tokens.CompactSize.label }
+    var code: CGFloat    { self == .reading ? Tokens.ReadingSize.label   : Tokens.CompactSize.badge }
+}
+
+private struct TextScaleKey: EnvironmentKey {
+    /// Compact by default: the dense surfaces are the majority, and a surface
+    /// that forgets to declare itself should not silently grow.
+    static let defaultValue: TextScale = .compact
+}
+
+extension EnvironmentValues {
+    var textScale: TextScale {
+        get { self[TextScaleKey.self] }
+        set { self[TextScaleKey.self] = newValue }
+    }
+}
+
+/// The top of a page in the manual: what you are reading, and what kind of thing
+/// it is.
+///
+/// Ported from Reference's `detailScaffold`, which is the piece Seedbed's
+/// manual was missing rather than doing differently. Without it a page opens
+/// straight into its first sub-heading, so "Keyboard" reads as the title of the
+/// window rather than as one section of Help, and nothing on screen says which
+/// of the five pages you are on except the sidebar selection.
+///
+/// The divider matters as much as the title: it holds a fixed header above a
+/// scrolling body, so the answer to "where am I" stays put while the answer to
+/// "what does it say" moves.
+struct PageHeader<Content: View>: View {
+    let title: String
+    let symbol: String
+    let badge: String
+    @ViewBuilder let content: Content
+
+    init(title: String, symbol: String, badge: String,
+         @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.symbol = symbol
+        self.badge = badge
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: Tokens.Space.row) {
+                HStack(spacing: Tokens.Space.control) {
+                    Image(systemName: symbol)
+                        .font(.system(size: Tokens.IconSize.regular, weight: .medium))
+                        .foregroundStyle(Tokens.accent)
+                    Text(title)
+                        .font(.system(size: Tokens.ReadingSize.title, weight: .semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text(badge.uppercased())
+                    .font(.system(size: Tokens.ReadingSize.badge, weight: .bold))
+                    .tracking(0.5)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, Tokens.ChipPadding.h)
+                    .padding(.vertical, Tokens.ChipPadding.v + 1)
+                    .background(Color.secondary.opacity(0.10), in: Capsule())
+            }
+            .padding(.horizontal, Tokens.Space.page)
+            .padding(.top, Tokens.Space.page)
+            .padding(.bottom, Tokens.Space.section - 4)
+            Divider()
+            content
+        }
+    }
+}
+
 struct SectionHeader: View {
+    @Environment(\.textScale) private var scale
     let title: String
     init(_ title: String) { self.title = title }
 
     var body: some View {
         Text(title)
-            .font(.system(size: Tokens.CompactSize.rowTitle, weight: .semibold))
+            .font(.system(size: scale.heading, weight: .semibold))
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -227,6 +368,7 @@ struct SectionHeader: View {
 /// label on a box of controls, and a page section is a heading over prose. They
 /// looked the same in three files while meaning different things.
 struct SettingsGroup<Content: View>: View {
+    @Environment(\.textScale) private var scale
     let title: String
     @ViewBuilder let content: Content
 
@@ -238,7 +380,7 @@ struct SettingsGroup<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.group) {
             Text(title.uppercased())
-                .font(.system(size: Tokens.CompactSize.label, weight: .semibold))
+                .font(.system(size: scale.label, weight: .semibold))
                 .foregroundStyle(.secondary)
             content
         }
@@ -250,12 +392,13 @@ struct SettingsGroup<Content: View>: View {
 /// these lines exist is that they say something a label could not fit, so a
 /// truncated one is worse than none.
 struct Caption: View {
+    @Environment(\.textScale) private var scale
     let text: String
     init(_ text: String) { self.text = text }
 
     var body: some View {
         Text(text)
-            .font(.system(size: Tokens.CompactSize.meta))
+            .font(.system(size: scale.meta))
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -279,12 +422,13 @@ struct DefinitionRow<Leading: View>: View {
 /// The stacked form of the same thing: a bold term with its explanation below,
 /// which is what reads better when the term is a sentence rather than a key.
 struct StackedDefinition: View {
+    @Environment(\.textScale) private var scale
     let term: String
     let detail: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.row) {
-            Text(term).font(.system(size: Tokens.CompactSize.meta, weight: .semibold))
+            Text(term).font(.system(size: scale.body, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Caption(detail)
@@ -294,12 +438,13 @@ struct StackedDefinition: View {
 
 /// A key cap, as the Help window draws one.
 struct KeyCap: View {
+    @Environment(\.textScale) private var scale
     let key: String
     var width: CGFloat = 74
 
     var body: some View {
         Text(key)
-            .font(.system(size: Tokens.CompactSize.label, design: .monospaced))
+            .font(.system(size: scale.label, design: .monospaced))
             .padding(.horizontal, 5).padding(.vertical, 2)
             .background(RoundedRectangle(cornerRadius: Tokens.Radius.control)
                 .fill(Color.secondary.opacity(0.15)))
@@ -315,13 +460,14 @@ struct KeyCap: View {
 /// rather than wrapping: a wrapped command line is a command line you cannot
 /// copy correctly.
 struct ExampleBlock: View {
+    @Environment(\.textScale) private var scale
     let text: String
     init(_ text: String) { self.text = text }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             Text(text)
-                .font(.system(size: Tokens.CompactSize.badge, design: .monospaced))
+                .font(.system(size: scale.code, design: .monospaced))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: true, vertical: true)
                 .padding(.horizontal, Tokens.Space.control)
@@ -381,6 +527,7 @@ extension View {
 /// sentence-case label over ONE. Merging them would have made every form field
 /// shout.
 struct FormField<Content: View>: View {
+    @Environment(\.textScale) private var scale
     let label: String
     @ViewBuilder let content: Content
 
@@ -392,7 +539,7 @@ struct FormField<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.row) {
             Text(label)
-                .font(.system(size: Tokens.CompactSize.label, weight: .medium))
+                .font(.system(size: scale.label, weight: .medium))
                 .foregroundStyle(.secondary)
             content
         }

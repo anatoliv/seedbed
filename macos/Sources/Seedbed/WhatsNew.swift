@@ -55,6 +55,31 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.3",
+            date: "5 September 2026",
+            highlight: "A real manual, and windows you can resize and read.",
+            changes: [
+                WhatsNewChange(kind: .added,
+                               text: "A guide: thirty five pages across nine subjects, listed "
+                                   + "in the sidebar so you can browse to what you want. Help "
+                                   + "used to be five pages, one of which was a table of key "
+                                   + "caps, with everything else buried inside them."),
+                WhatsNewChange(kind: .improved,
+                               text: "Text on pages you read is sized for reading. The picker "
+                                   + "keeps its denser type, which is what that scale is for, "
+                                   + "but the manual, Settings and the library window no "
+                                   + "longer set paragraphs in it."),
+                WhatsNewChange(kind: .improved,
+                               text: "Every page opens with its own title, an icon and a label "
+                                   + "saying what kind of page it is, held above the part that "
+                                   + "scrolls. Search moved into the sidebar, where you look "
+                                   + "for a page rather than inside one."),
+                WhatsNewChange(kind: .fixed,
+                               text: "The manual and Settings windows can be resized. They "
+                                   + "always showed a resize cursor and always refused, "
+                                   + "because their contents were pinned to an exact size."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.2",
             date: "5 September 2026",
             highlight: "Seedbed can update itself now, and it runs on Intel Macs.",
@@ -216,13 +241,13 @@ struct WhatsNewPage: View {
             VStack(alignment: .leading, spacing: Tokens.Space.group) {
                 HStack(spacing: 7) {
                     Text(release.version)
-                        .font(.system(size: Tokens.CompactSize.rowTitle, weight: .semibold))
+                        .font(.system(size: Tokens.ReadingSize.heading, weight: .semibold))
                     Text(release.date)
-                        .font(.system(size: Tokens.CompactSize.label))
+                        .font(.system(size: Tokens.ReadingSize.label))
                         .foregroundStyle(.secondary)
                 }
                 Text(release.highlight)
-                    .font(.system(size: Tokens.CompactSize.rowText))
+                    .font(.system(size: Tokens.ReadingSize.body))
                     .fixedSize(horizontal: false, vertical: true)
                 VStack(alignment: .leading, spacing: Tokens.Space.group) {
                     ForEach(release.changes) { change in

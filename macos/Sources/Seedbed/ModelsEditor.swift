@@ -137,7 +137,7 @@ struct ModelsEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Models").font(.system(size: Tokens.CompactSize.rowTitle, weight: .semibold))
+                Text("Models").font(.system(size: Tokens.ReadingSize.heading, weight: .semibold))
                 Spacer()
                 if let onDone { Button("Done", action: onDone).keyboardShortcut(.defaultAction) }
             }
@@ -154,7 +154,7 @@ struct ModelsEditor: View {
             HStack(spacing: Tokens.Space.control) {
                 if model.busy { ProgressView().controlSize(.small) }
                 Text(model.status)
-                    .font(.system(size: Tokens.CompactSize.meta))
+                    .font(.system(size: Tokens.ReadingSize.meta))
                     .foregroundStyle(model.statusIsError ? Color.red : .secondary)
                     .lineLimit(1)
                 Spacer()
@@ -171,8 +171,8 @@ struct ModelsEditor: View {
                 set: { if let id = $0 { model.select(id) } })
             ) { entry in
                 VStack(alignment: .leading, spacing: Tokens.Space.row) {
-                    Text(entry.name).font(.system(size: Tokens.CompactSize.rowText, weight: .medium)).lineLimit(1)
-                    Text(entry.id).font(.system(size: Tokens.CompactSize.label, design: .monospaced))
+                    Text(entry.name).font(.system(size: Tokens.ReadingSize.body, weight: .medium)).lineLimit(1)
+                    Text(entry.id).font(.system(size: Tokens.ReadingSize.label, design: .monospaced))
                         .foregroundStyle(.secondary).lineLimit(1)
                 }
                 .tag(entry.id)
@@ -196,7 +196,7 @@ struct ModelsEditor: View {
                     TextField("claude-opus-5", text: $model.draftID)
                         .textFieldStyle(.roundedBorder)
                         .disabled(!model.isNew)
-                        .font(.system(size: Tokens.CompactSize.rowText, design: .monospaced))
+                        .font(.system(size: Tokens.ReadingSize.body, design: .monospaced))
                 }
                 FormField("Display name") {
                     TextField("Claude Opus 5", text: $model.draftName)
@@ -208,7 +208,7 @@ struct ModelsEditor: View {
                 }
                 FormField("Prompting guidance — one URL or file path per line") {
                     TextEditor(text: $model.draftGuides)
-                        .font(.system(size: Tokens.CompactSize.meta, design: .monospaced))
+                        .font(.system(size: Tokens.ReadingSize.meta, design: .monospaced))
                         .frame(height: 70)
                         .padding(4)
                         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card)
@@ -216,7 +216,7 @@ struct ModelsEditor: View {
                 }
                 FormField("Notes — always part of this model's guidance") {
                     TextEditor(text: $model.draftNotes)
-                        .font(.system(size: Tokens.CompactSize.meta))
+                        .font(.system(size: Tokens.ReadingSize.meta))
                         .frame(height: 60)
                         .padding(4)
                         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card)
@@ -227,7 +227,7 @@ struct ModelsEditor: View {
                         .disabled(!model.canSave)
                         .buttonStyle(.borderedProminent)
                     Text("Changing guidance or notes makes every render for this model stale.")
-                        .font(.system(size: Tokens.CompactSize.label)).foregroundStyle(.secondary)
+                        .font(.system(size: Tokens.ReadingSize.label)).foregroundStyle(.secondary)
                 }
             }
             .padding(Tokens.Space.pane)

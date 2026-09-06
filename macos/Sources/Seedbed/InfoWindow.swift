@@ -22,6 +22,19 @@ enum InfoPage: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The capsule under the title. Reference badges a topic with its
+    /// category; these five pages are the categories, so the badge says what
+    /// kind of reading each one is rather than repeating its name.
+    var badge: String {
+        switch self {
+        case .gettingStarted: return "Overview"
+        case .help:           return "Reference"
+        case .faq:            return "Reference"
+        case .whatsNew:       return "Release notes"
+        case .about:          return "This build"
+        }
+    }
+
     var symbol: String {
         switch self {
         case .gettingStarted: return "sparkles"
@@ -63,10 +76,30 @@ final class InfoModel: ObservableObject {
     /// typing or pressing Return goes back to the results.
     @Published var browsing = false
 
+    /// Which guide page is showing, if one is. The five built-in pages and the
+    /// thirty guide pages share one sidebar, so exactly one of these is in
+    /// force: setting either clears the other.
+    @Published var guide: String?
+
     /// Go to a page and read it, keeping the query for when you want it back.
     func open(_ page: InfoPage) {
         self.page = page
+        self.guide = nil
         browsing = true
+    }
+
+    func open(guide id: String) {
+        self.guide = id
+        browsing = true
+    }
+
+    /// What the sidebar's selection binds to. A guide id and an `InfoPage`
+    /// raw value cannot collide, so one string identifies either.
+    var selection: String {
+        get { guide ?? page.rawValue }
+        set {
+            if let p = InfoPage(rawValue: newValue) { open(p) } else { open(guide: newValue) }
+        }
     }
 }
 
@@ -79,45 +112,101 @@ struct InfoWindowView: View {
     var openLibrary: () -> Void
     var openSettings: () -> Void
 
+    private func row(_ page: InfoPage) -> some View {
+        Label(page.title, systemImage: page.symbol)
+            .font(.system(size: Tokens.ReadingSize.body))
+            .tag(page.rawValue)
+    }
+
+    /// The scrolling half of a page, under the fixed header.
+    @ViewBuilder private func pageBody<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Tokens.Space.section) {
+                content()
+            }
+            .padding(Tokens.Space.page)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            List(selection: Binding(get: { model.page },
-                                    set: { model.open($0 ?? .help) })) {
-                ForEach(InfoPage.allCases) { page in
-                    Label(page.title, systemImage: page.symbol)
-                        .font(.system(size: Tokens.CompactSize.rowText))
-                        .tag(page)
-                }
-            }
-            .listStyle(.sidebar)
-            .frame(width: Tokens.Width.sidebar)
-            Divider()
+            // The search field lives in the SIDEBAR, above the contents, which
+            // is where Reference puts it and where a reader looks for it: the
+            // sidebar is the "how do I find a page" column, and searching is the
+            // other way of answering that question. It sat over the reading
+            // column before, which made it look like it searched the page.
             VStack(spacing: 0) {
-                // Above the scroll view, not inside it: a search field that
-                // scrolls away is one you have to scroll back up to reach, and
-                // the whole point of it is that you reach for it first.
                 ManualSearchField(query: $model.query,
                                   resultCount: model.browsing ? resultCount : nil,
                                   onReturnToResults: { model.browsing = false })
-                    .padding(.horizontal, Tokens.Space.page)
+                    .padding(.horizontal, Tokens.Space.group)
                     .padding(.top, Tokens.Space.group)
-                    .padding(.bottom, Tokens.Space.group)
+                    .padding(.bottom, Tokens.Space.control)
                 Divider()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: Tokens.Space.section) {
-                        if searching {
-                            ManualSearchResults(query: model.query) { model.open($0) }
-                        } else {
-                            page
+                List(selection: Binding(get: { model.selection },
+                                        set: { model.selection = $0 ?? InfoPage.help.rawValue })) {
+                    // The guide is what the sidebar is FOR. Before this it
+                    // listed five pages, one of which was a table of key caps,
+                    // and everything the app can do was inside them. Reference
+                    // lists fifty-three subjects and gives each a page; a reader
+                    // browses rather than scrolls.
+                    Section("Start here") {
+                        ForEach([InfoPage.gettingStarted, .help, .faq]) { row($0) }
+                    }
+                    ForEach(Guide.categories, id: \.name) { category in
+                        Section(category.name) {
+                            ForEach(Guide.pages(in: category.name)) { page in
+                                Label(page.title, systemImage: category.symbol)
+                                    .font(.system(size: Tokens.ReadingSize.body))
+                                    .tag(page.id)
+                            }
                         }
                     }
-                    .padding(Tokens.Space.page)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Section("This build") {
+                        ForEach([InfoPage.whatsNew, .about]) { row($0) }
+                    }
+                }
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
+            }
+            .frame(width: Tokens.Width.sidebar)
+            Divider()
+            Group {
+                if searching {
+                    PageHeader(title: "Search",
+                               symbol: "magnifyingglass",
+                               badge: "\(resultCount) result\(resultCount == 1 ? "" : "s")") {
+                        pageBody { ManualSearchResults(query: model.query) { model.open($0) } }
+                    }
+                } else if let id = model.guide,
+                          let entry = Guide.pages.first(where: { $0.id == id }) {
+                    PageHeader(title: entry.title,
+                               symbol: Guide.symbol(for: entry.category),
+                               badge: entry.category) {
+                        pageBody { GuideMarkdown(entry.body) }
+                    }
+                } else {
+                    PageHeader(title: model.page.title,
+                               symbol: model.page.symbol,
+                               badge: model.page.badge) {
+                        pageBody { page }
+                    }
                 }
             }
-            .frame(width: Tokens.Width.reading)
+            // The reading column grows with the window; the sidebar does not.
+            // A wider window should give the prose more room, which is the only
+            // reason to widen this one.
+            .frame(minWidth: Tokens.Size.infoMin.width - Tokens.Width.sidebar, maxWidth: .infinity)
         }
-        .frame(width: Tokens.Size.info.width, height: Tokens.Size.info.height)
+        // A minimum, not a size. A fixed frame here pinned the window no matter
+        // what the style mask said: `.resizable` was already set and the drag
+        // simply did nothing, because SwiftUI content of an exact size cannot be
+        // asked for another one.
+        .frame(minWidth: Tokens.Size.infoMin.width, idealWidth: Tokens.Size.info.width,
+               maxWidth: .infinity,
+               minHeight: Tokens.Size.infoMin.height, idealHeight: Tokens.Size.info.height,
+               maxHeight: .infinity)
     }
 
     /// A query of only whitespace is not a search, and blanking the page for one
@@ -184,11 +273,11 @@ struct GettingStartedPage: View {
     private func step(_ number: Int, _ title: String, _ body: String) -> some View {
         HStack(alignment: .top, spacing: Tokens.Space.control) {
             Text("\(number)")
-                .font(.system(size: Tokens.CompactSize.meta, weight: .bold))
+                .font(.system(size: Tokens.ReadingSize.meta, weight: .bold))
                 .frame(width: 20, height: 20)
                 .background(Circle().fill(Tokens.accent.opacity(0.18)))
             VStack(alignment: .leading, spacing: Tokens.Space.row) {
-                Text(title).font(.system(size: Tokens.CompactSize.rowText, weight: .semibold))
+                Text(title).font(.system(size: Tokens.ReadingSize.body, weight: .semibold))
                 Caption(body)
             }
         }
@@ -204,16 +293,17 @@ struct AboutPage: View {
             Image(systemName: "text.badge.star")
                 .font(.system(size: Tokens.CompactSize.hero)).foregroundStyle(Tokens.accent)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Seedbed").font(.system(size: Tokens.CompactSize.heading, weight: .semibold))
+                Text("Seedbed").font(.system(size: Tokens.ReadingSize.display,
+                                             weight: .semibold, design: .rounded))
                 Text("Version \(InfoWindows.version)")
-                    .font(.system(size: Tokens.CompactSize.meta)).foregroundStyle(.secondary)
+                    .font(.system(size: Tokens.ReadingSize.meta)).foregroundStyle(.secondary)
             }
             Spacer()
         }
         Text("A prompt library that keeps a short seed and generates the long, model-tailored "
              + "version of it. The app is a front end; the library itself is plain markdown in "
              + "a git repository.")
-            .font(.system(size: Tokens.CompactSize.rowText))
+            .font(.system(size: Tokens.ReadingSize.body))
             .fixedSize(horizontal: false, vertical: true)
         Divider()
         VStack(alignment: .leading, spacing: Tokens.Space.group) {
@@ -228,9 +318,9 @@ struct AboutPage: View {
 
     private func row(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top, spacing: Tokens.Space.control) {
-            Text(label).font(.system(size: Tokens.CompactSize.meta, weight: .medium))
+            Text(label).font(.system(size: Tokens.ReadingSize.meta, weight: .medium))
                 .foregroundStyle(.secondary).frame(width: 78, alignment: .leading)
-            Text(value).font(.system(size: Tokens.CompactSize.meta)).textSelection(.enabled)
+            Text(value).font(.system(size: Tokens.ReadingSize.meta)).textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
