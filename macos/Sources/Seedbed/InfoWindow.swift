@@ -357,6 +357,7 @@ enum BuildProvenance {
 struct AboutPage: View {
     let libraryPath: String
     let enhancer: String
+    @StateObject private var supporters = Supporters()
 
     var body: some View {
         HStack(spacing: Tokens.Space.snug) {
@@ -390,6 +391,8 @@ struct AboutPage: View {
             row("Signature", BuildProvenance.summary)
         }
         SeedbedDivider()
+        SeedbedDivider()
+        support
         // Every network call this app can make, named. The previous wording said
         // there was none beyond the enhancer and the guidance fetch, which
         // omitted the Sparkle update check an installed copy makes on its own
@@ -398,6 +401,47 @@ struct AboutPage: View {
                 + "configure, the documentation it fetches, and an update check against "
                 + "seedbed.dev. Crash reporting is off unless you turn it on in Settings, "
                 + "and never carries prompt text.")
+    }
+
+    /// Licence, and the links for anyone who wants to give something back.
+    ///
+    /// Deliberately stated in the same breath: the licence line is what makes
+    /// the support line honest. Nothing here is a paywall, a trial, or a
+    /// feature gate, and saying so beside the buttons is the difference between
+    /// an invitation and a nag.
+    @ViewBuilder private var support: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.medium) {
+            Text("MIT licence · © 2026 Anatoli Vishnyakov")
+                .font(Tokens.FontScale.small).foregroundStyle(.secondary)
+
+            if !SupportLinks.all.isEmpty {
+                HStack(spacing: Tokens.Space.row6) {
+                    Text("Support").font(Tokens.FontScale.small)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 78, alignment: .leading)
+                    ForEach(Array(SupportLinks.all.enumerated()), id: \.offset) { index, item in
+                        if index > 0 {
+                            Text("·").font(Tokens.FontScale.small).foregroundStyle(.tertiary)
+                        }
+                        Link(item.label, destination: item.url)
+                            .font(Tokens.FontScale.small)
+                    }
+                    Spacer(minLength: 0)
+                }
+                Caption("Free, and staying free. Tips unlock nothing, because there is "
+                        + "nothing to unlock.")
+            }
+
+            if !supporters.people.isEmpty {
+                SeedbedDivider()
+                Text("Thank you").font(Tokens.FontScale.small).foregroundStyle(.secondary)
+                // Wraps, because a list of names is not a column of one.
+                Text(supporters.people.map(\.name).joined(separator: " · "))
+                    .font(Tokens.FontScale.small)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .onAppear { supporters.refresh() }
     }
 
     private func row(_ label: String, _ value: String) -> some View {

@@ -548,20 +548,22 @@ struct LibraryView: View {
                 RoundedRectangle(cornerRadius: Tokens.Radius.control)
                     .stroke(Tokens.searchInputBorder, lineWidth: 0.5)
             )
-            // A Picker centres itself in whatever it is given. fixedSize keeps
-            // it at its content width and the Spacer holds it against the left
-            // edge, in line with the search field and the rows below.
-            HStack(spacing: 0) {
-                Picker("", selection: $model.categoryFilter) {
-                    Text("All categories").tag(String?.none)
-                    ForEach(model.categories, id: \.self) { Text($0).tag(String?.some($0)) }
-                }
-                .labelsHidden()
-                .font(Tokens.FontScale.small)
-                .fixedSize()
-                .disabled(model.categories.isEmpty)
-                Spacer(minLength: 0)
+            // Full width, matching the search field above it.
+            //
+            // These two are one filter bar, and a content-width control under a
+            // full-width one reads as a mistake rather than as a choice: the
+            // eye follows the ragged right edge. It also stopped the control
+            // moving — at content width the button resized every time the
+            // selection changed, so picking a short category name shrank the
+            // thing you had just clicked.
+            Picker("", selection: $model.categoryFilter) {
+                Text("All categories").tag(String?.none)
+                ForEach(model.categories, id: \.self) { Text($0).tag(String?.some($0)) }
             }
+            .labelsHidden()
+            .font(Tokens.FontScale.small)
+            .frame(maxWidth: .infinity)
+            .disabled(model.categories.isEmpty)
         }
         .chromeBar()
     }

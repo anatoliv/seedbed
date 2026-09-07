@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "_comment": "Opt-in supporter recognition shown in Seedbed's About page. Add a { \"name\": \"…\" } entry (optionally \"url\") only when someone asks to be listed, then redeploy with Scripts/publish-site.sh — no app release needed. Seedbed fetches https://seedbed.dev/supporters.json when the About page opens, caches the last good copy, and hides the section entirely when this list is empty.",
+  "supporters": []
+}
