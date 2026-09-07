@@ -15,20 +15,22 @@ SOURCE = ROOT / "macos" / "Sources" / "Seedbed" / "CrashReporting.swift"
 
 class CrashReportingTests(unittest.TestCase):
     def setUp(self) -> None:
-        """Give every case an empty packaging directory of its own.
+        """Point the script at an empty packaging directory.
 
-        Scrubbing the environment is only half the isolation, and scrubbing
-        alone is what made these tests machine-dependent: the DSN files are
-        gitignored, so their presence is a property of the developer's machine,
-        and the script anchors to its own directory whatever the caller's cwd.
-        The suite therefore passed on a checkout with no DSN and failed on one
-        with a real `sentry-dsn.local` present, which is the machine that cuts
-        releases. A test that is green only where the feature is inert is worse
-        than no test, because it reads as coverage.
+        Scrubbing the environment covers only half the input. The other half is
+        `Packaging/*-dsn.local` on disk, which the script resolves relative to
+        its own location — so no amount of environment hygiene on this side can
+        stop a configured machine from being seen. That is exactly how these
+        tests came to be green everywhere except the machine that builds
+        releases, where `sentry-dsn.local` exists and five cases asserting "no
+        provider" saw "hosted-sentry" instead.
+
+        An empty directory is the neutral state these cases mean by "default",
+        stated rather than assumed from the checkout.
         """
-        self._packaging = tempfile.TemporaryDirectory()
-        self.addCleanup(self._packaging.cleanup)
-        self.packaging = Path(self._packaging.name)
+        packaging = tempfile.TemporaryDirectory()
+        self.addCleanup(packaging.cleanup)
+        self.packaging = Path(packaging.name)
 
     def run_config(self, *args: str, **extra: str) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
@@ -39,14 +41,62 @@ class CrashReportingTests(unittest.TestCase):
             "SEEDBED_ERROR_ENVIRONMENT",
         ):
             env.pop(key, None)
-        # The file half of the isolation. Without it the real, gitignored
-        # Packaging directory leaks in and the answer depends on the machine.
-        env["SEEDBED_PACKAGING_DIR"] = str(self.packaging)
+        env.setdefault("SEEDBED_PACKAGING_DIR", str(self.packaging))
         env.update(extra)
         return subprocess.run(
             [str(SCRIPT), *args], env=env, text=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
         )
+
+    def test_the_isolation_can_actually_see_configuration(self) -> None:
+        """The assertion that would have caught this.
+
+        Every other case here asserts the script reports *no* provider, which a
+        broken seam satisfies for free: a script that could not read the
+        directory at all would pass all of them. This one asserts the opposite
+        direction — that a DSN placed in the packaging directory IS seen — so
+        the two together pin that the tests are reading the configuration they
+        think they are, rather than reporting emptiness for the wrong reason.
+        """
+        self.assertEqual("none\n", self.run_config("--provider-only").stdout)
+
+        (self.packaging / "sentry-dsn.local").write_text(
+            "https://public@example.invalid/project\n")
+        result = self.run_config("--provider-only")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            "hosted-sentry\n", result.stdout,
+            "a DSN in the packaging directory was not seen, so these tests "
+            "would report 'none' whatever the machine is configured with")
+
+    def test_the_dsn_files_are_read_through_the_override(self) -> None:
+        """Asserted at the source, because the honest runtime proof is unsafe.
+
+        Demonstrating this at runtime means writing a DSN into the repository's
+        own Packaging directory, and a run killed between the write and its
+        cleanup would leave a bogus DSN on the machine that builds releases --
+        where the next build would pick it up. A test that can misconfigure the
+        release machine is not worth the coverage.
+
+        Reinstating a bare literal is the one edit that reintroduces the bug, so
+        that is what this pins: the read itself, not the prose around it. An
+        earlier version forbade the string anywhere in the file and failed on
+        the header comment that explains the bug -- prose about a mistake is not
+        the mistake.
+        """
+        script = SCRIPT.read_text()
+        self.assertIn(
+            'PACKAGING_DIR="${SEEDBED_PACKAGING_DIR:-Packaging}"', script,
+            "the packaging directory is no longer overridable, so these tests "
+            "would read whatever the machine is configured with")
+        for variable, name in (
+            ("SEEDBED_CRASHBOX_DSN", "crashbox-dsn.local"),
+            ("SEEDBED_SENTRY_DSN", "sentry-dsn.local"),
+        ):
+            self.assertIn(
+                f'read_value {variable} "$PACKAGING_DIR/{name}"', script,
+                f"{name} is not read through the override, so it resolves "
+                "against the repository whatever the caller asks for")
 
     def temporary_app(self, root: str) -> Path:
         app = Path(root) / "Seedbed.app"
@@ -163,40 +213,6 @@ class CrashReportingTests(unittest.TestCase):
         for line in verifier.splitlines():
             if line.lstrip().startswith("echo "):
                 self.assertNotIn("$dsn", line)
-
-    # ------------------------------------------------------------------ the
-    # isolation itself, tested rather than assumed. These two exist because the
-    # rest of this class was green on a machine with no DSN and red on one with,
-    # and nothing in the suite could say which machine it was running on.
-
-    def test_the_override_really_displaces_the_repository_directory(self) -> None:
-        """A DSN in the temp directory is read; the real one is not.
-
-        This is the assertion the whole class rests on. If the override ever
-        stops working, every other case here silently starts reporting on
-        whatever the developer happens to have configured, which is exactly the
-        failure that was shipped.
-        """
-        (self.packaging / "crashbox-dsn.local").write_text(
-            "https://public@crashbox.invalid/42\n")
-        result = self.run_config("--provider-only")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "crashbox\n",
-                         "the script read something other than the injected directory")
-
-    def test_the_default_is_still_the_repository_packaging_directory(self) -> None:
-        """Real callers pass nothing and must keep the original behaviour.
-
-        Checked in the source rather than by running it, because running it
-        without the override is precisely the machine-dependent thing this
-        change exists to remove: the answer would depend on whether whoever
-        runs the suite happens to have a DSN.
-        """
-        script = SCRIPT.read_text()
-        self.assertIn('PACKAGING_DIR="${SEEDBED_PACKAGING_DIR:-$PWD/Packaging}"', script,
-                      "the default packaging directory changed; real callers rely on it")
-        self.assertIn('cd "$(dirname "$0")/.."', script,
-                      "$PWD in the default is only correct while the script anchors itself")
 
 
 if __name__ == "__main__":

@@ -5,22 +5,25 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Where the DSN files are read from. Defaults to this repository's Packaging
-# directory, which is the only value any real invocation uses.
+# Where the gitignored *-dsn.local files live. The `cd` above re-anchors to the
+# repository regardless of the caller's directory, which is what a build wants
+# and what a test cannot escape: a machine that has a real DSN configured makes
+# this script resolve a provider no caller asked for.
 #
-# It is overridable because it is the one input a test cannot otherwise control.
-# The DSN files are gitignored, so whether they exist is a property of the
-# machine rather than of the tree, and this script anchors to its own directory
-# regardless of the caller's working directory. Together those made the
-# behaviour untestable from outside: the suite passed on a checkout with no DSN
-# and failed on the developer machine that had one, which is the machine that
-# builds releases. Green exactly where the feature was inert.
+# That is not hypothetical. The crash-reporting suite was green on a clean
+# checkout, on the public snapshot and in CI, and red on the one machine where
+# releases are actually built — because it had `Packaging/sentry-dsn.local`, so
+# five cases asserting "no provider" saw "hosted-sentry". The tests passed
+# precisely where the feature they cover is inert.
 #
-# So the directory is injected rather than assumed. Real callers pass nothing
-# and get the old behaviour; tests point it at a temporary directory and get a
-# deterministic answer. Note this overrides the FILES only. An exported
-# SEEDBED_*_DSN still wins over both, which is what a release script relies on.
-PACKAGING_DIR="${SEEDBED_PACKAGING_DIR:-$PWD/Packaging}"
+# Overriding the directory is the only seam that fixes that honestly. Copying
+# this script into a fixture tree from the test side would also go green, and
+# would be worse: it would stop exercising the real path resolution, which is
+# the thing that broke.
+#
+# Unset, this is exactly the old literal `Packaging` — a build cannot tell the
+# difference.
+PACKAGING_DIR="${SEEDBED_PACKAGING_DIR:-Packaging}"
 
 read_value() {
     local from_environment="$1" from_file="$2" value
