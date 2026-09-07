@@ -22,7 +22,21 @@ NUMBER_WORDS = {
 
 
 def word_count(path: Path) -> int:
-    return len(path.read_text().split())
+    """Words in the PROMPT, which is what a copy puts on the clipboard.
+
+    This counted the whole file until 2026-09-07, provenance frontmatter and
+    all, so the manual told the user a render was 205 words when copying it
+    yields 182 — and the test protected the wrong number rather than catching
+    it. The README already counted the body and said the whole file reports 23
+    more, so the two documents disagreed by exactly that header.
+
+    Verified against the real thing: `promptlib copy fix-bug-and-test --model
+    claude-opus-5 | wc -w` is 182.
+    """
+    text = path.read_text(encoding="utf-8")
+    parts = text.split("+++")
+    body = "+++".join(parts[2:]) if len(parts) >= 3 else text
+    return len(body.split())
 
 
 class HelpContentFreshness(unittest.TestCase):

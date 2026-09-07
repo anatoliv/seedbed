@@ -115,8 +115,8 @@ enum Manual {
                 The ENHANCER writes the long versions. It is the model doing the writing, \
                 and it is the only part of this app that spends anything. It reads each \
                 target's published prompting guidance and expands your five words into a \
-                prompt shaped for that model. From the same seed you currently get 205 words \
-                of ordered prose for Opus 5 and 721 words of explicit structure for the Llama. \
+                prompt shaped for that model. From the same seed you currently get 182 words \
+                of ordered prose for Opus 5 and 698 words of explicit structure for the Llama. \
                 That difference is the whole reason to keep a library rather than a file \
                 of snippets.
 
@@ -131,8 +131,8 @@ enum Manual {
                 """,
             example: """
                 prompts/fix-bug-and-test.md      the seed you edit
-                rendered/claude-opus-5/…         205 words, prose
-                rendered/llama-3.3-70b/…         721 words, explicit structure
+                rendered/claude-opus-5/…         182 words, prose
+                rendered/llama-3.3-70b/…         698 words, explicit structure
                 """,
             key: nil),
     ]
@@ -324,6 +324,11 @@ enum Manual {
                 Only two things cause it: editing the seed, or the vendor's prompting \
                 guidance changing under you. A grey dot is the neighbouring case, which is \
                 a model this prompt targets but has never been built for.
+
+                With Differentiate Without Colour turned on in System Settings, the chips \
+                show a mark instead of a colour: a tick for current, an exclamation for \
+                stale, a dash for never built. Nothing here depends on telling green from \
+                amber at five points across.
                 """,
             example: nil, key: nil),
         ManualTopic(
