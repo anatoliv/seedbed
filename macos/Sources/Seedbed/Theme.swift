@@ -537,6 +537,52 @@ struct Caption: View {
     }
 }
 
+/// One line per control: the control's own name in bold, then what it does.
+///
+/// `Caption` is a paragraph about a group, and it was the only explanation this
+/// app's Settings had. That works while a group holds one switch and stops
+/// working at three, because the reader has to guess which sentence belongs to
+/// which control, and a control nobody wrote a sentence for is indistinguishable
+/// from one that needs no explanation. The MCP pane had five controls, the most
+/// jargon in the app, and no prose at all.
+///
+/// So the unit of explanation is the control, not the group. The term is spelled
+/// exactly as the control's label, because the reader is matching text on screen
+/// rather than reading an essay, and a paraphrase makes them do the matching
+/// twice.
+///
+/// One string per bullet rather than two `Text`s, so VoiceOver reads "Port, the
+/// number the server listens on" as a sentence instead of stopping between the
+/// name and its meaning.
+struct SettingsBullets: View {
+    @Environment(\.textScale) private var scale
+    let items: [(term: String, text: String)]
+
+    init(_ items: [(term: String, text: String)]) { self.items = items }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.row) {
+            ForEach(items, id: \.term) { item in
+                HStack(alignment: .top, spacing: Tokens.Space.row6) {
+                    Text("•").foregroundStyle(.secondary)
+                    Text(line(for: item))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .font(scale.meta)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func line(for item: (term: String, text: String)) -> AttributedString {
+        var term = AttributedString(item.term)
+        term.inlinePresentationIntent = .stronglyEmphasized
+        return term + AttributedString(": \(item.text)")
+    }
+}
+
 /// A term and what it means: a keyboard shortcut, an FAQ question, a glossary
 /// entry, a line of release notes. Four files had four versions of this.
 struct DefinitionRow<Leading: View>: View {

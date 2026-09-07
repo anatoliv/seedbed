@@ -158,6 +158,25 @@ struct MCPSettings: View {
                 Spacer()
             }
             statusRow
+            SettingsBullets([
+                ("Run the MCP server",
+                 "starts a small HTTP server on this Mac that an agent can call. It only runs "
+                 + "while Seedbed is running."),
+                ("Port",
+                 "the number that server listens on. Change it only if something else on this "
+                 + "Mac already uses it, and note the status line above reports the port "
+                 + "actually bound, which is the one your client must dial."),
+                ("After changing the port or a token",
+                 "every client you already configured is now pointing at the old one and will "
+                 + "fail to connect. Copy the configuration below again and replace the entry "
+                 + "in that client. A stale entry reports an authentication error even when "
+                 + "the real problem is the address."),
+                ("Why it is safe to leave on",
+                 "it binds to loopback only, so nothing on your network can reach it, and "
+                 + "every request must still carry a token. Both, not either. Ten wrong tokens "
+                 + "in a row start a lockout that doubles from one minute to fifteen, while a "
+                 + "correct token is always served, so a looping client cannot lock you out."),
+            ])
         }
     }
 

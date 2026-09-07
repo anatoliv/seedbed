@@ -123,9 +123,16 @@ struct GeneralSettings: View {
                             if new && !Paster.hasPermission { Paster.requestPermission() }
                             hasAccessibility = Paster.hasPermission
                         }
-                    Caption("With this on, ⏎ puts the prompt straight into whatever was "
-                            + "frontmost when you summoned the panel. Hold ⇧ to copy without "
-                            + "pasting, whichever way this is set.")
+                    SettingsBullets([
+                        ("Paste into the app you came from",
+                         "⏎ puts the prompt straight into whatever was frontmost when you "
+                         + "summoned the panel. Turn it off and ⏎ only copies, leaving you to "
+                         + "paste. Either way, holding ⇧ copies without pasting."),
+                        ("Accessibility permission",
+                         "sending ⌘V to another app is what macOS gates behind it, so this "
+                         + "setting cannot work without it. Seedbed asks the first time you "
+                         + "switch it on, and you grant it in System Settings."),
+                    ])
                     if pasteEnabled && !hasAccessibility {
                         HStack(alignment: .top, spacing: Tokens.Space.tight) {
                             Image(systemName: "exclamationmark.triangle.fill")
@@ -160,6 +167,12 @@ struct GeneralSettings: View {
                             .foregroundStyle(Tokens.danger)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    SettingsBullets([
+                        ("Open Seedbed at login",
+                         "registers Seedbed as a macOS login item, so the menu bar icon is "
+                         + "there after a restart without you starting it. It opens to the "
+                         + "menu bar only: no window appears and nothing steals focus."),
+                    ])
                 }
 
                 SettingsGroup("Library folder") {
@@ -177,8 +190,19 @@ struct GeneralSettings: View {
                         Button("Choose…", action: onChoose)
                         Spacer()
                     }
-                    Caption("Your prompts and everything generated from them live here, as "
-                            + "plain markdown in a git repository.")
+                    SettingsBullets([
+                        ("The folder shown above",
+                         "your prompts and everything generated from them, as plain markdown "
+                         + "in a git repository. Seedbed is a front end to it and carries no "
+                         + "prompts of its own, so without a checkout the library reads as "
+                         + "empty."),
+                        ("Reveal in Finder", "opens that folder, which is where you go to "
+                         + "commit, push or pull it."),
+                        ("Choose…", "points Seedbed at a different checkout. Everything reloads "
+                         + "from the new folder, and settings you save afterwards, including "
+                         + "the model registry and the enhancer, are written into it rather "
+                         + "than the old one."),
+                    ])
                 }
 
                 if Updater.shared?.canCheck == true {
@@ -187,10 +211,16 @@ struct GeneralSettings: View {
                             .onChange(of: automaticUpdates) { _, new in
                                 Updater.shared?.automaticallyChecks = new
                             }
-                        Caption("With this on, Seedbed asks seedbed.dev for the signed update "
-                                + "feed on its own schedule. The request says which version and "
-                                + "which macOS you are on and nothing about you. Turn it off and "
-                                + "nothing is checked until you choose Check for Updates.")
+                        SettingsBullets([
+                            ("Check for updates automatically",
+                             "Seedbed asks seedbed.dev for the signed update feed on its own "
+                             + "schedule. The request says which version and which macOS you "
+                             + "are on, and nothing about you. Turn it off and nothing is "
+                             + "checked until you pick Check for Updates from the menu."),
+                            ("What an update has to prove",
+                             "every build is signed, and one that does not match the key this "
+                             + "copy was built with is refused rather than installed."),
+                        ])
                     }
                 }
 
@@ -202,15 +232,24 @@ struct GeneralSettings: View {
                             CrashReporting.apply(enabled: new)
                         }
                     if CrashReporting.isConfigured {
-                        Caption("Off by default. With this on, a crash sends the stack trace, "
-                                + "the app version and the macOS version. It never sends a "
-                                + "prompt, a render, a variable you filled in, or an access "
-                                + "token; your home folder path is replaced with a tilde "
-                                + "before anything leaves the Mac.")
+                        SettingsBullets([
+                            ("Send crash reports",
+                             "off unless you turn it on. A crash then sends the stack trace, "
+                             + "the app version and the macOS version, so a fault that only "
+                             + "happens on your Mac can be found without you reporting it."),
+                            ("What is never sent",
+                             "a prompt, a render, a value you typed into a placeholder, or any "
+                             + "token. Your home folder path is rewritten to a tilde before "
+                             + "anything leaves this Mac, and there is no other telemetry and "
+                             + "no account."),
+                        ])
                     } else {
-                        Caption("This build cannot send crash reports: it was compiled without "
-                                + "a reporting address, which is what every locally built copy "
-                                + "is. Nothing is sent whatever this is set to.")
+                        SettingsBullets([
+                            ("Send crash reports",
+                             "unavailable in this build, which was compiled without a reporting "
+                             + "address. Every locally built copy is one of these. Nothing is "
+                             + "sent whatever this is set to."),
+                        ])
                     }
                 }
             }
@@ -313,8 +352,16 @@ struct ModelVisibility: View {
                     }
                     Spacer()
                 }
-                Caption("Working with two models today should not mean scrolling past seven. "
-                        + "Hiding one keeps it in models.toml and keeps its renders.")
+                SettingsBullets([
+                    ("The switches above",
+                     "which models the picker and the compare columns offer. Working with two "
+                     + "models today should not mean scrolling past seven."),
+                    ("Hiding is not deleting",
+                     "a hidden model keeps its entry in models.toml and keeps every render "
+                     + "already built for it, so changing your mind costs nothing and rebuilds "
+                     + "nothing. Remove one for good in the Models list below."),
+                    ("Show all", "brings every model in the registry back into the picker."),
+                ])
             }
         }
         .padding(Tokens.Space.pane)

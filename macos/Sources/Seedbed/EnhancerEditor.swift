@@ -247,6 +247,25 @@ struct EnhancerEditor: View {
                         .frame(maxWidth: 420, alignment: .leading)
                     }
 
+                    SettingsBullets([
+                        ("Provider preset",
+                         "a starting point, not a lock. Picking one fills in the fields below "
+                         + "and you can then change any of them; the menu reads Custom once "
+                         + "they no longer match a preset."),
+                        ("Running a model on another machine",
+                         "there is no preset for it because it is your address, not a "
+                         + "provider's. Pick the local preset closest to what you run (Ollama, "
+                         + "LM Studio or llama.cpp), then edit Endpoint to point at that "
+                         + "machine, for example http://your-server.local:11434/v1/chat/"
+                         + "completions. Plain http is accepted for a .local name or a private "
+                         + "address; anything on the public internet must be https."),
+                        ("Enhancer against target",
+                         "this pane picks the model that WRITES your prompts. Which models a "
+                         + "prompt is written FOR is the Models pane. Choosing OpenAI here does "
+                         + "not change who your prompts are tailored for, and targeting GPT "
+                         + "there does not call OpenAI."),
+                    ])
+
                     FormField("Authentication") {
                         Picker("", selection: $model.auth) {
                             Text("Claude Code CLI (no key)").tag("cli")
@@ -256,6 +275,25 @@ struct EnhancerEditor: View {
                             Text("ChatGPT sign-in (no API key)").tag("chatgpt_oauth")
                         }
                         .labelsHidden().pickerStyle(.radioGroup)
+                        SettingsBullets([
+                            ("Claude Code CLI",
+                             "the default, and the reason Seedbed works out of the box. It "
+                             + "shells out to the claude binary already on this Mac, so it "
+                             + "needs no key and spends nothing beyond the subscription you "
+                             + "already pay for."),
+                            ("Anthropic SDK",
+                             "uses ANTHROPIC_API_KEY or an existing ant login, rather than a "
+                             + "key typed here."),
+                            ("API key / local server",
+                             "anything that speaks the OpenAI chat-completions shape, whether "
+                             + "that is a paid provider or a model server of your own."),
+                            ("Azure OpenAI",
+                             "the same shape, but the key travels in an api-key header instead "
+                             + "of a bearer token, which is why it is its own mode."),
+                            ("ChatGPT sign-in",
+                             "builds through a Plus or Pro subscription with no API key. Opens "
+                             + "your browser; the tokens go to your login Keychain."),
+                        ])
                     }
 
                     if model.auth == "chatgpt_oauth" {
@@ -334,6 +372,27 @@ struct EnhancerEditor: View {
                         TextField("300", value: $model.timeout, format: .number)
                             .textFieldStyle(.roundedBorder).frame(maxWidth: 90)
                     }
+
+                    SettingsBullets([
+                        ("Model",
+                         "the exact id the endpoint expects, spelled its way. A local server "
+                         + "usually names whatever you have loaded; a provider publishes its "
+                         + "own list."),
+                        ("API key",
+                         "kept in your login Keychain, never written into a file in the "
+                         + "library, so it is not something a git push can carry away."),
+                        ("Fallback",
+                         "tried once when the primary fails in a way a retry could fix. A rate "
+                         + "limit or a 5xx moves to it; a 401 or a 404 does not, because the "
+                         + "same request would fail there for the same reason."),
+                        ("Timeout",
+                         "a build is one long request rather than a stream, so this is the "
+                         + "whole call. Raise it for a slow local model on a large prompt."),
+                        ("Test against Save",
+                         "Test saves and then makes one real call, so it spends whatever one "
+                         + "build costs and proves the endpoint, the key and the model id all "
+                         + "work together. Save only writes the settings."),
+                    ])
                 }
                 .padding(Tokens.Space.pane)
             }
