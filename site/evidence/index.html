@@ -96,6 +96,11 @@
         <p>
           <strong>Declared deviations.</strong> Four tasks rather than the five first planned. Scored against
           checkable criteria by one reader rather than judged blind. One run per condition at temperature 0.
+          Both fix tasks in the Opus run had <code>swift build</code> and <code>swift test</code> refused by the
+          permission system, so nothing was compiled or run in either condition. That hit the two arms unevenly:
+          the render asks the model to reproduce the failure and run the tests, the seed asks it to verify nothing,
+          and those are the two tasks the render lost. The scoring stands as recorded, and neither task has been
+          re-run with the toolchain available.
         </p>
 
         <h3>Inputs</h3>
@@ -237,7 +242,7 @@
         <h2>What this does and does not settle</h2>
         <ul>
           <li><strong>Settles:</strong> tailoring a prompt to a weak model measurably improves its output, mostly by suppressing fabrication and by making it comply with instructions it otherwise ignores. Combined with the flat Opus result: the enhancer earns its cost on weak models and not on strong ones.</li>
-          <li><strong>Does not settle:</strong> the weak-model run is one 30B vision-language model, not the 70B text model first planned. One run at temperature 0, scored by one reader, four tasks. A second person reproducing it would be worth more than this page.</li>
+          <li><strong>Does not settle:</strong> the weak-model run is one 30B vision-language model, not the 70B text model first planned. One run at temperature 0, scored by one reader, four tasks. The two Opus fix tasks ran with the build and test commands blocked, so half of that null result comes from a setting where the render's instructions could not be followed. A second person reproducing it would be worth more than this page.</li>
           <li><strong>Not claimed anywhere on this site:</strong> that Seedbed saves time (never measured; the tool counts copies, not minutes), that it improves any model (measured false on Opus 5), or that anyone but its author uses it.</li>
         </ul>
         <p style="margin-top:28px" class="back"><a href="/">Back to seedbed.dev</a></p>

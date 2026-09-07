@@ -120,9 +120,12 @@ struct MCPAuthAlert: Equatable, Sendable {
     var lastAttempt: Date
 
     var title: String {
-        let count = attempts == 1 ? "once" : "\(attempts) times"
         let time = lastAttempt.formatted(date: .omitted, time: .shortened)
-        return "A client was refused \(count), most recently at \(time)."
+        // "refused once, most recently at" is wrong: one refusal has no most
+        // recent. The singular gets its own sentence rather than a count.
+        return attempts == 1
+            ? "A client was refused at \(time)."
+            : "A client was refused \(attempts) times, most recently at \(time)."
     }
 
     var detail: String {

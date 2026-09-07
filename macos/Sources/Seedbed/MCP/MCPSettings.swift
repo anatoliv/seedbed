@@ -69,6 +69,12 @@ struct MCPSettings: View {
     @State private var confirmingRegenerate = false
     @State private var confirmingRegenerateReadOnly = false
     @State private var copied = ""
+    /// What the last "Update my client config" press did, or nil before the
+    /// first one. Shown in the pane rather than the footer, because it is
+    /// several sentences and it needs to stay on screen while the person reads
+    /// it. A write that reports nothing is indistinguishable from one that
+    /// failed, which is the failure this whole button exists to end.
+    @State private var configReport: ClaudeConfigInstaller.Report?
 
     private var url: String { "http://127.0.0.1:\(port)" }
 
@@ -280,8 +286,28 @@ struct MCPSettings: View {
                     copy(MCPClientSnippet.entry(name: "seedbed", url: url, token: readOnlyToken),
                          as: "read-only configuration")
                 }
+                // The read-only token, never the full one. A client this button
+                // configures has not been trusted with anything: it was never
+                // asked about, so it gets the token that cannot spend money.
+                Button("Update my client config") {
+                    configReport = ClaudeConfigInstaller.update(url: url, token: readOnlyToken)
+                }
+                .disabled(readOnlyToken.isEmpty)
                 Spacer()
             }
+            if let configReport {
+                if configReport.succeeded {
+                    resultRow(configReport.title, configReport.detail)
+                } else {
+                    warningRow(configReport.title, configReport.detail)
+                }
+            }
+            note("\"Update my client config\" writes the read-only configuration straight into "
+                 + "the Claude Code settings file in your home folder, replacing only the "
+                 + "seedbed entry and leaving every other server in it alone. It saves the "
+                 + "previous version beside it first, and it tells you which file it wrote. "
+                 + "Nothing is written unless you press it, so a client you configured by "
+                 + "hand stays exactly as you left it.")
         }
     }
 
@@ -337,6 +363,29 @@ struct MCPSettings: View {
             .fill(Tokens.Surface.sunken))
         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.control)
             .stroke(Tokens.warning.opacity(0.4), lineWidth: 0.5))
+    }
+
+    /// The same shape as `warningRow`, for the case where the write worked.
+    /// Deliberately as prominent as the failure: the person needs to see which
+    /// file was written and where the backup went, and a success reported in
+    /// passing is one they will not read.
+    private func resultRow(_ title: String, _ detail: String) -> some View {
+        HStack(alignment: .top, spacing: Tokens.Space.tight) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: Tokens.IconSize.compact))
+                .foregroundStyle(Tokens.positive)
+            VStack(alignment: .leading, spacing: Tokens.Space.row) {
+                Text(title).font(Tokens.FontScale.small.weight(.medium))
+                Text(detail).font(Tokens.FontScale.small).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(Tokens.Space.row6)
+        .background(RoundedRectangle(cornerRadius: Tokens.Radius.control)
+            .fill(Tokens.Surface.sunken))
+        .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.control)
+            .stroke(Tokens.Surface.hairline, lineWidth: 0.5))
     }
 
     private func note(_ text: String) -> some View {
