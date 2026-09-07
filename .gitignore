@@ -2,6 +2,11 @@
 # machine-local so a stale cache on one Mac never travels to another.
 .cache/
 
+# Finder metadata. Two of these were tracked from the first app commit, which
+# is why a new one in another directory read as the only untracked file in the
+# tree and stopped a publish: the guard is right, the repo was wrong.
+.DS_Store
+
 # Python
 __pycache__/
 *.pyc

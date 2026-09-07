@@ -42,18 +42,45 @@ def text_of(page: Path) -> str:
 
 class SiteAssets(unittest.TestCase):
     def test_brand_exports_are_byte_identical_to_the_masters(self) -> None:
-        for name in ("seedbed-mark.svg", "favicon.svg", "favicon-32.png", "apple-touch-icon.png"):
+        for name in ("seedbed-mark.svg", "seedbed-app-icon.svg", "favicon.svg",
+                     "favicon-32.png", "apple-touch-icon.png"):
             with self.subTest(name=name):
                 self.assertEqual(
                     (SITE / name).read_bytes(), (ROOT / "assets" / "brand" / name).read_bytes(),
                     f"site/{name} drifted from assets/brand/{name}; copy it, do not edit it",
                 )
 
+    def test_every_icon_url_is_versioned(self) -> None:
+        # The host serves svg and png as `immutable` for 7 days and a CDN sits in
+        # front, so an icon replaced at a stable path keeps being served from the
+        # edge. On 2026-09-07 the site showed the pre-refresh mark for two days
+        # after the new one was deployed, and the origin was correct the whole
+        # time. Versioned URLs are a different cache key, so the swap is visible
+        # at once; bump the version whenever an icon changes.
+        for page in PAGES:
+            html = text_of(page)
+            for ref in re.findall(r'(?:href|src|content)="((?:https://seedbed\.dev)?/[^"]+\.(?:svg|png))"', html):
+                if ref.endswith(".dmg"):
+                    continue
+                with self.subTest(page=page.name, ref=ref):
+                    self.assertRegex(ref, r"\?v=\d{8}$", f"{ref} carries no version query")
+
     def test_og_image_is_the_social_card_size(self) -> None:
         head = (SITE / "og.png").read_bytes()[:24]
         self.assertEqual(head[:8], b"\x89PNG\r\n\x1a\n")
         width, height = struct.unpack(">II", head[16:24])
         self.assertEqual((width, height), (1200, 630))
+
+    def test_og_image_is_generated_from_the_app_icon_master(self) -> None:
+        # site/og.png is built by Scripts/make-og-image.sh, which rasterizes
+        # assets/brand/seedbed-app-icon.svg and places it. Hand-copying the
+        # master's paths into a new drawing is what the brand README forbids,
+        # and it is how a social card silently stops matching the app icon.
+        script = ROOT / "Scripts" / "make-og-image.sh"
+        self.assertTrue(script.is_file())
+        body = script.read_text()
+        self.assertIn("assets/brand/seedbed-app-icon.svg", body)
+        self.assertIn("site/og.png", body)
 
     def test_pages_reference_only_assets_that_exist(self) -> None:
         for page in PAGES:
