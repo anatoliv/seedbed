@@ -21,6 +21,19 @@ BUILD_NUM="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Packaging/Info.
 APP="build/Seedbed.app"
 DMG="dist/Seedbed_${VERSION}_universal.dmg"
 
+# The same digest make-app.sh stamps into the bundle, recomputed over the tree.
+#
+# Kept character for character identical to the copy in make-app.sh — the two
+# values are compared against each other, so a divergence here makes every
+# comparison meaningless while looking entirely correct, and it would fail in
+# the loud direction on every release rather than the quiet one.
+# tests/test_bundle_freshness.py pins them equal.
+source_digest() {
+    find Sources Package.swift -type f -name '*.swift' -print0 \
+        | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256 \
+        | awk '{print $1}'
+}
+
 # --- The test suite -----------------------------------------------------------
 # The Python core owns the library: staleness, guidance, the enhancer, the
 # registry. The app is a front end to it, so shipping a bundle built from a tree
@@ -142,12 +155,51 @@ fi
 # This has now cost two debugging sessions in one day: a fix that looked like it
 # had no effect, and a design comparison reported against a build that predated
 # it. Neither was a wrong change; both were the previous binary.
-NEWEST_SOURCE="$(find Sources -name '*.swift' -newer "$APP/Contents/MacOS/Seedbed" -print -quit 2>/dev/null || true)"
-if [[ -n "$NEWEST_SOURCE" ]]; then
-    echo "error: $NEWEST_SOURCE is newer than the built binary." >&2
-    echo "       The bundle in build/ predates the source it claims to be." >&2
-    echo "       Run Scripts/make-app.sh — 'swift build' alone does not assemble it." >&2
-    exit 1
+#
+# Asked of the CONTENT where the bundle records a digest, and of modification
+# times only where it does not. Read from the built bundle, because the tree
+# cannot testify about the artifact.
+#
+# The shape is checked rather than the mere presence of a value: a truncated or
+# differently-computed digest would compare unequal forever, which reads as a
+# permanently stale bundle and teaches everyone to ignore the gate.
+BUNDLE_DIGEST="$(/usr/libexec/PlistBuddy -c 'Print :SeedbedSourceDigest' \
+    "$APP/Contents/Info.plist" 2>/dev/null || true)"
+if [[ "$BUNDLE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    TREE_DIGEST="sha256:$(source_digest)"
+    if [[ "$BUNDLE_DIGEST" != "$TREE_DIGEST" ]]; then
+        echo "error: the sources are not the ones $APP was built from." >&2
+        echo "       bundle: $BUNDLE_DIGEST" >&2
+        echo "       tree:   $TREE_DIGEST" >&2
+        echo "       Some source file, or Package.swift, differs in content from the" >&2
+        echo "       set this binary was compiled out of. Modification times do not" >&2
+        echo "       come into it, so this is a real difference in bytes." >&2
+        echo "       Run Scripts/make-app.sh — 'swift build' alone does not assemble it." >&2
+        exit 1
+    fi
+else
+    # No digest, so the bundle predates the record and gets the check it was
+    # always subject to. Absence must never read as "nothing to compare,
+    # therefore fine": an older bundle silently starting to pass a check it was
+    # previously failing is worse than the false alarm below, because it fails
+    # open and says nothing.
+    #
+    # The false alarm is real and is worth naming in the error itself, since the
+    # last person to read one of these believed it. A file rewritten with
+    # identical bytes — a restore from backup, a checkout, a formatter that
+    # changed nothing — moves its mtime and trips this while the bundle is
+    # byte-correct. Rebuilding records a digest and retires the ambiguity.
+    NEWEST_SOURCE="$(find Sources -name '*.swift' -newer "$APP/Contents/MacOS/Seedbed" -print -quit 2>/dev/null || true)"
+    if [[ -n "$NEWEST_SOURCE" ]]; then
+        echo "error: $NEWEST_SOURCE is newer than the built binary." >&2
+        echo "       The bundle in build/ predates the source it claims to be." >&2
+        echo "       This bundle records no source digest, so the comparison is by" >&2
+        echo "       modification time and cannot see content: a file restored with" >&2
+        echo "       identical bytes trips it too. Compare the file against the" >&2
+        echo "       revision the bundle names before believing it is stale." >&2
+        echo "       Run Scripts/make-app.sh — 'swift build' alone does not assemble it." >&2
+        exit 1
+    fi
 fi
 
 # The bundle must say which revision built it, and it must be the revision this

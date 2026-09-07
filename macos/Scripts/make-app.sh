@@ -95,6 +95,39 @@ if [[ -z "$IDENTITY" ]]; then
     esac
 fi
 
+# What the bundle will carry so a later check can ask whether it was built from
+# these bytes, rather than from a tree whose files merely look older.
+#
+# The freshness gate in check-release.sh compared source MTIMES against the
+# binary's, and content never entered into it. Restoring a file from a backup —
+# which is this project's house pattern for proving a guard works — returns it
+# byte for byte and moves its mtime, so a byte-correct bundle was reported stale
+# in terms indistinguishable from a real staleness. On 2026-09-07 an auditor
+# read one of those as proof that committed UI had never been built and sent a
+# finished card back on the strength of it. It also fails in the other
+# direction, silently: content edited without the mtime moving is invisible to
+# an mtime comparison and free to catch with a hash.
+#
+# Paths are hashed alongside contents, so a rename or a deletion moves the
+# digest even when every surviving byte is unchanged. Package.swift is in the
+# set because it decides flags and dependencies: a change there produces a
+# different binary from identical sources.
+#
+# Computed BEFORE the build, so it describes what was compiled. A tree edited
+# while the build runs then disagrees with the bundle, which is exactly the
+# staleness the reader downstream exists to catch.
+#
+# Kept character for character identical to the copy in check-release.sh — the
+# two are compared against each other, so a divergence makes every comparison
+# meaningless while looking entirely correct. tests/test_bundle_freshness.py
+# pins them equal.
+source_digest() {
+    find Sources Package.swift -type f -name '*.swift' -print0 \
+        | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256 \
+        | awk '{print $1}'
+}
+SOURCE_DIGEST="sha256:$(source_digest)"
+
 echo "==> Building release binary (universal)"
 # -Xswiftc -g emits DWARF so dsymutil can produce a real dSYM. Without it the
 # binary carries only symtab and unwind info: Sentry can resolve function names
@@ -168,6 +201,37 @@ if [[ -n "${SEEDBED_BUILD_REF:-}" ]]; then
     fi
     echo "==> Identity verified from the bundle: $BAKED_RELEASE"
 fi
+
+# The second field of the same record, and the one that answers freshness.
+#
+# Written for EVERY build, unlike the commit above. A commit stamp can be false
+# — a tree with uncommitted work carries a perfectly truthful HEAD — which is
+# why it is refused unless the tree is clean. A digest cannot be false in that
+# way: it describes the bytes that were actually compiled, so a local build's
+# digest is as true as a release build's, and withholding it would leave the
+# ordinary case relying on the mtime comparison this exists to replace.
+#
+# Added rather than Set, so the tracked Packaging/Info.plist needs no new key.
+# A digest committed into the tree would be a claim the tree makes about a build
+# that has not happened, and stale the moment anyone edits a source file. The
+# Delete first keeps the Add idempotent against a bundle that already has one.
+PLIST="$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Delete :SeedbedSourceDigest' "$PLIST" >/dev/null 2>&1 || true
+/usr/libexec/PlistBuddy -c "Add :SeedbedSourceDigest string $SOURCE_DIGEST" "$PLIST" >/dev/null
+
+# Read back out of the bundle, for the same reason the release is: the working
+# tree cannot testify about the artifact, and a PlistBuddy write that silently
+# did not take leaves an app that looks identical and carries nothing. An absent
+# digest is not a quiet pass downstream — it falls back to the mtime check — so
+# a failed write here would restore the very defect this replaces.
+BAKED_DIGEST="$(/usr/libexec/PlistBuddy -c 'Print :SeedbedSourceDigest' "$PLIST" 2>/dev/null || true)"
+if [[ "$BAKED_DIGEST" != "$SOURCE_DIGEST" ]]; then
+    echo "error: the built bundle records its source digest as '${BAKED_DIGEST:-<empty>}'," >&2
+    echo "       not $SOURCE_DIGEST. The write did not take, so nothing downstream" >&2
+    echo "       can tell this bundle from one built before its sources changed." >&2
+    exit 1
+fi
+echo "==> Source digest recorded from the bundle: $BAKED_DIGEST"
 
 # Bundle Sparkle.framework, which the app links and needs at runtime. The rpath
 # in Package.swift points here; without the copy the bundle links fine and dies
