@@ -134,3 +134,25 @@ class Presets(unittest.TestCase):
 
     def test_unknown_preset_is_none(self):
         self.assertIsNone(preset("nope"))
+
+    def test_one_preset_is_not_a_provider(self):
+        """Someone must be able to find "point this at my own server" in the menu.
+
+        Every other entry is a brand, and a list of brands reads as the complete
+        set of options. On 2026-09-07 a reader wanting a model on their own
+        machine went down that list, found no entry for it, and concluded it was
+        unsupported. It was supported the whole time: the endpoint is editable
+        and a private address passes `endpoint_is_acceptable`. The defect was
+        that nothing said so.
+
+        So this pins the entry rather than its wording, which is free to change.
+        """
+        custom = preset("custom")
+        self.assertIsNotNone(custom, "the non-provider preset is gone, and with it the "
+                                     "only hint in the menu that your own server is an option")
+        self.assertEqual(custom.auth, "api_key")
+        self.assertTrue(endpoint_is_acceptable(custom.endpoint),
+                        "its placeholder must satisfy the rule it is demonstrating")
+        self.assertFalse(custom.model,
+                         "the model depends on what the user runs, so it stays blank "
+                         "rather than suggesting one they do not have")

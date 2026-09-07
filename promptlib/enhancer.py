@@ -36,7 +36,13 @@ class Preset:
 
 #: Provider presets, cost-first:
 #: OpenAI is here because most people start there, the rest are ways to spend
-#: less, and the two local ones cost nothing at all.
+#: less, and the local ones cost nothing at all.
+#:
+#: Every entry except the last is a provider, which is why the last one exists.
+#: A reader looking for a way to point at a model server of their own read a
+#: list of brand names and concluded it was unsupported. It was always
+#: supported, since the endpoint is an editable field and `endpoint_is_acceptable`
+#: allows a private address, but a capability nobody can find is one nobody has.
 PRESETS: list[Preset] = [
     Preset("claude-cli", "Claude Code CLI (no key, uses your subscription)", "", "opus", "cli"),
     Preset("anthropic-sdk", "Anthropic SDK (ANTHROPIC_API_KEY or ant login)", "", "claude-opus-5", "sdk"),
@@ -66,6 +72,13 @@ PRESETS: list[Preset] = [
            "http://localhost:1234/v1/chat/completions", ""),
     Preset("llamacpp", "llama.cpp (local, free)",
            "http://localhost:8080/v1/chat/completions", ""),
+    # Deliberately last, and deliberately a placeholder rather than a real
+    # address: the point is to show the shape and then be edited. Upper case
+    # says "replace me", the same signal the Azure entry uses. A .local name
+    # keeps it acceptable to `endpoint_is_acceptable`, so it is a working
+    # example of the rule rather than one the validator would reject.
+    Preset("custom", "Custom / your own server (local or LAN)",
+           "http://YOUR-SERVER.local:11434/v1/chat/completions", ""),
 ]
 
 AUTH_MODES = ["cli", "sdk", "api_key", "azure_api_key", "chatgpt_oauth"]

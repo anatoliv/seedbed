@@ -253,12 +253,11 @@ struct EnhancerEditor: View {
                          + "and you can then change any of them; the menu reads Custom once "
                          + "they no longer match a preset."),
                         ("Running a model on another machine",
-                         "there is no preset for it because it is your address, not a "
-                         + "provider's. Pick the local preset closest to what you run (Ollama, "
-                         + "LM Studio or llama.cpp), then edit Endpoint to point at that "
-                         + "machine, for example http://your-server.local:11434/v1/chat/"
-                         + "completions. Plain http is accepted for a .local name or a private "
-                         + "address; anything on the public internet must be https."),
+                         "pick Custom / your own server. It fills in a placeholder address for "
+                         + "you to replace with yours, since the one thing Seedbed cannot know "
+                         + "is where your server is. Plain http is accepted for a .local name "
+                         + "or a private address; anything on the public internet must be "
+                         + "https."),
                         ("Enhancer against target",
                          "this pane picks the model that WRITES your prompts. Which models a "
                          + "prompt is written FOR is the Models pane. Choosing OpenAI here does "
