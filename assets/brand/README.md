@@ -53,6 +53,9 @@ not two interchangeable brand icons.
 - `favicon.svg`, `favicon-32.png`, and `apple-touch-icon.png` — website assets.
 - `seedbed-mark-512.png` — transparent general-purpose raster mark.
 
+The public site keeps its own copies of the web assets in `site/`, which must
+stay byte-identical to the ones here. The export script does not write there.
+
 ## Regenerating exports
 
 The SVG files are the production masters. After changing either one, regenerate
@@ -66,6 +69,21 @@ The export requires `rsvg-convert`, macOS `sips`, and Python 3. It also rebuilds
 `Seedbed.icns`; do not hand-edit any PNG or ICNS export. Inspect the 18 pt menu
 asset at native size after every geometry change. `tests/test_brand_assets.py`
 guards the expected dimensions and the app/web placement mapping.
+
+Then refresh the site's copies, because the export script does not touch them:
+
+```sh
+cp assets/brand/{seedbed-mark.svg,seedbed-app-icon.svg,favicon.svg,\
+favicon-32.png,apple-touch-icon.png} site/
+Scripts/make-og-image.sh          # the social card, from the app-icon master
+```
+
+and **bump the `?v=` query on every icon URL in `site/index.html` and
+`site/evidence/index.html`**. The site is served with a week-long `immutable`
+cache and a CDN in front of it, so an icon replaced at a stable path keeps being
+served from the edge: on 2026-09-07 visitors saw the previous mark for two days
+while the origin was correct. A versioned URL is a different cache key, and
+`tests/test_site.py` fails any icon reference that has none.
 
 ## Color
 

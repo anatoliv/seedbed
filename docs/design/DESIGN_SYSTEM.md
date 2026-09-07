@@ -270,6 +270,23 @@ honored for normal visits. For deterministic visual QA, `?appearance=dark` and
 `?appearance=light` override only the current page and never change the user's
 system appearance.
 
+**The public site is a second browser surface with different constraints.**
+`site/` carries the same palette by hand in `site/site.css` (warm paper
+`#F7F5F3` / graphite `#0D0E11`, terracotta `#C7693D` light and `#DF865D` dark,
+the 4/6/8/12px radii) but it cannot share the local UI's implementation: the
+host serves it under a Content-Security-Policy with no `script-src` and no
+`font-src`, so there is no bundled Inter, no JetBrains Mono and no JavaScript.
+System faces stand in (`ui-rounded` for display, the system UI stack for body,
+`ui-monospace` for code) and both palettes come from `prefers-color-scheme`
+alone, with no override query and no toggle — a toggle would need a script.
+Everything interactive is CSS: the model tabs are radio inputs, the growth
+animation is keyframes, and both respect `prefers-reduced-motion`. Icon URLs
+carry a `?v=<yyyymmdd>` query because that host also serves images as
+`immutable` for a week, so a replaced icon at a stable path keeps being served
+from cache. `tests/test_site.py` holds all of it: no script, no external
+stylesheet, no unversioned icon, and the copies under `site/` byte-identical to
+`assets/brand/`.
+
 ## Brand identity
 
 Design parity does not replace Seedbed's identity. Brand geometry is governed

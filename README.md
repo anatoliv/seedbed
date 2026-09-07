@@ -103,6 +103,13 @@ was previously the only way to get the app onto one. It still needs what the app
 is a front end *to*: a clone of this repository and Python 3.11+. The DMG carries
 those two instructions inside it, in the same words the cask uses.
 
+The site at seedbed.dev is part of that surface rather than a separate thing:
+its download links name the DMG by file name, so `release.sh` rewrites them
+through `Scripts/sync-site.sh` and the release gate refuses a page still
+pinned to the previous version. Deploying it is a separate script that is not
+in this repository, for the same reason `publish.sh` is not: it names the host
+and path this particular site is served from.
+
 The app's own **Check for Updates** is `git fetch` against the library checkout,
 so a copy installed from a DMG is told that pulling updates the prompts and that
 the app changes when a newer DMG replaces it.
@@ -138,13 +145,13 @@ guidance moved. You review a diff rather than trusting a black box.
     rendered/<model>/<id>.md  generated expansions, with provenance
     .cache/guides/            fetched guidance (gitignored, machine-local)
     assets/brand/README.md    which icon/mark belongs in each product context
-    site/                     the public site, seedbed.dev; deployed by Scripts/publish-site.sh
+    site/                     the public site served at seedbed.dev
 
 ## Same seed, two targets
 
-`fix this bug and test` renders as 233 words of outcome-focused prose for
-Claude Opus 5, and 433 words of numbered steps, a fixed output schema and a
+`fix this bug and test` renders as 182 words of outcome-focused prose for
+Claude Opus 5, and 698 words of numbered steps, a fixed output schema and a
 worked example for a local Llama. That difference is the point.
 
-(Counted on the prompt body. `wc -w` on the whole file reports 20 more, which is
-the provenance header at the top of every render.)
+(Counted on the prompt body, 2026-09-07. `wc -w` on the whole file reports 23
+more, which is the provenance header at the top of every render.)

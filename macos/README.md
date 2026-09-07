@@ -310,6 +310,14 @@ Reference after they earned their place there:
     Scripts/release.sh          build, notarize, staple, appcast, tag
     Scripts/publish.sh          put it on seedbed.dev
 
+`release.sh` syncs **three** version-pinned surfaces before the gate runs, not
+one: the appcast, `Casks/seedbed.rb` through `Scripts/sync-cask.sh`, and the
+public site through `Scripts/sync-site.sh`, whose download links name the DMG by
+file name. `check-release.sh` then re-checks all three, so a page or a cask
+still pinned to the previous release cannot ship. The site is the surface a
+stranger meets first and the one nobody here reads, which is exactly why it is
+checked mechanically rather than remembered.
+
 `publish.sh` deliberately cannot build. A script that can do both is one that can
 publish something the release gate never saw, so this one re-runs the gate and
 refuses if it does not pass.
@@ -332,6 +340,16 @@ nothing is rebuilt and nothing restarts. `publish.sh` itself is not in this
 repository — it names the host and path this particular site is served from, and
 that is the only part of releasing which is nobody else's business. Set
 `PUBLISH_HOST` and `PUBLISH_DIR` for your own.
+
+The marketing site is deployed by a second script, kept out of this repository
+for the same reason and landing in the same document root. It never touches the
+DMG or the feed — those belong to `publish.sh`, and a site deploy that could
+overwrite `appcast.xml` would roll the update channel backwards for every
+installed copy. It refuses to publish a page whose download link does not
+already answer 200, and it compares the sha256 of every asset **as served**
+against the local file. That last check exists because a status code cannot tell
+a current file from a cached one: the site served a superseded brand mark for
+two days while the origin was correct, and every check then in place passed.
 
 **The first Sparkle build cannot arrive through Sparkle.** 0.1.1 and earlier have
 no updater in them, so any copy on those has to be replaced by hand once. The
