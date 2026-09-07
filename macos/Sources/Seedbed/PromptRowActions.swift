@@ -110,5 +110,19 @@ struct PromptRowActions: View {
         }
         .buttonStyle(.plain)
         .help(help)
+        // `.help` sets the help attribute, which assistive technology reads
+        // AFTER a label. With no label there was nothing to read first but the
+        // SF Symbol's system name, so a screen-reader user heard
+        // "doc.on.doc" — or, where the symbol has no name, silence. The label
+        // is the help text without its trailing keyboard hint, because that
+        // hint is punctuation a screen reader spells out one glyph at a time.
+        .accessibilityLabel(Self.accessibilityLabel(from: help))
+    }
+
+    /// "Copy the Opus 5 prompt to the clipboard (⇧⏎)" becomes
+    /// "Copy the Opus 5 prompt to the clipboard".
+    static func accessibilityLabel(from help: String) -> String {
+        guard help.hasSuffix(")"), let open = help.lastIndex(of: "(") else { return help }
+        return String(help[..<open]).trimmingCharacters(in: .whitespaces)
     }
 }

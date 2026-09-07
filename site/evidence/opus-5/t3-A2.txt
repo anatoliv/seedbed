@@ -59,4 +59,4 @@ Two details worth flagging: `dirty` is now `private(set)`, so anything that assi
 
 To run them: `swift test` in `/private/var/folders/mb/jhx79j5n03760097trwvfty40000gn/T/tmp.zA8FuWEQ6f`. If it fails to build, the likeliest culprit is the `macOS(.v13)` platform line in `Package.swift`, not the model logic.
 
-Not filing a the task tracker card — this is a scratch package in a temp directory with no owning project, and the fix is the deliverable here rather than tracked work.
+Not filing a [a task tracker] card — this is a scratch package in a temp directory with no owning project, and the fix is the deliverable here rather than tracked work.

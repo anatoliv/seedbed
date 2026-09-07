@@ -38,6 +38,17 @@ struct Target: Decodable, Identifiable, Hashable {
         }
     }
 
+    /// The same three states as a shape, for Differentiate Without Colour and
+    /// for anyone who cannot tell 5pt green from 5pt amber — which is the
+    /// classic failure of a status dot, and this had no other cue at all.
+    var stateSymbol: String {
+        switch state {
+        case "current": return "checkmark"
+        case "stale":   return "exclamationmark"
+        default:        return "minus"
+        }
+    }
+
     /// Vendor prefixes waste the width a chip does not have: "Claude Opus 5"
     /// reads as "Opus 5", "Llama 3.3 70B (local)" as "Llama 3.3 70B".
     var shortName: String {
@@ -391,6 +402,31 @@ struct LibraryClient {
         Task.detached(priority: .utility) { _ = resolvedPython }
     }
 
+    /// The environment the Python package runs in, with a PATH a shell would
+    /// recognise.
+    ///
+    /// An app launched from Finder inherits roughly
+    /// `/usr/bin:/bin:/usr/sbin:/sbin`, so anything installed in a user or
+    /// Homebrew prefix is invisible to it. That is why the interpreter is
+    /// probed by absolute path rather than found on PATH — and the enhancer
+    /// shells out to the `claude` CLI, which lives in exactly those invisible
+    /// places. The symptom is a report that the CLI is not installed, on a Mac
+    /// where it is, and only when the app is launched the normal way.
+    ///
+    /// The user's PATH is prepended to rather than replaced: a deliberate
+    /// entry of theirs should still win.
+    static let childEnvironment: [String: String] = {
+        var env = ProcessInfo.processInfo.environment
+        let home = NSHomeDirectory()
+        let extras = ["\(home)/.local/bin", "\(home)/.claude/local",
+                      "/opt/homebrew/bin", "/usr/local/bin"]
+        let existing = env["PATH"].map { $0.split(separator: ":").map(String.init) } ?? []
+        var ordered = existing
+        for path in extras where !ordered.contains(path) { ordered.append(path) }
+        env["PATH"] = ordered.joined(separator: ":")
+        return env
+    }()
+
     /// True when this interpreter has `tomllib`, which is the 3.11+ gate.
     private static func canRunPromptlib(_ path: String) -> Bool {
         guard FileManager.default.isExecutableFile(atPath: path) else { return false }
@@ -417,6 +453,7 @@ struct LibraryClient {
         process.executableURL = URL(fileURLWithPath: python)
         process.arguments = ["-m", "promptlib"] + arguments
         process.currentDirectoryURL = root
+        process.environment = Self.childEnvironment
 
         let out = Pipe(), err = Pipe()
         process.standardOutput = out

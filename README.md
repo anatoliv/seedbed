@@ -41,7 +41,7 @@ On first load the Mac app points to
 always wins, and a valid legacy `~/Projects/seedbed` checkout remains an
 automatic fallback for upgrades.
 
-macOS 14 (Sonoma) or later, Apple Silicon or Intel. The cask is marked
+macOS 14 (Sonoma) or later, Apple silicon or Intel. The cask is marked
 `auto_updates`, so Seedbed keeps itself current through Sparkle rather than
 through `brew upgrade`.
 
@@ -56,10 +56,12 @@ through `brew upgrade`.
     python3 -m promptlib match "reviewing a diff before I merge"
     python3 -m promptlib guides fetch                    re-pull vendor guidance
 
-No dependencies: stdlib only, `tomllib` for frontmatter. The default enhancer
-shells out to the `claude` CLI already on this machine, so there is no API key
-and no extra spend. `--enhancer anthropic` uses the official SDK; `--enhancer
-openai` takes any OpenAI-compatible endpoint, including a local one.
+The core has no required Python packages beyond `tomllib` in Python 3.11. The
+default enhancer shells out to the `claude` CLI already on this machine, so
+there is no API key and no extra spend. The optional Anthropic backend uses its
+official SDK; OpenAI-compatible endpoints include local servers. You can also
+choose **ChatGPT sign-in** in the app, or run `python3 -m promptlib enhancer
+login`, to build through a Plus or Pro subscription without an API key.
 
 ## Let an agent ask for a prompt
 
@@ -110,9 +112,11 @@ pinned to the previous version. Deploying it is a separate script that is not
 in this repository, for the same reason `publish.sh` is not: it names the host
 and path this particular site is served from.
 
-The app's own **Check for Updates** is `git fetch` against the library checkout,
-so a copy installed from a DMG is told that pulling updates the prompts and that
-the app changes when a newer DMG replaces it.
+**Check for Updates** follows how the copy was installed. A development build
+inside the checkout uses `git fetch` and tells you to pull and rebuild. A copy
+installed from a release uses the signed Sparkle feed and can install the newer
+app. Neither path updates the prompt library itself; that remains a git checkout
+you update with `git pull`.
 
 Crash reporting exists for builds that leave this machine, and is off twice
 over: the user has to opt in, *and* the build has to carry a DSN, which no

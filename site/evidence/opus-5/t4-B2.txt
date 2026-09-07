@@ -10,7 +10,7 @@ So I have the snippet from your message and nothing else. I'm not going to patch
 
 ## What I need
 
-Point me at the repo — either give me the path and add it to the session's allowed directories, or re-run me with the project as the working directory. a sibling app and Reference are both menu-bar apps, so it's plausibly one of those.
+Point me at the repo — either give me the path and add it to the session's allowed directories, or re-run me with the project as the working directory. [another project] and [another project] are both menu-bar apps, so it's plausibly one of those.
 
 ## Static read, offered as hypotheses only — not a fix
 

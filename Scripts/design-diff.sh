@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
-# Print every shared design-token difference between Seedbed and Reference.
+# Print every shared design-token difference between Seedbed's Theme.swift and
+# the design contract it is held to.
+#
+# With no argument this checks against the vendored contract in
+# macos/Design/reference-tokens.json, which is the definition Seedbed ships and
+# the only one the tests use. Pass a path to a Tokens.swift, or set
+# REFERENCE_THEME, to compare against an external source before refreshing the
+# vendored copy — that is the one moment the two can legitimately differ.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-OTHER="${the task tracker:-$HOME/Projects/reference}/apps/reference-mac/Sources/Reference/Theme/Tokens.swift"
+OTHER="${1:-${REFERENCE_THEME:-}}"
 MINE="macos/Sources/Seedbed/Theme.swift"
 
-if [[ ! -f "$OTHER" ]]; then
-    echo "Reference not checked out at ${the task tracker:-$HOME/Projects/reference} — using the vendored contract."
+if [[ -z "$OTHER" || ! -f "$OTHER" ]]; then
+    echo "No external Tokens.swift given — checking against the vendored contract."
     python3 -m unittest tests.test_reference_parity -q
     exit 0
 fi

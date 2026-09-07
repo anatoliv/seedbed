@@ -7,7 +7,7 @@ this document were extracted from it on **2026-09-06**. Where code and prose
 disagree, the code is right and this document is stale: correct the document,
 then decide explicitly whether the code should change.
 
-The shared visual contract is the reference app's current macOS token source:
+The shared visual contract is Reference's current macOS token source:
 `apps/reference-mac/Sources/Reference/Theme/Tokens.swift`. Seedbed vendors a parsed
 snapshot at `macos/Design/reference-tokens.json`; `tests/test_reference_parity.py`
 compares every shared group token-for-token. Refresh the snapshot only after a
@@ -209,7 +209,7 @@ the 460pt `Surface.raised` panel with `Radius.sheet`, a 0.5pt hairline, and
 
 ## Help, FAQ, and release notes
 
-The information window follows the reference app's browsable two-pane Help structure.
+The information window follows Reference's browsable two-pane Help structure.
 The fixed sidebar is the index and owns search; the detail pane owns reading.
 Every detail page begins with the same 70pt two-row header as Reference: a 21pt
 title and neutral type chip on the first 22pt row, followed by a 12pt
@@ -218,19 +218,19 @@ horizontal and `Space.medium` vertical padding, then an opaque
 `SeedbedDivider` before the scrolling content.
 
 Long-form content is held to `Width.reading` (760pt) and uses `Space.pane`
-horizontal plus `Space.wide` vertical inset. Help and FAQ use the reference app's rendered
+horizontal plus `Space.wide` vertical inset. Help and FAQ use Reference's rendered
 Markdown hierarchy: 20pt section headings, 16pt topic headings, 15pt primary
 answers with 4pt line spacing, and spacing rather than ornamental rules between
 topics. Release notes use the narrower `Width.releaseNotes` (680pt), a 20pt
 inter-card gap, 16pt inset, 6pt radius, `primary` at 4% for the fill, and
 `primary` at 8% for the stroke. Change copy is primary 12pt text; the newest
-entry uses the reference app's solid positive Latest badge, while New / Improved / Fixed
+entry uses Reference's solid positive Latest badge, while New / Improved / Fixed
 retain the positive, secondary-accent, and warning palette.
 
 The information window keeps one deliberate Seedbed brand layer over that
 shared structure: page-header glyphs and the selected What's New navigation
 glyph use the contrast-safe terracotta `accent`; headings and release copy keep
-the reference app's primary ink so their weight and edge contrast match. What's New is the first
+Reference's primary ink so their weight and edge contrast match. What's New is the first
 unsectioned sidebar row, ahead of the long guide index; About alone remains in
 the trailing “This build” section. This makes release notes discoverable at the
 window's opening height and keeps Help, FAQ, and What's New visibly Seedbed.
@@ -261,8 +261,8 @@ These are Seedbed layout decisions rather than shared visual tokens.
 
 ## Web adapter
 
-The local web UI uses the reference app's shared browser tokens rather than pretending
-the native and browser renderers are identical. It bundles the reference app's licensed
+The local web UI uses Reference's shared browser tokens rather than pretending
+the native and browser renderers are identical. It bundles Reference's licensed
 Inter variable font and JetBrains Mono, uses the Paper/Midnight palettes from
 `reference/shared/tokens`, the 4px spacing scale, 4/6/8/12px radii, and
 150/200/240ms motion. `prefers-color-scheme` and `prefers-reduced-motion` are
@@ -303,7 +303,7 @@ other.
   and that this document does not name removed tokens.
 - `tests/test_theme_contrast.py` resolves adaptive palette values against the
   real Reference canvases in both appearances.
-- `tests/test_web_design_parity.py` holds the local web UI to the reference app's browser
+- `tests/test_web_design_parity.py` holds the local web UI to Reference's browser
   palette, fonts, radii, and reduced-motion contract.
 - `macos/Scripts/make-app.sh` must rebuild the app bundle before visual review.
 - `macos/Scripts/window-shot.sh` captures the app window itself. Review the HUD,

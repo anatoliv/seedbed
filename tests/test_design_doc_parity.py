@@ -73,7 +73,9 @@ class DesignDocNamesEveryToken(unittest.TestCase):
     def test_reference_is_the_named_reference(self) -> None:
         self.assertIn("Reference", self.doc)
         self.assertIn("reference-tokens.json", self.doc)
-        self.assertNotIn("visual language was ported from Reference", self.doc)
+        # The doc used to attribute the visual language to another project by
+        # name. `tests/test_no_sibling_projects.py` now forbids that repo-wide,
+        # so this only has to check the positive: the contract names itself.
 
 
 if __name__ == "__main__":

@@ -17,7 +17,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
 INDEX = SITE / "index.html"
 EVIDENCE = SITE / "evidence" / "index.html"
-PAGES = (INDEX, EVIDENCE)
+PRIVACY = SITE / "privacy.html"
+PAGES = (INDEX, EVIDENCE, PRIVACY)
 CASK = ROOT / "Casks" / "seedbed.rb"
 
 # The design notes behind the site list what it must not claim, each because a
@@ -127,8 +128,9 @@ class SiteContent(unittest.TestCase):
 
     def test_the_negative_result_is_published_beside_the_positive(self) -> None:
         # Publishing the Opus result that did not support the tool is what makes
-        # the qwen result worth believing. Both pages carry both.
-        for page in PAGES:
+        # the qwen result worth believing. The two pages that make the claim
+        # carry both results; the privacy page makes no claim about either.
+        for page in (INDEX, EVIDENCE):
             html = text_of(page)
             with self.subTest(page=page.name):
                 self.assertIn("claude-opus-5", html)

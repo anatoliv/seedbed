@@ -65,12 +65,45 @@ def _user_message(seed_body: str, model_name: str, guidance: str,
     )
 
 
+#: Where the `claude` CLI installs itself, in the order worth trying.
+#:
+#: `shutil.which` alone is not enough and the reason is the same one the
+#: interpreter probe exists for: an app launched from Finder inherits a minimal
+#: PATH — roughly /usr/bin:/bin:/usr/sbin:/sbin — so a binary in ~/.local/bin or
+#: /opt/homebrew/bin is invisible to it while working perfectly in a terminal.
+#: The failure looks like "not installed" to someone who has it installed.
+CLAUDE_CANDIDATES = [
+    "~/.local/bin/claude",          # the official installer
+    "~/.claude/local/claude",       # the older local install
+    "/opt/homebrew/bin/claude",     # Homebrew on Apple silicon
+    "/usr/local/bin/claude",        # Homebrew on Intel
+    "/usr/bin/claude",
+]
+
+
+def find_claude_cli() -> str | None:
+    """The `claude` binary, or None. `SEEDBED_CLAUDE_BIN` overrides everything."""
+    override = os.environ.get("SEEDBED_CLAUDE_BIN", "").strip()
+    if override:
+        return override if os.access(os.path.expanduser(override), os.X_OK) else None
+    found = shutil.which("claude")
+    if found:
+        return found
+    for candidate in CLAUDE_CANDIDATES:
+        path = os.path.expanduser(candidate)
+        if os.access(path, os.X_OK):
+            return path
+    return None
+
+
 def _via_claude_cli(prompt: str) -> str:
-    binary = shutil.which("claude")
+    binary = find_claude_cli()
     if not binary:
+        looked = ", ".join(CLAUDE_CANDIDATES)
         raise EnhancerError(
-            "the `claude` CLI is not on PATH. Install Claude Code, or pick another "
-            "backend with --enhancer anthropic|openai."
+            "the `claude` CLI was not found. Looked on PATH and in: " + looked + ". "
+            "Install Claude Code, set SEEDBED_CLAUDE_BIN to its path, or pick "
+            "another backend with --enhancer anthropic|openai."
         )
     try:
         done = subprocess.run(

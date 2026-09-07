@@ -19,8 +19,10 @@ enum MCPConstants {
     static let readTimeout: TimeInterval = 30
     /// Concurrent connections served at once. Real clients use one or two.
     static let maxConcurrentConnections = 16
-    /// Seedbed has its own fixed default. a sibling app owns 8787 and its gateway uses
-    /// 8788, so sharing either makes launch order decide which app works.
+    /// A fixed default of its own, clear of 8787 and 8788. Those two are
+    /// commonly taken by other local agent servers, and sharing a port makes
+    /// launch order decide which program works — a failure that looks like the
+    /// app being broken rather than like a collision.
     static let defaultPort: UInt16 = 8789
     static let legacyDefaultPort: UInt16 = 8787
 }

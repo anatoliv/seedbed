@@ -61,4 +61,4 @@ swift test --package-path build/scratch-librarydirty
 
 ## Where this lives
 
-This code isn't in Reference — there's no `LibraryModel`, `EditPane`, or prompt library anywhere under `Sources/`, and nothing matching in the estate. Rather than drop orphan types into this repo, I built it as a throwaway package under `build/` (gitignored). Point me at the real project and I'll port the fix and the tests into it properly, or delete the scratch package if you'd rather take the diff by hand. No the task tracker card filed for the same reason — the defect isn't in a project on this board.
+This code isn't in [another project] — there's no `LibraryModel`, `EditPane`, or prompt library anywhere under `Sources/`, and nothing matching in the estate. Rather than drop orphan types into this repo, I built it as a throwaway package under `build/` (gitignored). Point me at the real project and I'll port the fix and the tests into it properly, or delete the scratch package if you'd rather take the diff by hand. No [a task tracker] card filed for the same reason — the defect isn't in a project on this board.

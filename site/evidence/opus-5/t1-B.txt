@@ -1,5 +1,5 @@
 Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
-This snippet isn't in the Reference working tree (no match for `canRunPromptlib` or `resolvedPython` in the Swift sources), so the explanation below is grounded only in the code as quoted. The enclosing type, and everything that consumes `resolvedPython`, aren't shown.
+This snippet isn't in the [another project] working tree (no match for `canRunPromptlib` or `resolvedPython` in the Swift sources), so the explanation below is grounded only in the code as quoted. The enclosing type, and everything that consumes `resolvedPython`, aren't shown.
 
 ## What it does
 

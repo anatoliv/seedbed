@@ -41,8 +41,7 @@ DIST="dist"
 
 # The signing identity is discovered, never written down. A Team ID in a tracked
 # file is an identifier that follows the repo wherever it goes, and this one is
-# meant to be publishable; Reference's public tree carries no Team ID for the
-# same reason. Exactly one Developer ID Application identity is used silently,
+# meant to be publishable. Exactly one Developer ID Application identity is used silently,
 # several ask, none falls through to the caller's own handling.
 discover_identity() {
     security find-identity -v -p codesigning 2>/dev/null \
@@ -292,6 +291,12 @@ rm -rf "$STAGE"; mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 cp Packaging/dmg-readme.txt "$STAGE/Before you start.txt"
+# The licence and the third-party notices travel with the copy, because MIT
+# requires exactly that: Sparkle is embedded in the bundle as a framework and
+# the Sentry SDK is linked into the binary, and neither notice reached a user
+# until 2026-09-07. `tests/test_third_party_notices.py` pins both copies.
+cp ../LICENSE "$STAGE/LICENSE.txt"
+cp ../THIRD-PARTY-NOTICES.md "$STAGE/Third-Party Notices.txt"
 hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$STAGE"
 
@@ -349,6 +354,16 @@ xcrun stapler validate "$DMG" && echo "    staple validated"
 GA_BIN="${GA_BIN:-$(find "$HOME/Library/Developer" "$HOME/Library/Caches/org.swift.swiftpm" \
     ./.build "$HOME/Projects" -type f -name generate_appcast -path '*Sparkle*' 2>/dev/null | head -1)}"
 if [[ -n "${GA_BIN:-}" && -x "$GA_BIN" ]]; then
+    # 5a. Release notes, before the feed is generated. generate_appcast embeds
+    #     the contents of "<archive name>.html" sitting beside each DMG as that
+    #     item's <description>, and Seedbed shipped none — so every update dialog
+    #     asked the user to accept a new binary against an empty pane, while the
+    #     app already carried the notes for every release and the gate above
+    #     already refused a version without them. One source, two places to read
+    #     it: Sources/Seedbed/WhatsNew.swift.
+    echo "==> Writing release notes for the feed"
+    python3 Scripts/support/release-notes.py "$DIST"
+
     echo "==> Generating the appcast"
     "$GA_BIN" "$DIST" --download-url-prefix "${APPCAST_BASE}/" -o "$DIST/appcast.xml" >/dev/null
     APPCAST_BUILD="$(perl -0ne 'if (/<sparkle:version>(\d+)<\/sparkle:version>/) { print $1; exit }' "$DIST/appcast.xml")"

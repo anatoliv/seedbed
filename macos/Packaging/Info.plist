@@ -2,10 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
 	<key>CFBundleDisplayName</key>
 	<string>Seedbed</string>
 	<key>CFBundleExecutable</key>
 	<string>Seedbed</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
 	<key>CFBundleIconFile</key>
 	<string>Seedbed</string>
 	<key>CFBundleIdentifier</key>
@@ -18,12 +22,24 @@
 	<string>0.1.8</string>
 	<key>CFBundleVersion</key>
 	<string>9</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Seedbed reads and writes your prompt library from the folder you choose.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Seedbed reads and writes your prompt library from the folder you choose.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Seedbed reads and writes your prompt library from the folder you choose.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Seedbed reads and writes your prompt library from the folder you choose, including one on an external disk.</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Personal tool.</string>
+	<string>Copyright © 2026 Anatoli Vishnyakov. MIT licence.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>

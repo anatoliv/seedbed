@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seedbed privacy</title>
+<meta name="description" content="What Seedbed stores, what leaves your Mac and when, and what it never sends. No account, no analytics, no server. Crash reporting is off by default and cannot be switched on in a build compiled from source.">
+<meta name="theme-color" content="#f7f5f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0e11" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://seedbed.dev/privacy.html">
+<meta property="og:title" content="Seedbed privacy">
+<meta property="og:description" content="What Seedbed stores, what leaves your Mac and when, and what it never sends.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://seedbed.dev/privacy.html">
+<meta property="og:image" content="https://seedbed.dev/og.png?v=20260907">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg?v=20260907" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png?v=20260907" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260907">
+<link rel="stylesheet" href="/site.css?v=20260907">
+<style>
+  .article { max-width: 760px; }
+  .article h2 { font-family: var(--font-display); font-weight: 620; font-size: clamp(1.35rem, 2.4vw, 1.75rem); letter-spacing: -0.02em; line-height: 1.15; margin: 48px 0 12px; }
+  .article h3 { font-size: 16.5px; font-weight: 620; margin: 28px 0 8px; }
+  .article p, .article li { color: var(--dim); }
+  .article p strong, .article li strong { color: var(--ink); }
+  .article ul { padding-left: 22px; }
+  .article li + li { margin-top: 8px; }
+  .stamp { font-size: 13px; color: var(--faint); margin-top: 10px; }
+  .short { margin-top: 24px; padding: 20px 22px; border: 1px solid var(--line-strong); border-radius: var(--r-card); background: var(--card); }
+  .short p { color: var(--ink); font-size: 15.5px; }
+  .never { list-style: none; padding: 0; margin-top: 14px; display: grid; gap: 10px; }
+  .never li { display: grid; grid-template-columns: 20px 1fr; gap: 11px; align-items: start; }
+  .never svg { width: 16px; height: 16px; margin-top: 3px; stroke: var(--leaf); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="shell">
+    <div class="bar">
+      <a class="lockup" href="/" aria-label="Seedbed home"><img src="/seedbed-mark.svg?v=20260907" alt="" width="30" height="30">Seedbed</a>
+      <nav class="nav" aria-label="Site">
+        <a class="link" href="/#idea">How it works</a>
+        <a class="link" href="/#agents">Agents</a>
+        <a class="link" href="/evidence/">Evidence</a>
+        <a class="link" href="https://github.com/anatoliv/seedbed" rel="noopener">Source</a>
+        <a class="btn btn-primary btn-small" href="/#install">Download</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section style="padding-top:clamp(40px,6vw,72px)">
+    <div class="shell">
+      <div class="article">
+        <div class="cue"><span class="rows" aria-hidden="true"><i></i><i></i><i></i></span><span class="n">Privacy</span></div>
+        <h1 class="t-h2" style="font-size:clamp(2rem,4.5vw,2.8rem)">What leaves your Mac, and when.</h1>
+        <p class="stamp">Last updated 7 September 2026. Applies to Seedbed for macOS and to the Python package and local web page in the same repository.</p>
+
+        <div class="short">
+          <p>Seedbed has no account, no sign-up, no analytics and no server of its own. Your prompts are files in a git repository you control. Everything that goes over the network happens because you asked for it, and this page says what each of those things is.</p>
+        </div>
+
+        <h2>What Seedbed stores, and where</h2>
+        <ul>
+          <li><strong>Your library</strong> is plain markdown in a git checkout you chose the location of. Seeds, rendered prompts and the model registry are all files you can read, diff and delete. Seedbed never copies them anywhere else.</li>
+          <li><strong>Copy counts and the values you type into placeholders</strong> stay on the machine that typed them. Both files are excluded from the repository on purpose, so a project name you filled in on one Mac is not pushed to another.</li>
+          <li><strong>Fetched vendor guidance</strong> is cached on disk and also kept out of the repository, because it is a download rather than something you own.</li>
+          <li><strong>Settings</strong> live in the app's own preferences. The tokens for the local agent server live in your login Keychain, not in a file.</li>
+        </ul>
+
+        <h2>What leaves your Mac</h2>
+        <p>Four things, and each is the result of something you did.</p>
+
+        <h3>1. Fetching a model's prompting guidance</h3>
+        <p>When you refresh guidance, Seedbed downloads the vendor documentation pages listed in the model registry, from those vendors. Your prompts are not part of that request. It is an ordinary page fetch, and you can point a model at a local file instead.</p>
+
+        <h3>2. Building a rendered prompt</h3>
+        <p>Building sends the seed, the cached guidance and an instruction to whichever enhancer you configured. That destination is your choice, and it is the only place a prompt of yours is sent:</p>
+        <ul>
+          <li>By default, the <code>claude</code> command-line tool already installed on your Mac, under whatever subscription you already have. Seedbed adds no key and no account.</li>
+          <li>An Anthropic API key, if you configure one.</li>
+          <li>Any OpenAI-compatible endpoint, including one running on your own machine or network, in which case nothing leaves your network at all.</li>
+        </ul>
+        <p>Copying a prompt sends nothing. The render is already a file, so copying is a file read and works offline.</p>
+
+        <h3>3. Checking for updates</h3>
+        <p>A copy installed from the disk image asks seedbed.dev for the signed update feed, the way any Sparkle-based Mac app does. That request carries no identifier for you. A copy built from source in a checkout checks the git repository instead and never contacts the site.</p>
+
+        <h3>4. Crash reports, if you turn them on</h3>
+        <p><strong>Off by default, and behind two gates that both have to be open.</strong> You have to switch reporting on, and the build has to carry a reporting key that is injected at packaging time and never committed. A copy you compile from the public source has no key, so it cannot report anything however the switch is set.</p>
+        <p>When it is on, a report carries the stack trace, the app and system versions, and nothing else that identifies you. The reporting library is told not to attach your IP address or any user identifier, the machine name is cleared from every event, and any long run of hexadecimal, which is the shape an access token takes, is replaced before sending.</p>
+        <p><strong>Prompt text is never captured.</strong> That is a design decision before it is a filter: nothing in the app hands library content to the reporter. Errors from the Python core can quote a prompt, so they are shown to you in the window and deliberately not reported. A single launch may send at most twenty events, so a fault that repeats cannot turn into a flood.</p>
+
+        <h2>The agent server is local, and stays local</h2>
+        <p>Seedbed can expose your library to an AI coding tool through a small server. It listens only on the loopback interface, so nothing on your network can reach it, and every request must also carry a bearer token held in your login Keychain. Both, not either. A second read-only token can look prompts up but can never spend a model call. Ten wrong tokens start a lockout that doubles up to fifteen minutes, and a request that claims to come from another site is refused. There is no remote access switch and no tunnel.</p>
+
+        <h2>Permissions the app asks for</h2>
+        <ul>
+          <li><strong>Accessibility</strong>, and only to press Command-V in the app you summoned Seedbed over, which is exactly the capability that permission governs. Decline it and Seedbed copies to the clipboard and tells you why it did not paste.</li>
+          <li><strong>The clipboard</strong>, to put the prompt you asked for on it.</li>
+        </ul>
+        <p>Seedbed asks for nothing else: no contacts, no calendar, no camera, no microphone, no location, no full-disk access.</p>
+
+        <h2>What Seedbed never does</h2>
+        <ul class="never">
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>No accounts and no sign-in. There is nothing to sign in to.</span></li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>No analytics, no usage tracking, no advertising and no ad identifiers.</span></li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>No selling, renting or sharing of data. There is no data held to sell.</span></li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>No uploading of your prompts anywhere except the enhancer you chose.</span></li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>No background network activity. Nothing runs when you are not using it.</span></li>
+        </ul>
+
+        <h2>Children</h2>
+        <p>Seedbed is a developer tool and is not directed at children. It collects nothing from anyone, so it holds nothing about a child either.</p>
+
+        <h2>Changes, and how to check any of this</h2>
+        <p>If a future version sends something new, it will ship switched off, this page will say where the data goes, and the switch will be yours. The date at the top moves when the page does.</p>
+        <p>Seedbed is open source under the MIT licence, so the code is the authority rather than this page. The crash-report scrubbing, the two gates on reporting, the loopback binding and the token checks are all in the published repository, and the questions this page answers can be checked against it.</p>
+        <p>Questions, or something here that does not match what you observe: open an issue on <a href="https://github.com/anatoliv/seedbed/issues">GitHub</a>.</p>
+
+        <p style="margin-top:32px" class="t-small"><a href="/">Back to seedbed.dev</a></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="shell">
+    <div class="foot">
+      <span>Seedbed · a seedbed is where you raise seeds into what you actually plant out</span>
+      <nav aria-label="Footer">
+        <a href="/">Home</a>
+        <a href="/evidence/">Evidence</a>
+        <a href="https://github.com/anatoliv/seedbed">GitHub</a>
+        <a href="https://github.com/anatoliv/seedbed/blob/main/LICENSE">MIT</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

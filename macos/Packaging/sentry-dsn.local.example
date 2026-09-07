@@ -1,0 +1,14 @@
+Copy this file to sentry-dsn.local (gitignored) and put your Sentry DSN in it,
+on one line, if you want a build you distribute to be able to report crashes.
+
+    https://<key>@o<org>.ingest.sentry.io/<project>
+
+Never commit the real file. Three things keep it out of the public repository
+and they are all deliberate: `.gitignore` excludes `*.local`, the publish script
+excludes the same pattern from the snapshot, and its secrets guard matches a DSN
+by shape as a backstop.
+
+Without this file the packaged app carries an empty SentryDSN, and crash
+reporting cannot be switched on however the toggle is set. That is the correct
+state for a build made from a public checkout, and it is what the About page and
+Settings both say.

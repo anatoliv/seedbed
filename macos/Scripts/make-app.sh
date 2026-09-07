@@ -38,8 +38,7 @@ APP="build/Seedbed.app"
 
 # The signing identity is discovered, never written down. A Team ID in a tracked
 # file is an identifier that follows the repo wherever it goes, and this one is
-# meant to be publishable; Reference's public tree carries no Team ID for the
-# same reason. Exactly one Developer ID Application identity is used silently,
+# meant to be publishable. Exactly one Developer ID Application identity is used silently,
 # several ask, none falls through to the caller's own handling.
 discover_identity() {
     security find-identity -v -p codesigning 2>/dev/null \

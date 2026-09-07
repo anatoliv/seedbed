@@ -22,7 +22,7 @@ struct WhatsNewChange: Identifiable {
             }
         }
 
-        /// the reference app's chip recipe uses the semantic tint for both ink and wash.
+        /// Reference's chip recipe uses the semantic tint for both ink and wash.
         var ink: Color {
             tint
         }
@@ -53,7 +53,7 @@ struct WhatsNewRelease: Identifiable {
             highlight: "Sharper reading pages, a cleaner fill window, and conflict-free local services.",
             changes: [
                 WhatsNewChange(kind: .improved, text:
-                    "Help, FAQ, and What's New now match the reference app's window geometry, native "
+                    "Help, FAQ, and What's New now match Reference's window geometry, native "
                     + "reading type, warm surfaces, spacing, and Seedbed brand treatment."),
                 WhatsNewChange(kind: .improved, text:
                     "Prompt values now open in a compact in-window modal with focused input, "
@@ -62,8 +62,9 @@ struct WhatsNewRelease: Identifiable {
                     "A first load points to the shared Seedbed library under Application Support, "
                     + "while existing libraries and locations chosen in Settings keep working."),
                 WhatsNewChange(kind: .fixed, text:
-                    "Seedbed's MCP server now defaults to port 8789, clear of a sibling app's MCP "
-                    + "and gateway ports. Upgrades preserve every other custom port."),
+                    "Seedbed's MCP server now defaults to port 8789, clear of the ports "
+                    + "other local agent servers commonly take. Upgrades preserve every "
+                    + "custom port you set yourself."),
             ]),
         WhatsNewRelease(
             version: "0.1.7",
@@ -83,17 +84,17 @@ struct WhatsNewRelease: Identifiable {
         WhatsNewRelease(
             version: "0.1.6",
             date: "6 September 2026",
-            highlight: "Seedbed now shares the reference app's complete visual system on the Mac and in the browser.",
+            highlight: "Seedbed now shares Reference's complete visual system on the Mac and in the browser.",
             changes: [
                 WhatsNewChange(kind: .improved, text:
-                    "The Mac app now uses the reference app's Paper and Midnight surfaces, terracotta accent, "
+                    "The Mac app now uses Reference's Paper and Midnight surfaces, terracotta accent, "
                     + "type scale, spacing, radii, icons, elevation, motion, and shared component "
                     + "recipes throughout."),
                 WhatsNewChange(kind: .added, text:
                     "The browser now carries the same visual family with the exact Inter and "
                     + "JetBrains Mono files, warm light surfaces, and neutral graphite dark mode."),
                 WhatsNewChange(kind: .improved, text:
-                    "Help, FAQ, and What's New now use the reference app's compact two-row headers, a readable "
+                    "Help, FAQ, and What's New now use Reference's compact two-row headers, a readable "
                     + "line length, consistent section dividers, and clearer release cards."),
                 WhatsNewChange(kind: .fixed, text:
                     "Every text call now uses a named type role. Thirteen ad-hoc monospaced variants "

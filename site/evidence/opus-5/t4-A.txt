@@ -1,5 +1,5 @@
 Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
-The snippet isn't repo code — Reference's own `MenuBarController` assigns `statusItem.menu` directly (`Sources/Reference/MenuBarController.swift:147`) and never uses this pattern. So I fixed it standalone rather than inventing a new controller inside the app target.
+The snippet isn't repo code — [another project]'s own `MenuBarController` assigns `statusItem.menu` directly (`Sources/[another project]/MenuBarController.swift:147`) and never uses this pattern. So I fixed it standalone rather than inventing a new controller inside the app target.
 
 ## Diagnosis
 

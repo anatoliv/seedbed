@@ -1,4 +1,4 @@
-"""Keep Seedbed's MCP endpoint clear of a sibling app's reserved ports."""
+"""Keep Seedbed's MCP endpoint clear of the ports other local servers take."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ class MCPDefaultPortTests(unittest.TestCase):
         release_notes = WHATS_NEW.read_text().split('version: "0.1.8"', 1)[1]
         release_notes = release_notes.split('version: "0.1.7"', 1)[0]
         self.assertIn("defaults to port 8789", release_notes)
-        self.assertIn("a sibling app", release_notes)
+        self.assertIn("other local agent servers", release_notes)
 
 
 if __name__ == "__main__":

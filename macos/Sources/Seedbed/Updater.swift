@@ -29,6 +29,11 @@ final class Updater {
     /// until a release sets one.
     private let controller: SPUStandardUpdaterController?
 
+    /// The updater this launch created, so the Settings pane can offer Sparkle's
+    /// own background-check preference without the settings view having to be
+    /// handed the app controller.
+    private(set) static weak var shared: Updater?
+
     init() {
         // Sparkle reads SUFeedURL and SUPublicEDKey from the bundle. Starting
         // the updater in a bundle that has neither logs an error on every
@@ -36,11 +41,26 @@ final class Updater {
         // for an update, so it is not started at all.
         guard Self.isConfigured else {
             controller = nil
+            Self.shared = self
             return
         }
         controller = SPUStandardUpdaterController(startingUpdater: true,
                                                   updaterDelegate: nil,
                                                   userDriverDelegate: nil)
+        Self.shared = self
+    }
+
+    /// Whether Sparkle checks for a new version on its own schedule.
+    ///
+    /// `SUEnableAutomaticChecks` is `true` in Info.plist, which is what
+    /// suppresses the question Sparkle would otherwise ask on an early launch.
+    /// Suppressing the question and offering no switch left an installed copy
+    /// making unattended network requests with nothing in the interface to stop
+    /// them, which is not a defensible default for a tool given away free. This
+    /// is that switch; Sparkle persists the value itself.
+    var automaticallyChecks: Bool {
+        get { controller?.updater.automaticallyChecksForUpdates ?? false }
+        set { controller?.updater.automaticallyChecksForUpdates = newValue }
     }
 
     /// Whether this bundle carries a feed Sparkle can use.

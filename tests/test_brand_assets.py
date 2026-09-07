@@ -90,3 +90,28 @@ class BrandAssets(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BrandArtInTheApp(unittest.TestCase):
+    """No stand-in glyph where the brand rules require the mark.
+
+    The About page drew `Image(systemName: "text.badge.star")` as its identity
+    art until 2026-09-07 — a borrowed SF Symbol on the one screen whose whole
+    job is to say what this app is, and About art is one of the four contexts
+    the brand matrix reserves for the full terracotta tile. Reading the icon out
+    of the bundle means it cannot drift from what Finder shows.
+    """
+
+    SOURCES = ROOT / "macos" / "Sources" / "Seedbed"
+
+    def test_about_shows_the_bundle_icon_not_a_symbol(self) -> None:
+        text = (self.SOURCES / "InfoWindow.swift").read_text(encoding="utf-8")
+        about = text[text.index("struct AboutPage: View"):]
+        self.assertIn("Image(nsImage: NSApp.applicationIconImage)", about)
+        head = about[:about.index("SeedbedDivider()")]
+        self.assertNotIn("Image(systemName:", head,
+                         "the About identity art is an SF Symbol again")
+
+    def test_the_status_item_resolves_the_menu_template_from_the_bundle(self) -> None:
+        text = (self.SOURCES / "App.swift").read_text(encoding="utf-8")
+        self.assertIn('NSImage(named: "SeedbedMenuBar")', text)

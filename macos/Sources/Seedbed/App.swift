@@ -53,9 +53,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return stored > 0 && stored <= 65535 ? UInt16(stored) : MCPConstants.defaultPort
     }
 
-    /// Releases a sibling app's port on upgrades without trampling a different port a
-    /// person deliberately selected. Missing preferences and the former
-    /// Seedbed default both become 8789 exactly once.
+    /// Moves an existing copy off the former default without trampling a port a
+    /// person deliberately selected. Missing preferences and the old default
+    /// both become 8789 exactly once.
     static func migrateMCPDefaultPortIfNeeded(_ defaults: UserDefaults = .standard) {
         guard !defaults.bool(forKey: mcpDefaultPortMigrationKey) else { return }
         let stored = defaults.object(forKey: mcpPortKey) as? NSNumber
@@ -577,11 +577,11 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         menu.addItem(.separator())
-        let open = menu.addItem(withTitle: "Show Prompts…", action: #selector(openFromMenu),
+        let open = menu.addItem(withTitle: "Show Prompts", action: #selector(openFromMenu),
                                 keyEquivalent: "p")
         open.keyEquivalentModifierMask = [.command, .option]
         open.target = self
-        let library = menu.addItem(withTitle: "Library…", action: #selector(openLibraryFromMenu),
+        let library = menu.addItem(withTitle: "Library", action: #selector(openLibraryFromMenu),
                                    keyEquivalent: "l")
         library.target = self
         let rebuild = menu.addItem(withTitle: "Rebuild Everything Stale…",
@@ -596,6 +596,12 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let help = menu.addItem(withTitle: "Help & FAQ", action: #selector(openHelp),
                                 keyEquivalent: "")
         help.target = self
+        // Version, library path, signature and licence live on the About page,
+        // which was reachable only by opening Help and finding it in the
+        // sidebar. The menu is where people look for it.
+        let about = menu.addItem(withTitle: "About Seedbed", action: #selector(openAboutFromMenu),
+                                 keyEquivalent: "")
+        about.target = self
         let updates = menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates),
                                    keyEquivalent: "")
         updates.target = self
@@ -651,11 +657,24 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func openEnhancerEditor() { openSettings(.building) }
     @objc private func openMCPSettings() { openSettings(.mcp) }
 
+    /// What the title bar says for each page. macOS names these windows after
+    /// what is in them — "Seedbed Help", "About Seedbed" — and one title for
+    /// five pages is how a user loses track of where they are.
+    private static func infoWindowTitle(for page: InfoPage) -> String {
+        switch page {
+        case .about:          return "About Seedbed"
+        case .help:           return "Seedbed Help"
+        case .faq:            return "Seedbed FAQ"
+        case .whatsNew:       return "What's New in Seedbed"
+        case .gettingStarted: return "Getting Started with Seedbed"
+        }
+    }
+
     /// The manual: one window, five pages, opened on whichever one was asked
     /// for. It used to be five separate windows at four different widths.
     func openInfo(_ page: InfoPage) {
         infoModel.page = page
-        InfoWindows.shared.show("info", title: "Seedbed",
+        InfoWindows.shared.show("info", title: Self.infoWindowTitle(for: page),
                                 size: NSSize(width: Tokens.Size.info.width,
                                              height: Tokens.Size.info.height),
                                 minSize: NSSize(width: Tokens.Size.infoMin.width,
@@ -673,6 +692,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func openAbout() { openInfo(.about) }
+    @objc private func openAboutFromMenu() { openInfo(.about) }
     @objc private func openWelcome() { openInfo(.gettingStarted) }
     @objc private func openHelp() { openInfo(.help) }
     @objc private func openFAQ() { openInfo(.faq) }
@@ -843,8 +863,28 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     /// Rebuilding calls the enhancer for every stale pair, so it can run for
-    /// minutes. The panel owns the work and reports progress; this just opens it.
+    /// minutes and, on a paid backend, spend real money. The panel owns the work
+    /// and reports progress; this asks first and then opens it.
+    ///
+    /// The ellipsis on the menu item promised a dialog and there was none: one
+    /// mis-click started an unbounded run of model calls. Under the interface
+    /// guidelines an ellipsis means the command needs something from you before
+    /// it acts, so either the dialog appears or the ellipsis goes. The dialog is
+    /// the better answer here, because the cost is the surprising part.
     @objc private func refresh() {
+        let stale = model.staleCount
+        guard stale > 0 else { return }
+        let alert = NSAlert()
+        alert.messageText = stale == 1
+            ? "Rebuild the one prompt that is out of date?"
+            : "Rebuild \(stale) prompts that are out of date?"
+        let via = model.enhancerSummary.map { " to \($0)" } ?? ""
+        alert.informativeText = "Each one is a call\(via), so this can take a few minutes and, "
+            + "on a paid backend, costs money. You can keep working while it runs."
+        alert.addButton(withTitle: "Rebuild")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
         show()
         model.rebuild(scope: .everything)
     }

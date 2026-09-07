@@ -1,4 +1,5 @@
 import AppKit
+import Security
 import SwiftUI
 
 /// The five pages of the app's manual.
@@ -322,14 +323,54 @@ struct GettingStartedPage: View {
     }
 }
 
+/// What this copy's own signature says, read at runtime instead of assumed.
+///
+/// The About page asserted "locally, not notarized, built on this machine"
+/// unconditionally. That is false on every copy installed from the release DMG,
+/// which is Developer ID signed, notarized and stapled before it is published —
+/// and About is the one screen a cautious user opens to check exactly this. A
+/// hardcoded claim about a security property is worse than no claim.
+enum BuildProvenance {
+    /// True when the running copy satisfies the Developer ID requirement, which
+    /// is what Gatekeeper evaluates. Locally built copies are ad-hoc or
+    /// development-signed and do not.
+    static var isDeveloperIDSigned: Bool {
+        var code: SecCode?
+        guard SecCodeCopySelf(SecCSFlags(), &code) == errSecSuccess, let code else { return false }
+        var requirement: SecRequirement?
+        let text = "anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
+        guard SecRequirementCreateWithString(text as CFString, SecCSFlags(), &requirement) == errSecSuccess,
+              let requirement else { return false }
+        return SecCodeCheckValidity(code, SecCSFlags(), requirement) == errSecSuccess
+    }
+
+    /// Says only what was checked, and nothing more. Notarization is a separate
+    /// property and is not verified here, so this does not mention it: a build
+    /// made on this Mac is Developer ID signed too, and claiming Gatekeeper
+    /// approval on that basis would be the same kind of overstatement the
+    /// hardcoded string was.
+    static var summary: String {
+        isDeveloperIDSigned ? "Developer ID signed" : "locally built, not Developer ID signed"
+    }
+}
+
 struct AboutPage: View {
     let libraryPath: String
     let enhancer: String
 
     var body: some View {
         HStack(spacing: Tokens.Space.snug) {
-            Image(systemName: "text.badge.star")
-                .font(.system(size: Tokens.IconSize.hero)).foregroundStyle(Tokens.accent)
+            // The app's own icon, read from the bundle, so it can never drift
+            // from what Finder shows. This was `text.badge.star`, a borrowed
+            // SF Symbol — and About art is one of the four places the brand
+            // rules reserve for the full terracotta tile. The one screen whose
+            // job is to say what this app is was showing a glyph belonging to
+            // no product at all.
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 48, height: 48)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Tokens.ChipPadding.v) {
                 Text("Seedbed").font(Tokens.FontScale.display)
                 Text("Version \(InfoWindows.version)")
@@ -346,11 +387,17 @@ struct AboutPage: View {
         VStack(alignment: .leading, spacing: Tokens.Space.medium) {
             row("Library", libraryPath)
             row("Builds with", enhancer)
-            row("Signed", "locally, not notarized, built on this machine")
+            row("Signature", BuildProvenance.summary)
         }
         SeedbedDivider()
-        Caption("Personal tool. No analytics, and no network traffic except the model endpoint "
-                + "you configure and the documentation it fetches.")
+        // Every network call this app can make, named. The previous wording said
+        // there was none beyond the enhancer and the guidance fetch, which
+        // omitted the Sparkle update check an installed copy makes on its own
+        // schedule, and predated crash reporting entirely.
+        Caption("No account and no analytics. Over the network: the model endpoint you "
+                + "configure, the documentation it fetches, and an update check against "
+                + "seedbed.dev. Crash reporting is off unless you turn it on in Settings, "
+                + "and never carries prompt text.")
     }
 
     private func row(_ label: String, _ value: String) -> some View {

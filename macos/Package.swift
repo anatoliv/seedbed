@@ -9,10 +9,15 @@ let package = Package(
         // Sources/Seedbed/CrashReporting.swift. Linked unconditionally because
         // a build flag would mean the shipped binary and the one tested here
         // are different binaries.
-        .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.58.0"),
+        // Pinned exactly, not by range. This is a signed, notarized app whose
+        // crash reporting is privacy-hardened against option names and defaults
+        // that a minor release can move, and a public checkout should build the
+        // binary that was tested rather than whatever resolved that morning.
+        // The sibling projects pin the same way for the same reason.
+        .package(url: "https://github.com/getsentry/sentry-cocoa", exact: "8.58.4"),
         // Auto-update for copies installed from a release. A copy built out of
         // the checkout does not use it — see Updater.swift.
-        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0")
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.9.6")
     ],
     targets: [
         .executableTarget(

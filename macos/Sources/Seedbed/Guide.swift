@@ -397,7 +397,7 @@ extension Guide {
         """),
         GuidePage(id: "vars-fill", category: "Placeholders", title: "Filling one in",
                   body: """
-        Copying a prompt that has placeholders opens a small sheet, one field per placeholder, in the order they appear.
+        Copying a prompt that has placeholders opens a compact modal, one field per placeholder, in the order they appear.
 
         Values you have used before are on a menu beside each field, most recent first, so the second time you reach for the same prompt is faster than the first. Those are remembered per placeholder name rather than per prompt, so `{{FILE}}` in one seed offers what you typed for `{{FILE}}` in another.
 
@@ -490,7 +490,7 @@ extension Guide {
 
         A copy **built from the checkout** is told what commits it is behind and to pull and rebuild. Offering it a shipped release would replace the build you are working on.
 
-        A copy **installed from a release** checks the update feed and offers to install a newer version.
+        A copy **installed from a release** checks the signed Sparkle feed and offers to install a newer version.
 
         Either way, updating the app does not update your library. The prompts are a git checkout, so `git pull` is the other half, and no updater can do it for you.
         """),

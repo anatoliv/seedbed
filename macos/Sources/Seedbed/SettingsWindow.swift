@@ -109,6 +109,9 @@ struct GeneralSettings: View {
     /// Same reason as `pasteEnabled`: `CrashReporting` owns the default, which
     /// is off, so `@AppStorage` here would be a second source for one setting.
     @State private var crashReporting = CrashReporting.isEnabled
+    /// Same shape again: Sparkle owns this value and persists it, so mirroring
+    /// it into `@AppStorage` would be a second source for one setting.
+    @State private var automaticUpdates = Updater.shared?.automaticallyChecks ?? false
 
     var body: some View {
         ScrollView {
@@ -178,6 +181,19 @@ struct GeneralSettings: View {
                             + "plain markdown in a git repository.")
                 }
 
+                if Updater.shared?.canCheck == true {
+                    SettingsGroup("Updates") {
+                        Toggle("Check for updates automatically", isOn: $automaticUpdates)
+                            .onChange(of: automaticUpdates) { _, new in
+                                Updater.shared?.automaticallyChecks = new
+                            }
+                        Caption("With this on, Seedbed asks seedbed.dev for the signed update "
+                                + "feed on its own schedule. The request says which version and "
+                                + "which macOS you are on and nothing about you. Turn it off and "
+                                + "nothing is checked until you choose Check for Updates.")
+                    }
+                }
+
                 SettingsGroup("Diagnostics") {
                     Toggle("Send crash reports", isOn: $crashReporting)
                         .disabled(!CrashReporting.isConfigured)
@@ -206,6 +222,7 @@ struct GeneralSettings: View {
             launchAtLogin = LaunchAtLogin.isEnabled
             hasAccessibility = Paster.hasPermission
             crashReporting = CrashReporting.isEnabled
+            automaticUpdates = Updater.shared?.automaticallyChecks ?? false
         }
     }
 }

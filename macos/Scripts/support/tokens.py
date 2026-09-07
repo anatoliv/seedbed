@@ -3,7 +3,7 @@ systems can be compared by a machine instead of by eye.
 
 Both files are parsed by THIS function, so the comparison is like for like.
 Values are normalised rather than string-matched, because the same token can be
-written two correct ways: Reference spells a font `.system(size: 21, weight:
+written two correct ways: one file spells a font `.system(size: 21, weight:
 .semibold, design: .rounded)` and Seedbed spells the identical thing
 `.system(size: ReadingSize.display, weight: .semibold, design: .rounded)`.
 Comparing the raw text would report a difference that is not one, and a check

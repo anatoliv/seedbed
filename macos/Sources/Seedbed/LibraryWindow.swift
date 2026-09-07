@@ -503,11 +503,13 @@ struct LibraryView: View {
             SeedbedDivider()
             HStack(spacing: Tokens.Space.tight) {
                 Button { model.newPrompt() } label: { Image(systemName: "plus") }
+                    .accessibilityLabel("New prompt")
                     .help("New prompt (⌘N)")
                     .disabled(model.busy)
                 Button {
                     if let prompt = model.current { model.requestDelete(prompt) }
                 } label: { Image(systemName: "minus") }
+                    .accessibilityLabel("Delete the selected prompt")
                     .help("Delete this prompt and everything generated from it")
                     .disabled(model.selection == nil || model.busy)
                 Spacer()
@@ -531,6 +533,7 @@ struct LibraryView: View {
                 if !model.search.isEmpty {
                     Button { model.search = "" } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+                            .accessibilityLabel("Clear the search")
                     }
                     .buttonStyle(.plain)
                 }
@@ -853,11 +856,13 @@ struct ComparePane: View {
                     }
                     .disabled(columns.first?.model == target.model)
                     .help("Move this column left")
+                    .accessibilityLabel("Move the \(target.label) column left")
                     Button { model.moveColumn(target.model, by: 1) } label: {
                         Image(systemName: "chevron.right")
                     }
                     .disabled(columns.last?.model == target.model)
                     .help("Move this column right")
+                    .accessibilityLabel("Move the \(target.label) column right")
                 }
                 .buttonStyle(.borderless)
                 .font(Tokens.FontScale.micro)

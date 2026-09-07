@@ -22,6 +22,11 @@ final class InfoWindows {
                              minSize: NSSize? = nil,
                              @ViewBuilder content: () -> Content) {
         if let existing = windows[key] {
+            // Retitle on the way up. One window serves Getting Started, Help,
+            // the FAQ, What's New and About, and a title bar that always read
+            // "Seedbed" told the user nothing about which of those they were
+            // looking at. Convention is "Seedbed Help", "About Seedbed".
+            existing.title = title
             NSApp.activate(ignoringOtherApps: true)
             existing.makeKeyAndOrderFront(nil)
             return

@@ -101,8 +101,8 @@ synced file by default.
 Menu bar icon, then **Settings**, then **MCP**. Switch it on and press *Copy
 configuration*;
 paste the result into Claude Code, Cursor or Claude Desktop. The snippet is a
-standard `mcpServers` entry carrying the URL and the bearer token, and the URL
-takes no path after the port.
+standard `mcpServers` entry carrying the root URL and bearer token. Clients that
+require the conventional `/mcp` path may use it; other paths are rejected.
 
 | Tool | Does |
 |---|---|
@@ -126,7 +126,7 @@ Three things that refuse a request, each with a reason in the response body:
 a wrong token (and after ten of those, a lockout that doubles from one minute to
 fifteen, while a correct token is still always served); a `Host` or `Origin` that
 is not this Mac, which is what stops a web page pointing its own domain here and
-reading the library through your browser; and a stray path on the URL.
+reading the library through your browser; and an unsupported path on the URL.
 
 Settings live in `MCPEnabled` and `MCPPort` under `net.amnesia.seedbed`; the
 default port is 8789. Upgrades migrate the former 8787 default once, while a
@@ -162,7 +162,7 @@ Mirrors Reference's Settings → AI:
 | | |
 |---|---|
 | Provider presets | 14, filling endpoint + model + auth in one pick |
-| Auth modes | Claude Code CLI (no key), Anthropic SDK, API key / local server, Azure `api-key` header |
+| Auth modes | Claude Code CLI, ChatGPT sign-in, Anthropic SDK, API key / local server, Azure `api-key` header |
 | Endpoint + model | free-form, with the endpoint rule below |
 | API key | login Keychain (`promptlib-enhancer`), never a file, never echoed |
 | Fallback | endpoint + model + key, tried **once** on a retryable failure |
@@ -178,11 +178,11 @@ alone.
 or a 404**, because the same request body would fail the same way at a second
 endpoint. One attempt, not a loop.
 
-**Not implemented: ChatGPT sign-in (Codex OAuth).** The preset and auth mode are
-present and say so plainly rather than failing at build time. Porting it means
-PKCE, a loopback callback server and Keychain token refresh — it exists in
-Reference's Swift and would need a Python port to run inside the build
-pipeline. Use an API key, a local server, or the CLI backend meanwhile.
+**ChatGPT sign-in needs no API key.** Pick it under Settings → Building and
+press **Sign in with ChatGPT…**. Seedbed opens the browser for the OAuth consent,
+receives the callback on loopback, stores the tokens in the login Keychain, and
+refreshes the access token when needed. The terminal equivalents are
+`promptlib enhancer login`, `whoami`, and `logout`.
 
 ## Adding and configuring models
 
@@ -236,18 +236,15 @@ Two consequences worth knowing:
 
 ## Check for Updates…
 
-There is no Sparkle feed. "An update" here means the git repository has commits
-this build does not, so that is what the menu item checks — `git fetch`, then
-how far behind the tracking branch you are — and it prints the commits and the
-commands that take them.
+There are two update paths because there are two kinds of copy. A copy built out
+of the checkout runs `git fetch`, reports how far the tracking branch is ahead,
+and tells you to pull and rebuild with `make-app.sh`. Offering that copy a
+shipped app would overwrite the build under development.
 
-Which commands depends on where this copy came from, because the answer differs
-and giving the wrong one is worse than giving none. A copy built out of the
-checkout is rebuilt with `make-app.sh`; a copy installed from a release DMG has
-no Swift toolchain to rebuild with, so it is told that pulling updates the
-library — which is what most commits change — and that the app itself changes
-when a newer DMG is installed over it. `Updates.wasBuiltFrom` decides by asking
-whether the running bundle sits inside the library checkout.
+A copy installed from a release DMG uses the signed Sparkle feed and offers to
+install a newer app. `Updates.wasBuiltFrom` distinguishes the checkout build;
+`Updater` owns Sparkle for an installed copy. Neither mechanism updates the
+library checkout itself, so prompts and renders still move with `git pull`.
 
 ## Signing
 

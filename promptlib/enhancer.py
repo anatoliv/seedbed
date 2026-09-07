@@ -1,8 +1,9 @@
 """Which model does the building, and how it authenticates.
 
-Mirrors Reference's Settings → AI: provider presets, three auth modes,
-endpoint + model, a Keychain-held key, and a fallback tried once when the
-primary fails retryably.
+Provider presets, endpoint + model, five auth modes, a Keychain-held key, and
+a fallback tried once when the primary fails retryably. `cli` and `sdk` exist
+because the default enhancer is the Claude CLI already on the machine, which is
+what lets the tool work with no key and no account at all.
 
 Two things stay deliberately different from a chat client. There is no
 streaming (a build is one request and the result goes to a file), and the local
@@ -33,7 +34,7 @@ class Preset:
     auth: str = "api_key"
 
 
-#: Provider presets, matching Reference's `AIProviderPreset.all`. Cost-first:
+#: Provider presets, cost-first:
 #: OpenAI is here because most people start there, the rest are ways to spend
 #: less, and the two local ones cost nothing at all.
 PRESETS: list[Preset] = [
@@ -94,9 +95,9 @@ def keychain_set(service: str, value: str) -> None:
 def endpoint_is_acceptable(url: str) -> bool:
     """https anywhere; plain http only to this machine or the LAN.
 
-    Same rule as Reference. An API key sent over http to a public host is
-    readable by anything between here and there, and a local model server has
-    no certificate — so the rule is about where, not about the scheme alone.
+    An API key sent over http to a public host is readable by anything between
+    here and there, and a local model server has no certificate — so the rule is
+    about where, not about the scheme alone.
     """
     parsed = urlparse(url)
     if parsed.scheme == "https":

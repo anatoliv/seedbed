@@ -1,0 +1,10 @@
+# Funding options shown as a "Sponsor" button on github.com/anatoliv/seedbed.
+# Seedbed is free and MIT-licensed and always will be; nothing here unlocks
+# anything, because there is nothing to unlock.
+#
+# If a Support surface is ever added to the app itself, keep these handles and
+# that surface in step; two places listing donation links is two places to
+# forget.
+github: [anatoliv]        # shows once GitHub Sponsors is enabled for the account
+ko_fi: anatolivishnyakov
+custom: ["https://paypal.me/anatolivishnyakov"]

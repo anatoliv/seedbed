@@ -1,9 +1,8 @@
 """Sign in with ChatGPT, so a ChatGPT subscription can build prompts.
 
-A Python port of Reference's `CodexOAuth.swift` / `CodexCallbackServer.swift` /
-`CodexAuthManager.swift`, which in turn mirror the first-party Codex CLI's login
-flow (`openai/codex`, `codex-rs/login`). It lives here rather than in Swift
-because prompt building runs in this package, and the app is a front end over it.
+Mirrors the first-party Codex CLI's login flow (`openai/codex`,
+`codex-rs/login`). It lives here in Python rather than in Swift because prompt
+building runs in this package, and the app is a front end over it.
 
 **Every constant below mirrors a literal in the open-source Codex CLI**, and the
 redirect URI in particular is allow-listed server-side: change the port and the

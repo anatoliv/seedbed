@@ -9,8 +9,7 @@
 # Overrides, each of which prints loudly rather than passing quietly:
 #   SKIP_TESTS=1        do not run the Python suite
 #
-# Ported from Reference's Scripts/check-release.sh, which is where the
-# two-moment structure comes from: a stale release note or a failing test is
+# The two-moment structure is the point: a stale release note or a failing test is
 # knowable in seconds, and finding out after a build plus two notarizations has
 # cost ten minutes is how a gate stops being run.
 
@@ -249,7 +248,7 @@ if ! python3 Scripts/support/cask.py "$VERSION" "$BUILD_NUM" "$DMG_SHA" --check;
     exit 1
 fi
 # Homebrew 6+ refuses a third-party tap that has not been trusted, so install
-# instructions that omit the step do not work. Found the hard way on Reference.
+# instructions that omit the step do not work.
 if ! grep -q 'brew trust' ../README.md 2>/dev/null; then
     echo "error: the README install steps omit 'brew trust' — Homebrew 6+ refuses" >&2
     echo "       third-party taps without it, so the instructions do not work." >&2

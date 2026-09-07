@@ -7,8 +7,8 @@
 #
 # Called by Scripts/release.sh beside sync-cask.sh, for the same reason the cask
 # is synced: site/index.html pins a DMG file name in its download links, and a
-# page nobody here installs from is a page that goes stale unnoticed. The
-# Reference site sat two releases behind before its gate learned to look.
+# page nobody here installs from is a page that goes stale unnoticed, offering a
+# download that still works and an "updates itself" that is a lie.
 #
 # Three places carry the version and all three move together: every
 # Seedbed_<v>_universal.dmg link, every data-version attribute, and the visible

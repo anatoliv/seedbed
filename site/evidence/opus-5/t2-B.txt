@@ -1,5 +1,5 @@
 Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
-No Python in this repo (`Reference` is a Swift/SwiftPM project), so this is an external snippet — everything below is grounded in the text as pasted. Note it's truncated in two places: `write` has a signature but no body, and `Render` is only a docstring.
+No Python in this repo (`[another project]` is a Swift/SwiftPM project), so this is an external snippet — everything below is grounded in the text as pasted. Note it's truncated in two places: `write` has a signature but no body, and `Render` is only a docstring.
 
 ## What it does
 

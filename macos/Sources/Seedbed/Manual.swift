@@ -240,15 +240,16 @@ enum Manual {
                 configured with some other hostname is refused outright rather than half \
                 working.
 
-                Related, and a much more common mistake: the endpoint is the server root, \
-                so the URL takes no path. A stray one returns "not found" and tells you to \
-                drop it.
+                The copied configuration uses the server root. `/mcp` is accepted as a \
+                compatibility path for clients that require it; any other path returns \
+                "not found".
                 """,
             example: """
                 http://127.0.0.1:8789          answered
                 http://localhost:8789          answered
+                http://127.0.0.1:8789/mcp      answered
                 http://seedbed.example.com     forbidden
-                http://127.0.0.1:8789/mcp      not found, drop the path
+                http://127.0.0.1:8789/other    not found
                 """,
             key: nil),
         ManualTopic(
@@ -342,7 +343,7 @@ enum Manual {
             example: """
                 seed:  fix {{BUG}} in {{PROJECT}} and add a regression test
                 form:  BUG      [ crash on empty history      ▾ ]
-                       PROJECT  [ Reference                  ▾ ]
+                       PROJECT  [ reference                     ▾ ]
                 """,
             key: nil),
         ManualTopic(
@@ -471,8 +472,8 @@ enum Manual {
                 you that it is switched on and did not start.
 
                 If it is running, the client is nearly always holding a regenerated token \
-                or a URL with a path on the end. Copy the configuration again from \
-                Settings, then MCP. Note also that the server lives inside this app, so \
+                or a URL with an unsupported path. The root and `/mcp` both work. Copy the \
+                configuration again from Settings, then MCP. The server lives inside this app, so \
                 quitting Seedbed takes it down and the client sees a connection failure \
                 rather than a message.
                 """,
@@ -522,8 +523,8 @@ enum Manual {
                 config file. That is the whole procedure.
 
                 What you get is a standard mcpServers block with the URL and the bearer \
-                token already filled in. Nothing else needs setting up, and the URL takes \
-                no path after the port.
+                token already filled in. Nothing else needs setting up. The copied root \
+                URL is preferred; `/mcp` is also accepted for clients that require it.
                 """,
             example: """
                 {
@@ -670,7 +671,7 @@ enum Manual {
                 warns you that it is switched on and did not start.
 
                 If it is running, the client is almost certainly using an old token or a \
-                URL with a path on the end. Copy the configuration again from Settings, \
+                URL with an unsupported path other than `/mcp`. Copy the configuration again from Settings, \
                 then MCP. If the menu says nothing at all, Seedbed is not running: the \
                 server lives inside the app and goes down with it.
                 """,

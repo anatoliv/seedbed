@@ -419,6 +419,16 @@ struct KeyCatcher: NSViewRepresentable {
         var model: HUDModel?
         override var acceptsFirstResponder: Bool { true }
 
+        // This view IS the panel's search field: it takes every keystroke and
+        // the query is drawn beside it as plain text. Without these overrides
+        // there was no search control in the accessibility tree at all — no
+        // role, no label, no value — so a screen-reader user could neither find
+        // the field nor hear what had been typed into it.
+        override func isAccessibilityElement() -> Bool { true }
+        override func accessibilityRole() -> NSAccessibility.Role? { .textField }
+        override func accessibilityLabel() -> String? { "Search prompts" }
+        override func accessibilityValue() -> Any? { model?.query ?? "" }
+
         /// kVK_ANSI_1…9 are not contiguous, hence the table.
         private static let digitKeyCodes: [UInt16: Int] = [
             18: 1, 19: 2, 20: 3, 21: 4, 23: 5, 22: 6, 26: 7, 28: 8, 25: 9,
@@ -493,6 +503,10 @@ struct KeyCatcher: NSViewRepresentable {
 }
 
 struct HUDView: View {
+    /// The panel ships exactly one animation, the scroll that follows the
+    /// selection. `Tokens.Motion.reducedCurve` existed for this and was wired
+    /// to nothing.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var model: HUDModel
 
     var body: some View {
@@ -571,12 +585,14 @@ struct HUDView: View {
             }
             .buttonStyle(.plain)
             .help("Sort order (⌘S)")
+            .accessibilityLabel("Sort order, currently \(model.sort.label)")
             Button { model.onClose() } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: Tokens.IconSize.compact)).foregroundStyle(.tertiary)
             }
             .buttonStyle(.plain)
             .help("Close (esc)")
+            .accessibilityLabel("Close the panel")
         }
         .chromeBar()
     }
@@ -598,7 +614,11 @@ struct HUDView: View {
             .onChange(of: model.selection) { _, new in
                 let list = model.filtered
                 guard list.indices.contains(new) else { return }
-                withAnimation(Tokens.Motion.microCurve) { proxy.scrollTo(list[new].id, anchor: .center) }
+                if reduceMotion {
+                    proxy.scrollTo(list[new].id, anchor: .center)
+                } else {
+                    withAnimation(Tokens.Motion.microCurve) { proxy.scrollTo(list[new].id, anchor: .center) }
+                }
             }
         }
     }
@@ -648,6 +668,10 @@ struct PromptRow: View {
     let prompt: Prompt
     let selected: Bool
     @State private var hovering = false
+    /// System setting, honoured rather than assumed: a 5pt colour difference is
+    /// the whole state cue on a chip, and this is the switch that says it is
+    /// not enough for this user.
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.row) {
@@ -658,10 +682,14 @@ struct PromptRow: View {
                 }
                 Text(prompt.title).font(Tokens.FontScale.body.weight(.medium)).lineLimit(1)
                 Spacer(minLength: Tokens.Space.row)
-                if hovering {
-                    actions
-                } else if prompt.uses > 0 {
-                    Text("\(prompt.uses)×").font(Tokens.FontScale.nano).foregroundStyle(.tertiary)
+                ZStack(alignment: .trailing) {
+                    if prompt.uses > 0 {
+                        Text("\(prompt.uses)×").font(Tokens.FontScale.nano)
+                            .foregroundStyle(.tertiary)
+                            .opacity(hovering ? 0 : 1)
+                            .accessibilityHidden(true)
+                    }
+                    actions.opacity(hovering ? 1 : 0)
                 }
             }
             Text(prompt.body).font(Tokens.FontScale.tiny).foregroundStyle(.secondary).lineLimit(1)
@@ -675,6 +703,23 @@ struct PromptRow: View {
         .cornerRadius(Tokens.Radius.card)
         .padding(.horizontal, Tokens.Space.row6)
         .onHover { hovering = $0 }
+        // `.contain` rather than `.combine`: the row gets a name of its own and
+        // the action buttons inside it stay reachable as separate elements. A
+        // plain tap gesture on a stack produces no traits at all, so before
+        // this there was no list to discover and no way to tell which row the
+        // keyboard was on.
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(accessibilityName)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    /// What a screen reader says for this row.
+    private var accessibilityName: String {
+        var parts = [prompt.title]
+        if prompt.pinned { parts.append("pinned") }
+        if prompt.uses == 1 { parts.append("used once") }
+        else if prompt.uses > 1 { parts.append("used \(prompt.uses) times") }
+        return parts.joined(separator: ", ")
     }
 
     private var actions: some View {
@@ -714,7 +759,15 @@ struct PromptRow: View {
                 Text("⌘\(shortcut)").font(Tokens.FontScale.monoTiny)
                     .foregroundStyle(.secondary)
             }
-            Circle().fill(target.dotColor).frame(width: 5, height: 5)
+            Group {
+                if differentiateWithoutColor {
+                    Image(systemName: target.stateSymbol)
+                        .font(.system(size: Tokens.IconSize.mini, weight: .bold))
+                } else {
+                    Circle().frame(width: 5, height: 5)
+                }
+            }
+            .foregroundStyle(target.dotColor)
             Text(target.shortName)
                 .font(Tokens.FontScale.micro.weight(favourite ? .semibold : .regular))
                 .lineLimit(1)
@@ -725,6 +778,9 @@ struct PromptRow: View {
         .background(Capsule().fill(Color.secondary.opacity(target.isUsable ? 0.14 : 0.06)))
         .opacity(target.isUsable ? 1 : 0.7)
         .help("\(target.name): \(target.label). ⌘\(shortcut) copies, ⌥⌘\(shortcut) rebuilds.")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(target.name), \(target.label)")
+        .accessibilityAddTraits(.isButton)
         .onTapGesture { model.copy(prompt, target: target) }
     }
 }
