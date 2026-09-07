@@ -1,0 +1,24 @@
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+This is Python, and it's not from Reference (that's a Swift repo) — so I'm reading it standalone. Two dataclasses from what looks like a prompt-management pipeline: hand-written **seeds** get expanded into per-model **renders**.
+
+## `Seed`
+
+A prompt source file loaded from disk, with metadata alongside the text.
+
+**Fields** — `id` and `body` are required; the rest describe the seed rather than being it. `targets` is presumably the list of models this seed should be expanded for, `tags`/`category` for organizing, `pinned` for surfacing. `path` is `None` for a seed constructed in memory and set for one loaded from a file. The `field(default_factory=list)` on the two lists is the standard dataclass requirement — a bare `= []` would share one list across every instance.
+
+**`hash`** — digests `body` only, and the docstring says why: it's a staleness key. Somewhere there's a check like "does this render's recorded seed hash still match the seed's current hash", and if the hash covered `title` or `pinned`, retitling a seed or pinning it would invalidate every downstream render and trigger a pointless (probably paid) re-expansion. Only a change to the actual prompt text should do that.
+
+**`load`** — parses one file:
+- `_split` separates metadata from body (frontmatter-style, given the shape); `path.name` is passed in so errors can name the file.
+- An empty body is a hard `FormatError`. Reasonable — a seed with metadata and no prompt is a silent no-op otherwise.
+- `id` falls back to `path.stem`, so the filename is the id unless you override it. Note it's `meta.get("id") or path.stem`, not `meta.get("id", ...)` — an explicit empty `id:` in the file also falls back rather than producing a seed with an empty id.
+- The `list(...)` and `bool(...)` wrappers are coercion at the boundary: whatever the parser hands back (YAML scalar, tuple, `None`-ish) becomes the declared type, so nothing downstream has to re-check.
+
+**`write`** — body truncated in your paste, but by symmetry with `load` it serializes metadata + body back out, which is what lets the tool edit seeds rather than only read them.
+
+## `Render`
+
+Only the declaration and docstring are here. "A seed expanded for one target model" plus the staleness comment on `Seed.hash` implies each `Render` stores the expanded text along with the source seed's id and the body hash at expansion time — so a later run can compare hashes and re-expand only the seeds whose text actually changed.
+
+The last part is inference from the docstrings; if you paste the rest of `write` and the `Render` fields I can confirm it.

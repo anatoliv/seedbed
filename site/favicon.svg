@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Seedbed favicon</title>
+  <desc id="desc">A single leaf on a terracotta tile.</desc>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#F26B3A"/>
+  <path fill="#FAF9F7" d="M8 12c13-1 25 1 33 8 7 6 10 14 9 23-9 0-19-2-27-8C14 29 10 21 8 12Z"/>
+  <path fill="none" stroke="#FAF9F7" stroke-width="5" stroke-linecap="round"
+        d="M22 26c13 4 24 14 32 28"/>
+</svg>

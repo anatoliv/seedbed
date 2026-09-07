@@ -1,0 +1,25 @@
+## I can't reproduce this — there's no codebase here
+
+The primary working directory `/private/var/folders/.../tmp.zA8FuWEQ6f` is **empty**: zero files, not a git repo. What I tried:
+
+- `ls -la` and a recursive `find -type f` on the working dir → 0 files.
+- Checked for a toolchain: `swiftc` exists at `/usr/bin/swiftc`, so I could have built something — but there's no target, no `Package.swift`, no `.xcodeproj`, and no test suite to run.
+- Tried to locate the code in your actual projects (`grep -rl 'buildStatusItem\|statusClicked' ~/Projects`) — blocked by the sandbox, which only permits searching the empty temp dir.
+
+So I have the snippet from your message and nothing else. I'm not going to patch a file I can't see or claim a test result I didn't produce.
+
+## What I need
+
+Point me at the repo — either give me the path and add it to the session's allowed directories, or re-run me with the project as the working directory. a sibling app and Reference are both menu-bar apps, so it's plausibly one of those.
+
+## Static read, offered as hypotheses only — not a fix
+
+The symptom you describe ("nothing happens", not "wrong thing happens") means the action never reaches `statusClicked`, which puts the fault *before* `showMenu()`. `showMenu()` itself uses the standard set-menu / `performClick` / clear-menu idiom, so I'd look there last.
+
+The one I'd check first: **`NSControl.target` is a weak reference.** If the object assigned as `target = self` is created without being stored — a local `let controller = StatusController()` in `applicationDidFinishLaunching`, say — it deallocates immediately. The status item survives because `NSStatusBar` owns it, so the icon stays in the menu bar and still highlights on click, but `target` is now nil, the action falls through to the responder chain, nobody handles `statusClicked`, and nothing happens. That matches "the app is otherwise running" precisely.
+
+Second: whether `statusItem` is a strong stored property, and whether its owner is retained for the app's lifetime.
+
+Two smaller things I noticed but which do *not* explain this symptom, so don't let them distract you: the menu items pass no `target`, so `open` won't resolve through the responder chain and that item will render disabled — a menu that appears greyed out, not a menu that never appears. And control-click arrives as `.leftMouseUp` with a modifier, so it would hit the `togglePanel()` branch rather than showing the menu.
+
+To confirm the target-deallocation theory in about a minute, without a rebuild loop: put a `deinit { print("controller deallocated") }` on the class that owns `buildStatusItem`, and a `print` at the top of `statusClicked`. If you see the deinit at launch and never see the click log, that's it.

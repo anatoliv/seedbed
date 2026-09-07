@@ -1,0 +1,120 @@
+The bug you're experiencing — where the "unsaved changes" warning appears **immediately when a prompt is selected**, even before the user types anything — is due to the `dirty` flag being set **too early**.
+
+In your current code, the `dirty` flag is set to `false` in `loadDraft()`, but **the `TextField` and `TextEditor` bindings** are immediately setting `dirty = true` when the user selects a prompt, because the `set` closure in the `Binding` is called **as soon as the view is rendered**, even if the user hasn't edited anything.
+
+This happens because SwiftUI **re-renders the view** when `model.draftTitle` or `model.draftBody` changes, and the `Binding`'s `set` closure runs **on assignment**, even if the value is the same.
+
+---
+
+### ✅ Root Cause:
+- When `loadDraft()` runs, it sets `draftTitle` and `draftBody` to the prompt's values.
+- But the `TextField` and `TextEditor` are bound to these values, and **SwiftUI triggers the `set` closure** of the `Binding` when the view is rendered.
+- Even if the value is unchanged, the `set` closure runs, and `model.dirty = true` is executed.
+- So, **the `dirty` flag becomes `true` immediately after loading**, even without user input.
+
+---
+
+### ✅ Fix: Only mark as dirty when the value actually changes
+
+We need to **only set `dirty = true` when the new value is different from the original**.
+
+We can do this by **comparing the new value with the original value** (which we can store when loading the draft).
+
+---
+
+### ✅ Solution:
+
+Update your `LibraryModel` to store the **original** values when loading the draft, and only mark `dirty` as `true` when the value changes.
+
+```swift
+final class LibraryModel: ObservableObject {
+    @Published var draftTitle = ""
+    @Published var draftBody = ""
+    @Published var dirty = false
+
+    // Store original values when loading
+    private var originalTitle = ""
+    private var originalBody = ""
+
+    private func loadDraft() {
+        guard let prompt = current else { return }
+        originalTitle = prompt.title
+        originalBody = prompt.body
+        draftTitle = prompt.title
+        draftBody = prompt.body
+        dirty = false
+    }
+
+    // Update title and check if it changed
+    func updateTitle(_ newTitle: String) {
+        if newTitle != originalTitle {
+            draftTitle = newTitle
+            dirty = true
+        } else {
+            draftTitle = newTitle
+            dirty = false
+        }
+    }
+
+    // Update body and check if it changed
+    func updateBody(_ newBody: String) {
+        if newBody != originalBody {
+            draftBody = newBody
+            dirty = true
+        } else {
+            draftBody = newBody
+            dirty = false
+        }
+    }
+}
+```
+
+Then update your `EditPane` to use these methods instead of direct binding:
+
+```swift
+struct EditPane: View {
+    @ObservedObject var model: LibraryModel
+
+    var body: some View {
+        TextField("", text: Binding(
+            get: { model.draftTitle },
+            set: { model.updateTitle($0) }))
+        TextEditor(text: Binding(
+            get: { model.draftBody },
+            set: { model.updateBody($0) }))
+    }
+}
+```
+
+---
+
+### ✅ Alternative: Use `@Published` with `willSet` (less clean)
+
+You could also use `willSet` on `draftTitle` and `draftBody`, but that's less safe because it runs on **any** change, including internal ones.
+
+The above solution is **cleaner and more explicit**.
+
+---
+
+### ✅ Test the Fix
+
+1. **Select a prompt** → `loadDraft()` runs → `draftTitle` and `draftBody` are set to the prompt values.
+   - `dirty` is set to `false`.
+   - No warning appears.
+
+2. **Type a character** → `updateTitle` is called → `newTitle != originalTitle` → `dirty = true`.
+   - Warning appears.
+
+3. **Undo or revert to original** → `dirty = false` again.
+
+4. **Select a different prompt** → `loadDraft()` runs again → `originalTitle` and `originalBody` are updated → `dirty = false`.
+
+---
+
+### ✅ Final Notes
+
+- This fix ensures the "unsaved changes" warning only appears **after a real edit**.
+- It avoids false positives when the user just selects a prompt.
+- You can extend this pattern to other fields if needed.
+
+Let me know if you want to support **undo/redo** or **auto-save**!

@@ -256,7 +256,22 @@ if ! grep -q 'brew trust' ../README.md 2>/dev/null; then
     exit 1
 fi
 
+# --- The public site ------------------------------------------------------------
+# site/index.html links the DMG by file name, three times, and is the surface a
+# stranger meets first. A page pinned to the previous release offers a download
+# that still works and an "updates itself" that is a lie, and a page pinned to
+# a release not yet uploaded 404s. sync-site.sh --check reads every marker and
+# refuses anything but this version; Scripts/publish-site.sh separately refuses
+# to deploy until the DMG it links is served.
+if [[ -f ../site/index.html ]]; then
+    Scripts/sync-site.sh --check || exit 1
+else
+    echo "error: missing ../site/index.html — the public site is part of the release." >&2
+    exit 1
+fi
+
 echo "release ok: $VERSION ($BUILD_NUM)"
 echo "  app and DMG stapled, Gatekeeper accepts the app, bundle matches the plist"
+echo "  cask, appcast and site all pin this release"
 echo "  appcast offers $APPCAST_VERSION ($APPCAST_BUILD), EdDSA signed"
 echo "  cask pins $WANT_VERSION and this DMG's sha256, caveats match the DMG readme"

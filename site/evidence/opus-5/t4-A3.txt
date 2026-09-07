@@ -1,0 +1,30 @@
+I fixed the bug and wrote the tests, but **I could not run them** — every toolchain command (`swift test`, `swift --version`, `xcrun --find swift`) was refused for approval, and this session is non-interactive so I can't clear that. Please run `swift test` yourself.
+
+## The bug
+
+`showMenu()` did this:
+
+```swift
+statusItem.menu = menu
+statusItem.button?.performClick(nil)
+statusItem.menu = nil          // ← immediately
+```
+
+Assigning `statusItem.menu` hands the button's target/action over to `NSStatusItem`'s own popup handling; clearing it on the very next line tears that down before the menu can be presented, and leaves the button without the action `build()` installed. So the menu never appears and the item goes dead for subsequent clicks too.
+
+The fix presents the menu transiently with `NSMenu.popUp(positioning:at:in:)`, which blocks until dismissal and never touches `statusItem.menu`, so the button keeps its target/action (`StatusController.swift:57`).
+
+Two other real defects in the same path:
+
+- **"Open" would have been greyed out** even once the menu showed. `addItem(withTitle:action:keyEquivalent:)` leaves `target` nil, so validation goes through the responder chain — which does not include `StatusController` — and `openThing` is unreachable. Now targeted at the controller; "Quit" is targeted at `NSApplication.shared` (`StatusController.swift:43`).
+- **Control-click did nothing.** It arrives as `.leftMouseUp` with `.control` set, not as `.rightMouseUp`, so it fell into the panel branch. Event interpretation now lives in a pure `static func response(for:)`, which is also the seam the tests drive.
+
+## Tests
+
+New test target in `Tests/StatusMenuTests/StatusControllerTests.swift` (registered in `Package.swift`), covering click routing (right-click, control-click, plain left, unrelated modifier, nil event) and menu construction — titles, key equivalent, targets, and `menu.update()` followed by an `isEnabled` assertion on every item, which is the direct regression test for the greyed-out "Open".
+
+The presentation call itself is deliberately not tested: `popUp` runs a modal tracking loop and would hang a headless run. It's now a single line with the decision logic pulled out around it.
+
+## Not addressed
+
+`togglePanel()` is still an empty stub, so a plain left-click genuinely does nothing. If your "clicking does nothing" report was about left-click rather than the menu, that's the reason — but there's no panel anywhere in this repo, so I didn't invent one. There's also no app entry point here, so I couldn't confirm something actually retains the `StatusController`; `NSControl.target` is a weak reference, and if the controller is only held by a local in your app's setup, clicks would silently stop working regardless of this fix. Worth a look at the call site of `build()`.

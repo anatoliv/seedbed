@@ -1,0 +1,11 @@
+Fix the bug in this codebase and verify the fix with tests.
+
+Work in this order:
+
+1. Reproduce the bug first. Run the failing case and capture the actual output before changing anything. If you cannot reproduce it, say so and tell me what you tried rather than guessing at a fix.
+2. Find the root cause, not the symptom. Read the relevant code paths before concluding. Do not patch around the failure (special-casing the failing input, loosening an assertion, catching and swallowing the error) — fix the underlying defect.
+3. Make the minimal correct change. Do not refactor surrounding code, add abstractions, or clean up unrelated issues you notice along the way. Mention them instead.
+4. Add or update a test that fails against the old code and passes against the new code. The test should cover the general defect, not just the one input that surfaced it.
+5. Run the project's existing test suite for the affected area and report the actual results, including any failures or tests you skipped.
+
+Done means: the bug no longer reproduces, a regression test covers it, and the surrounding tests pass. Report what the root cause was, what you changed, and the test output you saw — in a few sentences of prose, not a long writeup. If tests fail or something is still broken, say that plainly instead of describing the work as complete.

@@ -1,0 +1,62 @@
+Fix and tests are written. I could not execute them — `swift test` and `xcrun` both require approval in this non-interactive session, so **the suite has not been run**. Everything below is reviewed-by-reading, not verified output.
+
+## The bug
+
+`dirty` was being set by the *fact that the setter ran*, not by the text changing:
+
+```swift
+set: { model.draftTitle = $0; model.dirty = true }
+```
+
+`TextField` and `TextEditor` write back through their binding when the model's text changes out from under them — on selection, `loadDraft()` assigns new text, the controls reconcile on the next render pass and push that same value back through `set`. The setter can't tell that echo apart from a keystroke, so selecting a prompt marks the draft dirty. `dirty = false` inside `loadDraft()` runs *before* the write-back, so it doesn't help.
+
+## The fix
+
+Stop inferring dirtiness from setter calls; derive it by comparing the draft against a baseline captured at load. That's idempotent, so an echo write is a no-op, and it also clears the warning when a user types something and undoes it back to the original.
+
+`Sources/PromptLibrary/LibraryModel.swift`:
+
+```swift
+@Published public var draftTitle = "" { didSet { refreshDirty() } }
+@Published public var draftBody  = "" { didSet { refreshDirty() } }
+@Published public private(set) var dirty = false
+
+private var savedTitle = ""
+private var savedBody  = ""
+private var isLoading  = false
+
+private func loadDraft() {
+    guard let prompt = current else { return }
+    isLoading = true                    // title and body land one at a time
+    savedTitle = prompt.title
+    savedBody  = prompt.body
+    draftTitle = prompt.title
+    draftBody  = prompt.body
+    isLoading = false
+    refreshDirty()
+}
+
+public func markSaved() {               // persisting rebaselines
+    savedTitle = draftTitle
+    savedBody  = draftBody
+    refreshDirty()
+}
+
+private func refreshDirty() {
+    guard !isLoading else { return }
+    let changed = draftTitle != savedTitle || draftBody != savedBody
+    if dirty != changed { dirty = changed }
+}
+```
+
+The custom `Binding`s in `EditPane` existed only to set the flag, so they go away — `TextField("", text: $model.draftTitle)` and `TextEditor(text: $model.draftBody)`.
+
+Two details worth flagging: `dirty` is now `private(set)`, so anything that assigned it directly (a save handler doing `dirty = false`) must call `markSaved()` instead. And `isLoading` guards the half-loaded state between the two draft assignments, which would otherwise publish a one-frame `dirty == true` on every prompt switch.
+
+## Tests
+
+`Tests/PromptLibraryTests/LibraryModelTests.swift`, 13 cases. The regression test is `testEditorWriteBackOfUnchangedTextDoesNotReportUnsavedChanges`, which replays the echo (`model.draftTitle = model.draftTitle`) after selection. The rest cover: selection is clean, real edits in either field are dirty, hand-reverting an edit clears it, switching prompts rebaselines (including to a prompt with identical text), `markSaved()` makes the saved text the new baseline, `select(nil)` leaves the draft alone, and `$dirty` publishes exactly once per transition with no transient on switch.
+
+To run them: `swift test` in `/private/var/folders/mb/jhx79j5n03760097trwvfty40000gn/T/tmp.zA8FuWEQ6f`. If it fails to build, the likeliest culprit is the `macOS(.v13)` platform line in `Package.swift`, not the model logic.
+
+Not filing a the task tracker card — this is a scratch package in a temp directory with no owning project, and the fix is the deliverable here rather than tracked work.

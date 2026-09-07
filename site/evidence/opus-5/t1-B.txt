@@ -1,0 +1,37 @@
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+This snippet isn't in the Reference working tree (no match for `canRunPromptlib` or `resolvedPython` in the Swift sources), so the explanation below is grounded only in the code as quoted. The enclosing type, and everything that consumes `resolvedPython`, aren't shown.
+
+## What it does
+
+It picks an absolute path to a Python 3 interpreter the app can shell out to, instead of relying on `/usr/bin/env python3`. The problem is stated in the doc comment: a GUI app launched from Finder inherits a minimal `PATH`, so `env` resolves to Apple's Python 3.9, which lacks `tomllib` — the same command that works fine from a terminal fails inside the app. The fix is to try a fixed list of known install locations and pick the first one that passes a capability check, not the first one that exists.
+
+## How it works
+
+Three pieces. `pythonKey` is the `UserDefaults` key (`"PythonPath"`) for a user-supplied override. `candidates` is an ordered fallback list: Homebrew on Apple Silicon, Homebrew on Intel, then version-pinned Homebrew binaries newest-first, with `/usr/bin/python3` last — deliberately, since that's the interpreter the comment blames for the bug.
+
+`resolvedPython` is a `static let` whose value comes from an immediately-applied closure. Swift initializes static stored properties lazily and exactly once, thread-safely, on first access, which is what makes the "resolved once per launch" comment in the code true: the probing happens on whichever thread touches the property first, and every later read gets the cached answer. Inside, an override from `UserDefaults` is preferred, but only if it is non-empty *and* passes the same probe as everything else:
+
+```swift
+if let override = UserDefaults.standard.string(forKey: pythonKey),
+   !override.isEmpty, canRunPromptlib(override) {
+```
+
+A bad override doesn't error — it just falls through to `candidates.first(where: canRunPromptlib)`, which passes the static method itself as the predicate closure and yields `String?`.
+
+`canRunPromptlib` is the actual test. It first guards on `FileManager.isExecutableFile`, cheaply skipping paths that don't exist (most machines have only one of the Homebrew prefixes). Then it spawns the interpreter with `-c "import tomllib"`, routes both stdout and stderr to `FileHandle.nullDevice` so nothing leaks into the app's own streams, `waitUntilExit()`s, and reports success as `terminationStatus == 0`. The neat part is that `tomllib` entered the standard library in Python 3.11, so a single import doubles as a version floor and an "this binary actually runs" check — no version-string parsing. `try process.run()` sits in a `do`/`catch` that returns `false`, covering the case where the file passes the executable check but can't be launched (wrong architecture, bad interpreter line, sandbox denial).
+
+## Inputs, outputs, side effects
+
+The only input is the `PythonPath` value in `UserDefaults.standard` — shared global state read at first access. The output is `String?`: an absolute interpreter path, or `nil` when nothing qualifies.
+
+The side effects are the interesting part. Resolution stats the filesystem and spawns up to eight short-lived child processes, synchronously blocking the calling thread until each exits. Nothing here dispatches to a background queue, so if the first read of `resolvedPython` happens on the main thread during launch, the UI blocks for the duration of all the probes. Child processes inherit the app's environment, so anything like `PYTHONHOME` in the app's env influences the probe result.
+
+## Edge cases and assumptions
+
+The most consequential assumption is that a probed interpreter exits promptly. There is no timeout on `waitUntilExit()` and no `terminate()` path — a hung binary (a stale network mount, a first-run Gatekeeper check on an unsigned Homebrew build) hangs the resolver permanently, and because the caching lives in a `static let`, the hang happens on the thread that happens to touch it first.
+
+There's also a gap between the comment and the code worth flagging: the comment says the interpreter is "chosen by whether it can actually import what promptlib needs," but the probe imports only `tomllib`, a stdlib module. If `promptlib` (not shown) depends on any pip-installed package, an interpreter can pass the probe and still fail at real use — the check verifies "Python ≥ 3.11", not "has promptlib's dependencies".
+
+Caching is per-process, so it's stale by construction: editing the `PythonPath` default, or a `brew upgrade` that removes the `python3.13` the app selected, takes effect only after relaunch. Failures are silent — both output streams are discarded and nothing is logged, so a `nil` result carries no diagnosis for the user or a bug report.
+
+Finally, callers must handle `nil`; there's no fallback string, and the behavior when no interpreter qualifies depends entirely on code not shown here. Two environmental preconditions also sit outside the snippet: the app must not be sandboxed in a way that forbids spawning arbitrary executables or reading `/opt/homebrew` (all candidates would fail), and the ordering assumes the unversioned Homebrew `python3` symlink is the preferred choice — the versioned entries only matter if that symlink is missing or points at something older than 3.11. This never picks the newest available Python, just the first workable one.

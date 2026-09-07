@@ -1,0 +1,27 @@
+A macOS menu-bar app builds a menu and shows it when its status item is clicked.
+Nothing happens on click — the menu never appears. The app is otherwise running.
+
+private func buildStatusItem() {
+    statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    statusItem.button?.image = NSImage(systemSymbolName: "star", accessibilityDescription: nil)
+    statusItem.button?.action = #selector(statusClicked)
+    statusItem.button?.target = self
+    statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+}
+
+@objc private func statusClicked() {
+    if let event = NSApp.currentEvent, event.type == .rightMouseUp {
+        showMenu()
+    } else {
+        togglePanel()
+    }
+}
+
+private func showMenu() {
+    let menu = NSMenu()
+    menu.addItem(withTitle: "Open", action: #selector(open), keyEquivalent: "")
+    menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    statusItem.menu = menu
+    statusItem.button?.performClick(nil)
+    statusItem.menu = nil
+}

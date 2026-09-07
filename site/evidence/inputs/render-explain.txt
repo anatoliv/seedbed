@@ -1,0 +1,16 @@
+Read the code below and explain what it does.
+
+<code>
+{{CODE}}
+</code>
+
+Write the explanation for a competent programmer who has not seen this code before. Cover:
+
+1. **What it does** — the purpose in one or two sentences, at the level of the problem it solves rather than a line-by-line restatement.
+2. **How it works** — the control flow and data flow through the main path, naming the key functions, types, and variables as they appear in the code. Explain any non-obvious technique, algorithm, or idiom it relies on.
+3. **Inputs, outputs, and side effects** — what it consumes, what it returns, and anything it touches beyond its return value (I/O, mutation of arguments, global or shared state, network, filesystem).
+4. **Edge cases and assumptions** — what it expects of its inputs, how it handles or fails to handle error conditions, and any preconditions a caller must satisfy.
+
+Ground every claim in the code as written. If behavior depends on something not shown — a called function, an import, a config value, a type defined elsewhere — say so explicitly rather than guessing at it. If the code appears to contain a bug, note it briefly where relevant, but do not rewrite the code unless asked.
+
+Write in flowing prose with short paragraphs, using headings for the four sections above and inline code for identifiers. Include a short code excerpt only where quoting a specific line makes the explanation clearer. Aim for a focused explanation, not exhaustive coverage: a reader should finish knowing what the code is for and how it works, without a walkthrough of every line.

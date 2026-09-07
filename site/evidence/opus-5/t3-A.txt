@@ -1,0 +1,64 @@
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+I could not run the suite: `swift build`/`swift test` require permission approval and this session is non-interactive, so both calls were refused. The tests below are written and in place but **unverified** — I'm not claiming they pass.
+
+## The bug
+
+`dirty` is derived from *"the binding's setter ran"*, which is not the same thing as *"the user typed"*. SwiftUI's `TextField` and `TextEditor` write back through their binding on their own — when the text is replaced externally (`loadDraft` assigning the newly selected prompt), and on focus/commit churn. That write-back lands **after** `loadDraft` has set `dirty = false`, so selecting a prompt latches the warning on.
+
+Trying to filter *which* setter calls are real edits is a losing game. The fix is to compare against the loaded baseline, which makes an unchanged write-back a no-op by construction.
+
+## Fix
+
+`build/scratch-librarydirty/Sources/LibraryCore/LibraryModel.swift:24` — `dirty` becomes computed. It still drives the status bar, because `draftTitle`/`draftBody` are `@Published` on the same object, so `objectWillChange` fires and the view re-reads it.
+
+```swift
+@Published public var draftTitle = ""
+@Published public var draftBody = ""
+
+private var baselineTitle = ""
+private var baselineBody = ""
+
+public var dirty: Bool {
+    draftTitle != baselineTitle || draftBody != baselineBody
+}
+
+func loadDraft() {
+    baselineTitle = current?.title ?? ""
+    baselineBody = current?.body ?? ""
+    draftTitle = baselineTitle
+    draftBody = baselineBody
+}
+
+public func markSaved() {   // call after a successful save
+    baselineTitle = draftTitle
+    baselineBody = draftBody
+}
+```
+
+The custom bindings then have no job left, so `EditPane` collapses to:
+
+```swift
+TextField("", text: $model.draftTitle)
+TextEditor(text: $model.draftBody)
+```
+
+Two changes beyond the literal report, both load-bearing for `dirty` being correct:
+
+- `guard let prompt = current else { return }` became `current?.title ?? ""`. The old early return left the previous prompt's text in the fields on deselect, which then read as dirty against an empty selection — the same false warning by another route.
+- You need `markSaved()`. With the old flag, saving presumably set `dirty = false` by hand; with a derived flag, the save path has to move the baseline or the pane stays dirty forever after a save.
+
+There's also a behaviour change worth a look: typing and then undoing back to the loaded text now clears the warning, where the flag version kept it. I think that's right — there is genuinely nothing to save — but it's a visible difference, so say if you want the stickier semantics.
+
+## Tests
+
+Eight cases in `build/scratch-librarydirty/Tests/LibraryCoreTests/LibraryModelTests.swift`. The two that matter are `testSelectingAPromptIsNotDirty` (the reported symptom) and `testBindingWriteBackOfUnchangedValueIsNotDirty`, which replays the identical-value write-back that the text views perform — that one fails on the original code and is the actual regression guard. The rest cover a real edit in each field, edit-then-revert, switching prompts after an edit, deselect, and `markSaved`.
+
+To run it:
+
+```sh
+swift test --package-path build/scratch-librarydirty
+```
+
+## Where this lives
+
+This code isn't in Reference — there's no `LibraryModel`, `EditPane`, or prompt library anywhere under `Sources/`, and nothing matching in the estate. Rather than drop orphan types into this repo, I built it as a throwaway package under `build/` (gitignored). Point me at the real project and I'll port the fix and the tests into it properly, or delete the scratch package if you'd rather take the diff by hand. No the task tracker card filed for the same reason — the defect isn't in a project on this board.

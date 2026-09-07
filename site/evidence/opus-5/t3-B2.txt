@@ -1,0 +1,28 @@
+I could not reproduce this, and I don't want to hand you a fix dressed up as verified work.
+
+**What I tried:** the primary working directory (`/private/var/folders/.../tmp.zA8FuWEQ6f`) is empty — no Swift sources, no package manifest, not a git repo. `find . -type f` returns nothing. So there is no `LibraryModel.swift` or `EditPane.swift` on disk to run against; the only copy of the code is the snippet in your message. I then tried to stand up a minimal SPM package to reproduce from that snippet, but `swift --version` (and any path check outside the working dir) is blocked by this session's sandbox and needs approval that a non-interactive session can't obtain. So: no toolchain, no code, no test run, no captured output.
+
+**What I can tell you from reading the snippet** — offered as a diagnosis, not a delivered fix:
+
+The defect is that `dirty` is derived from "the binding's setter ran," which is not the same fact as "the user edited." `TextField` and `TextEditor` write back through their binding as part of normal reconciliation, not only on keystrokes. `loadDraft()` assigns `draftTitle`/`draftBody`, which fires `objectWillChange`; body re-evaluates, the text views install the new string into their AppKit backing, and that echoes back out through `set`, which unconditionally does `model.dirty = true` — after `loadDraft` had just set it false. Selecting a prompt is enough to trip it.
+
+The fix I'd make is to stop storing `dirty` and derive it from a baseline captured at load:
+
+```swift
+private var baselineTitle = ""
+private var baselineBody  = ""
+
+var dirty: Bool { draftTitle != baselineTitle || draftBody != baselineBody }
+
+private func loadDraft() {
+    guard let prompt = current else { return }
+    baselineTitle = prompt.title;  baselineBody = prompt.body
+    draftTitle    = prompt.title;  draftBody    = prompt.body
+}
+```
+
+with `EditPane` binding straight to `$model.draftTitle` / `$model.draftBody` and no `dirty = true` side effect. `dirty` stays observable because both stored properties are `@Published`. A smaller variant — keeping stored `dirty` and guarding the setter with `guard $0 != model.draftTitle else { return }` — also kills the echo, but it still equates "a value arrived" with "a user edited," so it won't handle type-then-undo-back-to-original.
+
+The regression test worth writing covers the general defect rather than the one input: load a prompt and assert not dirty; re-assign the same values through the binding path and assert still not dirty; assign a genuinely different value and assert dirty; edit and revert to the loaded text and assert clean again. That last case fails against both the current code and the guard-only variant.
+
+**Not done:** nothing changed, nothing tested. If you point me at the actual repo path — or approve `swift` in this session so I can build a reproduction from the snippet — I'll reproduce first and then do this properly.

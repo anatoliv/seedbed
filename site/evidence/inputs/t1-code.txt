@@ -1,0 +1,39 @@
+    /// An app launched from Finder inherits a minimal PATH (/usr/bin:/bin:...),
+    /// NOT the shell's. `/usr/bin/env python3` therefore finds Xcode's Python
+    /// 3.9, which has no `tomllib`, and every call fails with a traceback —
+    /// while the same command works perfectly from a terminal. So the
+    /// interpreter is resolved explicitly, and chosen by whether it can
+    /// actually import what promptlib needs rather than by where it sits.
+    static let pythonKey = "PythonPath"
+
+    private static let candidates = [
+        "/opt/homebrew/bin/python3",
+        "/usr/local/bin/python3",
+        "/opt/homebrew/bin/python3.14",
+        "/opt/homebrew/bin/python3.13",
+        "/opt/homebrew/bin/python3.12",
+        "/opt/homebrew/bin/python3.11",
+        "/usr/bin/python3",
+    ]
+
+    /// Resolved once per launch; probing costs a process spawn each.
+    private static let resolvedPython: String? = {
+        if let override = UserDefaults.standard.string(forKey: pythonKey),
+           !override.isEmpty, canRunPromptlib(override) {
+            return override
+        }
+        return candidates.first(where: canRunPromptlib)
+    }()
+
+    /// True when this interpreter has `tomllib`, which is the 3.11+ gate.
+    private static func canRunPromptlib(_ path: String) -> Bool {
+        guard FileManager.default.isExecutableFile(atPath: path) else { return false }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = ["-c", "import tomllib"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do { try process.run() } catch { return false }
+        process.waitUntilExit()
+        return process.terminationStatus == 0
+    }

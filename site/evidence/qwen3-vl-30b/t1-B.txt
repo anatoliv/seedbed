@@ -1,0 +1,35 @@
+**Summary**  
+This code determines a valid Python 3 interpreter path by checking a list of candidate paths and selecting the first one that can successfully import the `tomllib` module, with an optional override from user defaults.
+
+**Inputs**  
+- `pythonKey` (String): a constant string used as a key in `UserDefaults`.
+- `candidates` (Array of String): a list of file paths to potential Python 3 interpreters.
+- `UserDefaults.standard` (not shown in the provided code): a system service used to read the `pythonKey` value.
+- `FileManager.default` (not shown in the provided code): a system service used to check file executability.
+- `Process` (not shown in the provided code): a system service used to spawn subprocesses.
+- `URL` (not shown in the provided code): a system type used to represent file paths.
+- `FileHandle.nullDevice` (not shown in the provided code): a system constant used to discard output.
+
+**Outputs and side effects**  
+- `resolvedPython` (String?): a constant value assigned at compile time, either a valid Python path or `nil`.
+- Executes subprocesses to test Python interpreter availability.
+- Reads from the filesystem to check file executability.
+- Reads from `UserDefaults` to retrieve a potential override path.
+
+**Step by step**  
+1. The code defines a constant `pythonKey` used to retrieve a Python path from `UserDefaults`.
+2. It defines a constant array `candidates` containing possible Python 3 interpreter paths.
+3. It defines a function `canRunPromptlib` that checks whether a given path can run a Python command importing `tomllib`.
+4. It initializes a constant `resolvedPython` by evaluating a closure.
+5. Inside the closure, it checks if `UserDefaults.standard` contains a non-empty value for `pythonKey`.
+6. If such a value exists, it checks whether that path can run `tomllib` using `canRunPromptlib`.
+7. If the override path works, it returns that path.
+8. Otherwise, it iterates over `candidates` and returns the first path for which `canRunPromptlib` returns `true`.
+9. If no candidate works, it returns `nil`.
+
+**Branches and edge cases**  
+- If `UserDefaults.standard.string(forKey: pythonKey)` returns a non-empty string, the code uses that path instead of scanning `candidates`.
+- If the override path is not executable or fails to import `tomllib`, the code proceeds to scan `candidates`.
+- If no candidate path is executable or fails to import `tomllib`, `resolvedPython` is set to `nil`.
+- The `canRunPromptlib` function returns `false` if the file is not executable, or if the subprocess fails to run or exits with a non-zero status.
+- The `canRunPromptlib` function catches any `Process` launch error and returns `false`.

@@ -1,0 +1,125 @@
+You're encountering a common issue with macOS menu-bar apps: **the menu doesn't appear when the status item is clicked**, even though the code looks correct. Let's analyze and fix the problem.
+
+---
+
+### 🔍 **Root Cause**
+
+The issue lies in this line:
+
+```swift
+statusItem.button?.performClick(nil)
+```
+
+This line **does not actually show the menu**. In fact, `performClick()` is not the correct way to display a menu. The `NSStatusItem`'s menu is shown automatically when the user clicks the status item **if** the `menu` property is set **before** the click.
+
+But more importantly, **you're setting the menu, then immediately clearing it**:
+
+```swift
+statusItem.menu = menu
+statusItem.button?.performClick(nil)
+statusItem.menu = nil  // ← This is the problem!
+```
+
+You're **removing the menu immediately after setting it**, so the menu never has a chance to be displayed.
+
+---
+
+### ✅ **Fix**
+
+Remove the line that clears the menu:
+
+```swift
+private func showMenu() {
+    let menu = NSMenu()
+    menu.addItem(withTitle: "Open", action: #selector(open), keyEquivalent: "")
+    menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    statusItem.menu = menu
+    // Remove this line:
+    // statusItem.menu = nil
+}
+```
+
+Also, **you don't need to call `performClick()`** — the menu will appear automatically when the user clicks the status item **if** the menu is set.
+
+But wait — you're calling `showMenu()` from `statusClicked`, which is triggered by a click. So if you're already in the click handler, you don't need to simulate a click.
+
+---
+
+### 🛠️ **Additional Fixes & Best Practices**
+
+1. **Ensure `statusItem.menu` is set before the user clicks.**
+2. **Don’t clear the menu immediately.**
+3. **Make sure the menu is set before the click event.**
+4. **Avoid calling `performClick()` unless you're simulating a click.**
+
+---
+
+### ✅ **Corrected Code**
+
+```swift
+private func buildStatusItem() {
+    statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    statusItem.button?.image = NSImage(systemSymbolName: "star", accessibilityDescription: nil)
+    statusItem.button?.action = #selector(statusClicked)
+    statusItem.button?.target = self
+    // No need to sendAction on specific events — it's handled by the button
+}
+
+@objc private func statusClicked() {
+    if let event = NSApp.currentEvent, event.type == .rightMouseUp {
+        showMenu()
+    } else {
+        togglePanel()
+    }
+}
+
+private func showMenu() {
+    let menu = NSMenu()
+    menu.addItem(withTitle: "Open", action: #selector(open), keyEquivalent: "")
+    menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    statusItem.menu = menu
+    // Do NOT set menu to nil here!
+    // The menu will be cleared automatically when it's dismissed
+}
+```
+
+---
+
+### 🧪 **Testing**
+
+1. **Build and run the app.**
+2. **Click the status item:**
+   - Left-click → should toggle your panel.
+   - Right-click → should show the menu with "Open" and "Quit".
+3. **Verify:**
+   - Menu appears on right-click.
+   - "Quit" works.
+   - No crashes or errors.
+
+---
+
+### 📝 **Bonus Tips**
+
+- **Use `NSMenu`'s `autoenablesItems` and `autoenablesItems`** if needed.
+- **Ensure `statusItem` is retained** (e.g., stored as a property) — otherwise it may be deallocated.
+- **Avoid setting `menu` to `nil` unless you want to clear it.**
+- **Consider using `NSMenu`'s `popUp` method** if you want to show a menu programmatically without relying on the status item click.
+
+---
+
+### ✅ Final Fix Summary
+
+> ❌ **Wrong:**  
+> ```swift
+> statusItem.menu = menu
+> statusItem.button?.performClick(nil)
+> statusItem.menu = nil
+> ```
+
+> ✅ **Correct:**  
+> ```swift
+> statusItem.menu = menu
+> // No need to call performClick or clear menu
+> ```
+
+Now the menu should appear on right-click. 🎉

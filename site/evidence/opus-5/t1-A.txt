@@ -1,0 +1,26 @@
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+That's a fragment of a Swift helper that answers one question: *which* `python3` should this Mac app shell out to. It's not in this repo (nothing here references `PythonPath`, `resolvedPython`, or `promptlib`), so this is on the pasted code alone.
+
+## The problem the comment describes
+
+A GUI app launched from Finder/Dock gets a minimal environment from `launchd` — roughly `/usr/bin:/bin:/usr/sbin:/sbin` — not the `PATH` your shell builds from `.zshrc`. So `/usr/bin/env python3` inside the app resolves to Apple's system Python 3.9, while the exact same command in Terminal resolves to Homebrew's 3.12+. Python 3.9 has no `tomllib` (stdlib since 3.11), so every call dies with an `ImportError` traceback that is unreproducible from a terminal. Classic "works on my machine, where my machine is the same machine."
+
+## What each piece does
+
+**`pythonKey`** — a `UserDefaults` key, so a user (or a support instruction: `defaults write <domain> PythonPath /path/to/python3`) can force a specific interpreter.
+
+**`candidates`** — a hardcoded preference order that bypasses `PATH` entirely: Apple Silicon Homebrew, then Intel Homebrew, then explicit version-pinned Homebrew installs newest-first, then system Python last. `/usr/bin/python3` is in the list not because it's expected to work but so there's a final thing to try.
+
+**`resolvedPython`** — a `static let` with an immediately-invoked closure, so Swift computes it lazily on first access and exactly once, thread-safely. The override wins only if it's non-empty *and* passes the probe; a stale or wrong override falls through to the candidate scan rather than hard-failing. Type is `String?` — `nil` means no usable interpreter, and callers have to handle that.
+
+**`canRunPromptlib`** — the actual test. Cheap check first (`isExecutableFile`, which also filters out the many broken symlinks in `/usr/local/bin`), then spawn the interpreter with `-c "import tomllib"`, both streams to `/dev/null` so nothing leaks into the app's log, and treat exit status 0 as success. `try process.run()` failing is just `false`.
+
+The design point in the comment is the real one: it selects by **capability, not location**. "Is it at the Homebrew path" is a proxy that breaks; "can it import what I need" is the thing you actually care about.
+
+## Three things worth knowing about it
+
+**The probe tests a proxy, not the dependency.** `import tomllib` proves 3.11+, and the doc comment says as much — but the function is named `canRunPromptlib`. If `promptlib` is a third-party package rather than pure-stdlib code, an interpreter can pass this gate and still fail at runtime with `ModuleNotFoundError: promptlib`. Probing `import promptlib, tomllib` would make the name true; whether that's right depends on whether promptlib ships inside the bundle or is expected in site-packages.
+
+**Up to 7 blocking process spawns on first access.** `waitUntilExit()` is synchronous, and each Python startup is ~20–50ms. If the first read of `resolvedPython` happens on the main thread during a UI interaction, that's a visible stall in the worst case. Usually fine, but worth forcing the resolution early on a background queue if it's ever hit from a click handler.
+
+**`/usr/bin/python3` can trigger the Command Line Tools dialog.** On a Mac without CLT installed, that path is a shim: it exists and is executable, so `isExecutableFile` returns true, but running it pops Apple's "install command line developer tools" prompt. Since it's last in the list, this only bites a user with no Homebrew Python at all — who is also the user for whom the whole resolution is about to fail anyway. Still an odd modal to surface from a probe.

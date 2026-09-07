@@ -1,0 +1,13 @@
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+I could not reproduce this — the code you pasted is not in this repo, in any form.
+
+What I checked:
+
+- `grep -rn "statusClicked|buildStatusItem|sendAction(on|performClick|togglePanel|showMenu" --include="*.swift" Sources Tests` → no matches.
+- Only one file touches the menu bar at all: `Sources/Reference/MenuBarController.swift`. It uses the *other* pattern — it builds the `NSMenu` in `rebuildMenu()` and assigns `statusItem.menu = menu` permanently (MenuBarController.swift:147). There is no button `action`/`target`, no `sendAction(on:)`, and no `performClick`, so the failure mode you describe can't arise here.
+- `git log --all -S "performClick"` and `-S "statusClicked"` over all refs → zero commits. This code has never been in this repository.
+- No test references `MenuBarController` (only `AppController.swift` does), so there's no existing failing case to run either.
+
+I'm not going to write a fix or a regression test against code that isn't here — that would be guessing at which of several plausible defects yours actually is. From the snippet alone, the candidates I'd want to distinguish are: `NSApp.currentEvent` being a `.rightMouseDown` rather than `.rightMouseUp` when the action fires (so `showMenu()` is never reached and every click falls through to `togglePanel()`); `statusItem` not being held strongly, so the item is gone from the bar entirely; and the menu items being built with `addItem(withTitle:action:)`, which leaves `target` nil so `Open` goes to the responder chain and comes back disabled. Those need different fixes, and the one-line symptom "nothing happens" doesn't separate them.
+
+Tell me which repo and file this lives in and I'll reproduce it there. If it's meant to be a *new* feature for Reference — a left-click panel with a right-click menu, replacing the always-attached `statusItem.menu` — say so and I'll treat it as that instead.

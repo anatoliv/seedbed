@@ -1,0 +1,40 @@
+@dataclass
+class Seed:
+    """A short prompt you maintain by hand."""
+
+    id: str
+    body: str
+    title: str = ""
+    targets: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+    category: str = ""
+    pinned: bool = False
+    path: Path | None = None
+
+    @property
+    def hash(self) -> str:
+        """Only the body decides staleness — pinning or retitling must not
+        invalidate a render that is still correct."""
+        return digest(self.body)
+
+    @classmethod
+    def load(cls, path: Path) -> "Seed":
+        meta, body = _split(path.read_text(encoding="utf-8"), path.name)
+        if not body:
+            raise FormatError(f"{path.name}: seed body is empty")
+        return cls(
+            id=meta.get("id") or path.stem,
+            body=body,
+            title=meta.get("title", ""),
+            targets=list(meta.get("targets", [])),
+            tags=list(meta.get("tags", [])),
+            category=meta.get("category", ""),
+            pinned=bool(meta.get("pinned", False)),
+            path=path,
+        )
+
+    def write(self, path: Path) -> None:
+@dataclass
+class Render:
+    """A seed expanded for one target model."""
+

@@ -1,0 +1,135 @@
+This Swift code is designed to **find and validate a working Python 3 interpreter** on macOS, especially in situations where the system's default `PATH` (like the one inherited by apps launched from Finder) doesn't include the expected Python environment.
+
+Let’s break it down step by step:
+
+---
+
+### 🔍 **Problem Context**
+When an app is launched from **Finder** (e.g., a GUI app), it inherits a **minimal `PATH`** like:
+```
+/usr/bin:/bin:/usr/sbin:/sbin
+```
+This is **not** the same as the `PATH` used in a terminal (which might include Homebrew, conda, or other Python installations).
+
+As a result:
+- `/usr/bin/env python3` may resolve to **Xcode's Python 3.9**, which is **old** and **lacks `tomllib`** (a module introduced in Python 3.11).
+- Since `promptlib` (a dependency) requires `tomllib`, this causes a crash with a traceback.
+- But the same command works fine in a terminal because the terminal’s `PATH` includes a modern Python.
+
+So the app needs to **explicitly find a working Python 3 interpreter** that supports `tomllib`.
+
+---
+
+### 🧩 Code Explanation
+
+#### 1. **Constants and Candidates**
+```swift
+static let pythonKey = "PythonPath"
+```
+This is a key used to store a **user-specified Python path** in `UserDefaults`. If the user sets it, the app will try that first.
+
+```swift
+private static let candidates = [
+    "/opt/homebrew/bin/python3",
+    "/usr/local/bin/python3",
+    "/opt/homebrew/bin/python3.14",
+    "/opt/homebrew/bin/python3.13",
+    "/opt/homebrew/bin/python3.12",
+    "/opt/homebrew/bin/python3.11",
+    "/usr/bin/python3",
+]
+```
+These are **common locations** where a modern Python 3 interpreter might be installed, especially via **Homebrew** (on Apple Silicon Macs) or other package managers.
+
+> Note: The list includes versions like `python3.14`, `3.13`, etc., to try to find a **Python 3.11+** interpreter (since `tomllib` is only available in Python 3.11+).
+
+---
+
+#### 2. **Resolved Python Path (Lazy Evaluation)**
+```swift
+private static let resolvedPython: String? = {
+    if let override = UserDefaults.standard.string(forKey: pythonKey),
+       !override.isEmpty, canRunPromptlib(override) {
+        return override
+    }
+    return candidates.first(where: canRunPromptlib)
+}()
+```
+
+This is a **lazy, once-per-launch** evaluation of the best Python interpreter.
+
+- First, check if the user has **manually set** a Python path via `UserDefaults` (e.g., via a preference pane).
+- If so, use it **only if** it's valid (i.e., it can run `import tomllib`).
+- Otherwise, go through the `candidates` list and return the **first one** that passes the `canRunPromptlib` test.
+
+> This avoids spawning processes unnecessarily — the check is done only once at startup.
+
+---
+
+#### 3. **Validation Function: `canRunPromptlib`**
+```swift
+private static func canRunPromptlib(_ path: String) -> Bool {
+    guard FileManager.default.isExecutableFile(atPath: path) else { return false }
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: path)
+    process.arguments = ["-c", "import tomllib"]
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+    do { try process.run() } catch { return false }
+    process.waitUntilExit()
+    return process.terminationStatus == 0
+}
+```
+
+This function **tests whether a given Python interpreter can import `tomllib`**.
+
+- **Check if the file is executable** (safety check).
+- Create a `Process` to run Python with the command:  
+  ```bash
+  python3 -c "import tomllib"
+  ```
+- Redirect output and errors to `/dev/null` (so no noise).
+- Run the process and wait for it to finish.
+- Return `true` only if the process exits with status `0` (success).
+
+> This is a **reliable way** to check if a Python interpreter supports `tomllib` — which is the **minimum requirement** for `promptlib`.
+
+---
+
+### ✅ Summary: What This Code Does
+
+> **It finds a working Python 3 interpreter that supports `tomllib` (i.e., Python 3.11 or newer), avoiding the broken Xcode Python that comes with macOS.**
+
+#### Key Features:
+- **Avoids Finder's broken `PATH`** by not relying on `env`.
+- **Explicitly resolves** the Python interpreter.
+- **Validates** that the interpreter supports `tomllib` (the key dependency).
+- **Prioritizes user override** (via `UserDefaults`).
+- **Only probes once** at app launch (efficient).
+- **Uses process spawning** to test Python functionality (safe and reliable).
+
+---
+
+### 🛠️ Why This Matters
+This is a **common macOS issue** when building GUI apps that need to run Python scripts. The app must **not** rely on the shell’s `PATH` or `env`, because:
+- Finder launches apps with a minimal `PATH`.
+- Xcode’s Python is old and lacks modern modules.
+- `tomllib` is required for parsing TOML files (common in config files).
+
+By doing this, the app ensures it **always uses a working Python interpreter**, regardless of how it’s launched.
+
+---
+
+### 💡 Example Use Case
+Imagine your app runs a Python script that uses `promptlib` to interact with the user. Without this code:
+- Launching from Finder → fails with `ModuleNotFoundError: No module named 'tomllib'`.
+- Launching from terminal → works fine.
+
+With this code:
+- The app **automatically finds** a working Python 3.11+ interpreter (e.g., from Homebrew).
+- It **never fails** due to missing `tomllib`.
+
+---
+
+### ✅ Final Note
+This is a **robust, cross-platform-safe** way to resolve Python interpreters in macOS apps. It’s especially useful for tools like **IDEs, CLI wrappers, or automation apps** that need to run Python code reliably.

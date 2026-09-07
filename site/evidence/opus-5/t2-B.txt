@@ -1,0 +1,37 @@
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+No Python in this repo (`Reference` is a Swift/SwiftPM project), so this is an external snippet — everything below is grounded in the text as pasted. Note it's truncated in two places: `write` has a signature but no body, and `Render` is only a docstring.
+
+## What it does
+
+`Seed` models a short, hand-maintained prompt stored as a file: a text body plus some metadata (title, tags, category, which target models it applies to). It's the source-of-truth record in what looks like a prompt-compilation pipeline — the trailing `Render` class, *"a seed expanded for one target model"*, is the derived artifact, and `Seed.hash` exists to decide when a cached render has gone stale.
+
+## How it works
+
+It's a plain `@dataclass` — no `frozen=True`, no custom `__init__` — so the fields listed are both the constructor signature and the instance state. `targets` and `tags` use `field(default_factory=list)` rather than a bare `[]`, the standard idiom for avoiding a mutable default shared across all instances. `path: Path | None` records where the seed came from and defaults to `None`, which is what lets you build a `Seed` in memory that was never on disk.
+
+The interesting piece is `hash`:
+
+```python
+return digest(self.body)
+```
+
+It hashes the body *only*, and the docstring says why: pinning or retitling a seed shouldn't invalidate a render that is still correct. So the cache key is deliberately narrower than the record. `digest` is not shown — presumably a module-level helper wrapping something like SHA-256 and returning hex — so the actual algorithm and stability of that value across runs depend on code not in the snippet. Because it's a `@property`, it's recomputed on every access rather than cached alongside the body.
+
+`load` is the main path. It reads the whole file as UTF-8, hands the text to `_split(text, path.name)` — also not shown, but the shape `(meta, body)` plus the filename argument says it parses some frontmatter-style header and passes the name along for error messages. It rejects an empty body outright, then maps `meta` onto the fields. Two small details worth naming:
+
+- `meta.get("id") or path.stem` uses `or`, not `.get("id", path.stem)`. An `id:` key present but empty also falls back to the filename stem, which is the more useful behaviour here.
+- `list(meta.get("targets", []))` copies rather than aliasing, so later mutation of `seed.targets` can't reach back into the parsed `meta` dict.
+
+## Inputs, outputs, side effects
+
+`load` takes a `Path`, performs one filesystem read, and returns a new `Seed`; it raises `FormatError` (defined elsewhere) on an empty body, and will propagate `OSError`/`UnicodeDecodeError` from `read_text` untouched. `hash` is pure, assuming `digest` is. `write(self, path)` clearly performs a filesystem write, but its body isn't in the snippet — notably it takes an explicit destination rather than defaulting to `self.path`, and whether it updates `self.path` or serialises the metadata back into the same format `_split` reads is unknowable from what's shown. No network or global state appears anywhere in the visible code.
+
+## Edge cases and assumptions
+
+The strong precondition is on `_split`: it must return a two-tuple of a mapping and a string, and the mapping must be `.get`-able. Beyond the empty-body check, nothing validates types. That leaves a few sharp edges:
+
+`bool(meta.get("pinned", False))` coerces rather than parses, so a value that arrives as the string `"false"` — which is what a naive frontmatter parser might hand back — becomes `True`. Whether that can happen depends entirely on `_split`.
+
+More likely to bite: `list(...)` on `targets` and `tags` assumes an iterable of strings. If the file writes `targets: gpt-4` as a scalar instead of a list, `list("gpt-4")` silently produces `['g', 'p', 't', '-', '4']` rather than failing. That's the one spot I'd call a latent bug, and again it hinges on whether `_split` normalises scalars to lists.
+
+Finally, a Python subtlety: defining a property named `hash` does not make `Seed` hashable. A `@dataclass` with the default `eq=True` sets `__hash__ = None`, so `Seed` instances can't go in a `set` or serve as dict keys — you have to key on `seed.hash` explicitly, which is presumably the intent given the render-cache framing.

@@ -1,0 +1,28 @@
+A macOS SwiftUI library window shows an "unsaved changes" warning in its status
+bar as soon as a prompt is selected, before the user types anything. Expected:
+it should only appear after a real edit.
+
+final class LibraryModel: ObservableObject {
+    @Published var draftTitle = ""
+    @Published var draftBody = ""
+    @Published var dirty = false
+
+    private func loadDraft() {
+        guard let prompt = current else { return }
+        draftTitle = prompt.title
+        draftBody = prompt.body
+        dirty = false
+    }
+}
+
+struct EditPane: View {
+    @ObservedObject var model: LibraryModel
+    var body: some View {
+        TextField("", text: Binding(
+            get: { model.draftTitle },
+            set: { model.draftTitle = $0; model.dirty = true }))
+        TextEditor(text: Binding(
+            get: { model.draftBody },
+            set: { model.draftBody = $0; model.dirty = true }))
+    }
+}

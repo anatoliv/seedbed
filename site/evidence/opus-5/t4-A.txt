@@ -1,0 +1,204 @@
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+The snippet isn't repo code — Reference's own `MenuBarController` assigns `statusItem.menu` directly (`Sources/Reference/MenuBarController.swift:147`) and never uses this pattern. So I fixed it standalone rather than inventing a new controller inside the app target.
+
+## Diagnosis
+
+Three defects, the first is the one that kills the menu. I checked each against the SDK headers rather than from memory:
+
+**1. `showMenu()` clears `statusItem.menu` immediately after `performClick`.** This is the bug. `performClick:` is documented as "sends the action message to its target" — it does *not* carry a guarantee that it blocks for the whole menu-tracking session, so `statusItem.menu = nil` can run before the menu is ever displayed and tears it down. Worse, `performClick` is being called *from inside the button's own action*, so if it does dispatch the action it re-enters `statusClicked()` with the same `NSApp.currentEvent` — recursion, not a menu.
+
+`NSMenu.h:78` has the right API for this, and `NSMenu.h:74` states the contract the hack was missing: `popUpMenuPositioningItem:atLocation:inView:` "returns YES if menu tracking ended because an item was selected, and NO if menu tracking was cancelled" — i.e. it blocks by contract, and it never touches `statusItem.menu`.
+
+**2. `NSControl.target` is weak** — `NSControl.h:24`: `@property (nullable, weak) id target;`. If nothing else holds a strong reference to the controller, it deallocates, the target zeroes, and *neither* click does anything. That matches "nothing happens" for both branches, so it's worth ruling out at the call site.
+
+**3. The "Open" item will be greyed out.** `addItem(withTitle:action:keyEquivalent:)` leaves `target == nil`, and `NSMenu.h:138` confirms `autoenablesItems` defaults to YES — so the item is validated against the responder chain, which a plain controller isn't in. "Quit" survives only because `NSApplication.terminate(_:)` is on the chain.
+
+Also fixed: Control-click is the standard right-click alternative on macOS and arrives as `.leftMouseUp` with `.control`, so the original routed it to the panel.
+
+## Fixed code
+
+```swift
+import AppKit
+
+enum StatusClickIntent: Equatable { case showMenu, togglePanel }
+
+/// Ownership: `NSControl.target` is a *weak* reference (NSControl.h:24), so
+/// whoever creates this must retain it strongly. If the only reference is the
+/// status item's button, the target zeroes out and clicks stop working.
+final class StatusItemController: NSObject {
+
+    private var statusItem: NSStatusItem?
+    private let onOpen: () -> Void
+    private let onTogglePanel: () -> Void
+
+    /// Test seam. Production path pops the menu below the status button.
+    var menuPresenter: ((NSMenu) -> Void)?
+
+    init(onOpen: @escaping () -> Void, onTogglePanel: @escaping () -> Void) {
+        self.onOpen = onOpen
+        self.onTogglePanel = onTogglePanel
+        super.init()
+    }
+
+    func install() {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem = item
+        guard let button = item.button else { return }
+        button.image = NSImage(systemSymbolName: "star", accessibilityDescription: "Status")
+        button.target = self
+        button.action = #selector(statusClicked)
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+    }
+
+    /// Right-click *and* control-click both mean "menu" on macOS; control-click
+    /// is delivered as a left mouse up, which the original code sent to the panel.
+    static func intent(for type: NSEvent.EventType?,
+                       modifiers: NSEvent.ModifierFlags) -> StatusClickIntent {
+        guard let type else { return .togglePanel }
+        switch type {
+        case .rightMouseUp, .rightMouseDown:
+            return .showMenu
+        case .leftMouseUp, .leftMouseDown:
+            return modifiers.contains(.control) ? .showMenu : .togglePanel
+        default:
+            return .togglePanel
+        }
+    }
+
+    @objc private func statusClicked() {
+        let event = NSApp.currentEvent
+        handleClick(eventType: event?.type, modifiers: event?.modifierFlags ?? [])
+    }
+
+    func handleClick(eventType: NSEvent.EventType?, modifiers: NSEvent.ModifierFlags) {
+        switch Self.intent(for: eventType, modifiers: modifiers) {
+        case .showMenu:    showMenu()
+        case .togglePanel: onTogglePanel()
+        }
+    }
+
+    private func showMenu() {
+        let menu = makeMenu()
+        if let menuPresenter {
+            menuPresenter(menu)
+            return
+        }
+        guard let button = statusItem?.button else { return }
+        button.highlight(true)
+        defer { button.highlight(false) }
+        // Blocks for the whole tracking session and leaves statusItem.menu
+        // alone, so the button's own action keeps working afterwards.
+        menu.popUp(positioning: nil,
+                   at: NSPoint(x: 0, y: button.bounds.height + 4),
+                   in: button)
+    }
+
+    func makeMenu() -> NSMenu {
+        let menu = NSMenu()
+        let open = menu.addItem(withTitle: "Open", action: #selector(openPanel), keyEquivalent: "")
+        open.target = self   // without this, autoenabling greys it out
+        menu.addItem(withTitle: "Quit",
+                     action: #selector(NSApplication.terminate(_:)),
+                     keyEquivalent: "q")
+        return menu
+    }
+
+    @objc private func openPanel() { onOpen() }
+}
+```
+
+## Tests
+
+```swift
+import XCTest
+import AppKit
+
+final class StatusItemControllerTests: XCTestCase {
+
+    // MARK: - Click routing
+
+    func testRightClickShowsMenu() {
+        XCTAssertEqual(StatusItemController.intent(for: .rightMouseUp, modifiers: []), .showMenu)
+    }
+
+    func testPlainLeftClickTogglesPanel() {
+        XCTAssertEqual(StatusItemController.intent(for: .leftMouseUp, modifiers: []), .togglePanel)
+    }
+
+    func testControlLeftClickShowsMenu() {
+        XCTAssertEqual(StatusItemController.intent(for: .leftMouseUp, modifiers: [.control]), .showMenu)
+    }
+
+    func testMissingEventFallsBackToPanel() {
+        XCTAssertEqual(StatusItemController.intent(for: nil, modifiers: []), .togglePanel)
+    }
+
+    // MARK: - The menu actually gets presented
+
+    func testRightClickPresentsTheMenuOnceAndDoesNotTogglePanel() {
+        var toggles = 0
+        let c = StatusItemController(onOpen: {}, onTogglePanel: { toggles += 1 })
+        var presented: [NSMenu] = []
+        c.menuPresenter = { presented.append($0) }
+
+        c.handleClick(eventType: .rightMouseUp, modifiers: [])
+
+        XCTAssertEqual(presented.count, 1)
+        XCTAssertEqual(toggles, 0)
+    }
+
+    func testLeftClickTogglesPanelAndPresentsNoMenu() {
+        var toggles = 0
+        let c = StatusItemController(onOpen: {}, onTogglePanel: { toggles += 1 })
+        var presented: [NSMenu] = []
+        c.menuPresenter = { presented.append($0) }
+
+        c.handleClick(eventType: .leftMouseUp, modifiers: [])
+
+        XCTAssertEqual(toggles, 1)
+        XCTAssertTrue(presented.isEmpty)
+    }
+
+    // MARK: - Menu contents
+
+    func testOpenItemHasATargetSoAutoenablingKeepsItEnabled() throws {
+        let c = StatusItemController(onOpen: {}, onTogglePanel: {})
+        let menu = c.makeMenu()
+        XCTAssertTrue(menu.autoenablesItems)
+
+        let open = try XCTUnwrap(menu.item(withTitle: "Open"))
+        XCTAssertIdentical(open.target as AnyObject?, c,
+                           "nil target means responder-chain validation, which greys the item out")
+    }
+
+    func testOpenItemInvokesTheOpenHandler() throws {
+        var opened = 0
+        let c = StatusItemController(onOpen: { opened += 1 }, onTogglePanel: {})
+        let menu = c.makeMenu()
+        let index = menu.indexOfItem(withTitle: "Open")
+
+        menu.performActionForItem(at: index)
+
+        XCTAssertEqual(opened, 1)
+    }
+
+    // MARK: - Why the controller must be retained
+
+    func testControlTargetIsWeak() {
+        let button = NSButton()
+        weak var weakOwner: NSObject?
+        autoreleasepool {
+            let owner = NSObject()
+            weakOwner = owner
+            button.target = owner
+        }
+        XCTAssertNil(weakOwner)
+        XCTAssertNil(button.target,
+                     "NSControl.target is weak: an unretained controller silently stops receiving clicks")
+    }
+}
+```
+
+**I could not execute these.** `swift` requires approval and this session is non-interactive, so every attempt was refused — I have no test output and am not claiming the suite is green. The diagnosis above is grounded in the SDK headers I read (`NSControl.h:24,46`, `NSMenu.h:74,78,138`), not in a run. Run `swift test` and I'll fix anything that falls over.
+
+One thing to check on your side that I can't see from the snippet: whether the object calling `buildStatusItem()` is stored in a property. If it's a local in `applicationDidFinishLaunching`, defect 2 is the whole story and no amount of menu-code fixing will help.

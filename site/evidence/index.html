@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seedbed evidence: seed versus render, measured</title>
+<meta name="description" content="The experiments behind seedbed.dev: the same four tasks given to a model as a five-word seed and as its tailored render, with pre-registered criteria, raw outputs and both results, including the one that did not support the tool.">
+<meta name="theme-color" content="#f7f5f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0e11" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://seedbed.dev/evidence/">
+<meta property="og:title" content="Seedbed evidence: seed versus render, measured">
+<meta property="og:description" content="Four tasks, two models, pre-registered criteria, raw outputs. One result favours the tool and one does not; both are here.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://seedbed.dev/evidence/">
+<meta property="og:image" content="https://seedbed.dev/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/site.css?v=20260907">
+<style>
+  .article { max-width: 780px; }
+  .article h2 { font-family: var(--font-display); font-weight: 620; font-size: clamp(1.4rem, 2.6vw, 1.9rem); letter-spacing: -0.02em; line-height: 1.15; margin: 56px 0 14px; }
+  .article h3 { font-size: 17px; font-weight: 620; margin: 32px 0 10px; }
+  .article p { color: var(--dim); }
+  .article p strong { color: var(--ink); }
+  .article ul, .article ol { color: var(--dim); padding-left: 22px; }
+  .article li + li { margin-top: 6px; }
+  .verdictline { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px; }
+  @media (max-width: 640px) { .verdictline { grid-template-columns: 1fr; } }
+  .verdictline div { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 16px 18px; }
+  .verdictline .m { font-family: var(--font-mono); font-size: 13px; color: var(--dim); }
+  .verdictline .r { font-family: var(--font-display); font-size: 26px; font-weight: 640; letter-spacing: -0.02em; margin-top: 4px; }
+  .verdictline .r.flat { color: var(--warn); }
+  .verdictline .r.won { color: var(--leaf); }
+  .files { list-style: none; padding: 0; margin: 12px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px 14px; font-family: var(--font-mono); font-size: 12.5px; }
+  .files a { color: var(--accent); }
+  .files span { color: var(--faint); }
+  blockquote { margin: 14px 0; padding: 10px 14px; border-left: 3px solid var(--line-strong); background: var(--sunken); border-radius: 0 var(--r-card) var(--r-card) 0; font-size: 14px; color: var(--ink); }
+  .back { font-size: 13.5px; }
+  td.p { color: var(--warn); font-weight: 600; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="shell">
+    <div class="bar">
+      <a class="lockup" href="/" aria-label="Seedbed home"><img src="/seedbed-mark.svg" alt="" width="30" height="30">Seedbed</a>
+      <nav class="nav" aria-label="Site">
+        <a class="link" href="/#idea">How it works</a>
+        <a class="link" href="/#targets">Targets</a>
+        <a class="link" href="/#agents">Agents</a>
+        <a class="link" href="https://github.com/anatoliv/seedbed" rel="noopener">Source</a>
+        <a class="btn btn-primary btn-small" href="/#install">Download</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section style="padding-top:clamp(40px,6vw,72px)">
+    <div class="shell">
+      <div class="article">
+        <div class="cue"><span class="rows" aria-hidden="true"><i></i><i></i><i></i></span><span class="n">Evidence</span><span>2026-09-05</span></div>
+        <h1 class="t-h2" style="font-size:clamp(2rem,4.5vw,3rem)">Does a tailored prompt beat the raw seed?</h1>
+        <p class="t-lede" style="margin-top:18px">
+          Seedbed exists because a prompt shaped for a specific model should beat the short seed. That claim was
+          checked once the tool worked, before this site was written. This page is the method, the scoring and
+          every raw output, so the result can be disagreed with rather than taken on trust.
+        </p>
+
+        <div class="verdictline">
+          <div><div class="m">claude-opus-5</div><div class="r flat">No advantage</div><div class="t-small t-mute">0 of 4 tasks gained on correctness</div></div>
+          <div><div class="m">qwen3-vl-30b, local</div><div class="r won">Render won 3 of 4</div><div class="t-small t-mute">9 of 12 criteria against 5 of 12</div></div>
+        </div>
+
+        <h2>Method</h2>
+        <p>
+          <strong>Four tasks with known right answers.</strong> All four are defects that had been diagnosed and fixed
+          in the Seedbed repository the day before, so there is a correct answer rather than a matter of taste. Two
+          are "explain this code" tasks and two are "fix this bug and test" tasks.
+        </p>
+        <p>
+          <strong>Two conditions, same model, same appended input, one call each.</strong> Condition A is the raw seed,
+          verbatim: <code>explain what this code does</code> or <code>fix this bug and test</code>. Condition B is that
+          model's render of the same seed, built by Seedbed's enhancer from the vendor's published prompting guidance.
+          The render was built for the model actually under test, not borrowed from another target.
+        </p>
+        <p>
+          <strong>Criteria were registered before anything ran</strong>, so the scoring could not be fitted to the
+          results. Explain tasks: (1) names the actual mechanism, (2) invents no behaviour, (3) states what it could
+          not determine rather than guessing. Fix tasks: (4) identifies the true root cause, (5) proposes a fix that
+          would work, (6) includes a test that would fail before and pass after.
+        </p>
+        <p>
+          <strong>Declared deviations.</strong> Four tasks rather than the five first planned. Scored against
+          checkable criteria by one reader rather than judged blind. One run per condition at temperature 0.
+        </p>
+
+        <h3>Inputs</h3>
+        <p>The two seeds, the two renders used in the Opus run, and the four task inputs.</p>
+        <ul class="files">
+          <li><a href="/evidence/inputs/seed-explain.txt">seed-explain.txt</a> <span>5 words</span></li>
+          <li><a href="/evidence/inputs/seed-fix.txt">seed-fix.txt</a> <span>5 words</span></li>
+          <li><a href="/evidence/inputs/render-explain.txt">render-explain.txt</a> <span>Opus 5 render</span></li>
+          <li><a href="/evidence/inputs/render-fix.txt">render-fix.txt</a> <span>Opus 5 render</span></li>
+          <li><a href="/evidence/inputs/t1-code.txt">t1-code.txt</a> <span>interpreter probe</span></li>
+          <li><a href="/evidence/inputs/t2-code.txt">t2-code.txt</a> <span>only the body is hashed</span></li>
+          <li><a href="/evidence/inputs/t3-bug.txt">t3-bug.txt</a> <span>setter fires on first layout</span></li>
+          <li><a href="/evidence/inputs/t4-bug.txt">t4-bug.txt</a> <span>menu never opens</span></li>
+        </ul>
+
+        <h2>Run 1: Claude Opus 5. No correctness advantage.</h2>
+        <p>
+          The strongest target in the registry, and the one where tailoring should matter least. Both conditions
+          found the true mechanism in every task where it was findable. The render explained more thoroughly; the
+          seed delivered more working code.
+        </p>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Task</th><th>A: raw seed</th><th>B: render</th></tr></thead>
+            <tbody>
+              <tr><td>t1 explain: interpreter probe</td><td class="y">correct</td><td class="y">correct, and caught that the probe spawns up to 8 synchronous child processes and blocks its caller</td></tr>
+              <tr><td>t2 explain: only the body is hashed</td><td class="y">correct</td><td class="y">correct, and noted the hash recomputes on every access</td></tr>
+              <tr><td>t3 fix: setter fires on first layout</td><td class="y">correct, with fix and tests</td><td class="p">correct diagnosis, declined to deliver a fix</td></tr>
+              <tr><td>t4 fix: menu never opens, bare snippet</td><td class="y">correct fix and 11 tests</td><td class="n">wrong root cause (guessed a weak <code>target</code> deallocating)</td></tr>
+              <tr><td>t4 fix: same bug, repository present</td><td class="y">correct, and caught control-click misrouting</td><td class="y">correct region and fix, flagged rather than patched</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:14px">
+          <strong>What tailoring changed was risk posture, not correctness.</strong> B fabricates less and refuses
+          more; A always produces something. On a strong model that is a trade, not an improvement.
+        </p>
+        <h3>Raw outputs, Opus 5</h3>
+        <p class="t-small">Verbatim, with one edit: in t3-B.txt the names of two sibling projects the model went looking in are replaced with <code>[a sibling project]</code>.</p>
+        <ul class="files">
+          <li><a href="/evidence/opus-5/t1-A.txt">t1-A.txt</a> <span>seed</span></li>
+          <li><a href="/evidence/opus-5/t1-B.txt">t1-B.txt</a> <span>render</span></li>
+          <li><a href="/evidence/opus-5/t2-A.txt">t2-A.txt</a> <span>seed</span></li>
+          <li><a href="/evidence/opus-5/t2-B.txt">t2-B.txt</a> <span>render</span></li>
+          <li><a href="/evidence/opus-5/t3-A.txt">t3-A.txt</a> <span>seed, bare snippet</span></li>
+          <li><a href="/evidence/opus-5/t3-A2.txt">t3-A2.txt</a> <span>seed, repository present</span></li>
+          <li><a href="/evidence/opus-5/t3-B.txt">t3-B.txt</a> <span>render, bare snippet</span></li>
+          <li><a href="/evidence/opus-5/t3-B2.txt">t3-B2.txt</a> <span>render, repository present</span></li>
+          <li><a href="/evidence/opus-5/t4-A.txt">t4-A.txt</a> <span>seed</span></li>
+          <li><a href="/evidence/opus-5/t4-A2.txt">t4-A2.txt</a> <span>seed, second run</span></li>
+          <li><a href="/evidence/opus-5/t4-A3.txt">t4-A3.txt</a> <span>seed, repository present</span></li>
+          <li><a href="/evidence/opus-5/t4-B.txt">t4-B.txt</a> <span>render</span></li>
+          <li><a href="/evidence/opus-5/t4-B2.txt">t4-B2.txt</a> <span>render, bare snippet</span></li>
+          <li><a href="/evidence/opus-5/t4-B3.txt">t4-B3.txt</a> <span>render, repository present</span></li>
+        </ul>
+
+        <h2>Run 2: Qwen3-VL 30B, local. The render won 3 of 4.</h2>
+        <p>
+          An open-weight 30B model served locally, at temperature 0 with a 2000-token limit, both conditions on the
+          same endpoint. The render was built for this model from Qwen's published guidance and added to the registry
+          as a real target, so this tests the actual claim: does a prompt tailored for the model you are about to use
+          beat the raw seed on it.
+        </p>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Task</th><th>Criterion</th><th>A: raw seed</th><th>B: render</th></tr></thead>
+            <tbody>
+              <tr><td rowspan="3">t1 explain: interpreter probe</td><td>names mechanism</td><td class="y">yes</td><td class="y">yes</td></tr>
+              <tr><td>no invention</td><td class="y">yes</td><td class="y">yes</td></tr>
+              <tr><td>states unknowns</td><td class="n">no</td><td class="y">yes, 5 explicit "not shown in the provided code"</td></tr>
+              <tr><td rowspan="3">t2 explain: only the body is hashed</td><td>names mechanism</td><td class="y">yes</td><td class="y">yes</td></tr>
+              <tr><td>no invention</td><td class="n">no: "likely SHA-256", "likely YAML-like", invents what <code>save</code> "would likely" do</td><td class="y">yes</td></tr>
+              <tr><td>states unknowns</td><td class="n">no</td><td class="y">yes, 4 explicit</td></tr>
+              <tr><td rowspan="3">t3 fix: setter fires on first layout</td><td>root cause</td><td class="y">yes</td><td class="y">yes</td></tr>
+              <tr><td>working fix</td><td class="y">yes</td><td class="y">yes</td></tr>
+              <tr><td>real test</td><td class="n">no: a manual click-through headed "Test the Fix"</td><td class="y">yes, XCTest</td></tr>
+              <tr><td rowspan="3">t4 fix: menu never opens</td><td>root cause</td><td class="p">partial: says <code>performClick</code> is the wrong mechanism, never names the re-entrancy</td><td class="n">wrong: blames <code>statusItem.menu = nil</code></td></tr>
+              <tr><td>working fix</td><td class="y">yes</td><td class="n">no: keeps <code>performClick</code>, which is the bug</td></tr>
+              <tr><td>real test</td><td class="n">none</td><td class="y">yes, XCTest, for a fix that does not work</td></tr>
+              <tr><th>Total</th><th></th><th>5 of 12</th><th>9 of 12</th></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>What the difference consists of</h3>
+        <p>
+          <strong>The render stops the model inventing.</strong> Condition A produced five confident fabrications on
+          t2 alone. Condition B produced none, and instead said "not shown in the provided code" nine times across
+          the two explain tasks.
+        </p>
+        <p>
+          <strong>The render makes it answer the question that was asked.</strong> Both fix tasks asked for a test.
+          A produced none in either. B produced XCTest code both times.
+        </p>
+        <p>
+          <strong>Shorter, not longer.</strong> B's answers ran 409, 498, 351 and 319 words against A's 802, 831, 629
+          and 540: 44% fewer, while scoring higher. The raw seed made this model ramble; the render made it terse and
+          specific. On Opus the render made answers longer and no better.
+        </p>
+        <h3>Raw outputs, Qwen3-VL 30B</h3>
+        <ul class="files">
+          <li><a href="/evidence/qwen3-vl-30b/t1-A.txt">t1-A.txt</a> <span>seed</span></li>
+          <li><a href="/evidence/qwen3-vl-30b/t1-B.txt">t1-B.txt</a> <span>render</span></li>
+          <li><a href="/evidence/qwen3-vl-30b/t2-A.txt">t2-A.txt</a> <span>seed</span></li>
+          <li><a href="/evidence/qwen3-vl-30b/t2-B.txt">t2-B.txt</a> <span>render</span></li>
+          <li><a href="/evidence/qwen3-vl-30b/t3-A.txt">t3-A.txt</a> <span>seed</span></li>
+          <li><a href="/evidence/qwen3-vl-30b/t3-B.txt">t3-B.txt</a> <span>render</span></li>
+          <li><a href="/evidence/qwen3-vl-30b/t4-A.txt">t4-A.txt</a> <span>seed</span></li>
+          <li><a href="/evidence/qwen3-vl-30b/t4-B.txt">t4-B.txt</a> <span>render</span></li>
+        </ul>
+
+        <h2>The task both runs failed, and what it changed in the tool</h2>
+        <p>
+          t4 was lost by the render on both models, in the same condition: a bare snippet, no repository. Every render
+          told the model to reproduce the failure and read the surrounding code before changing anything, which is
+          right for an agent in a checkout. Given a snippet in a chat window, the same render searched for code that
+          was not there and got the answer wrong. The tool was building prompts for one usage context and handing
+          them to another.
+        </p>
+        <p>
+          <strong>The change.</strong> A seed now declares where it is pasted, <code>agent</code> or <code>chat</code>.
+          The context goes to the enhancer and is part of the staleness hash, so a render built for one context is
+          stale for the other. The same five-word seed, built both ways:
+        </p>
+        <blockquote><strong>agent:</strong> "Reproduce the failure first. Find the relevant code and tests, then run whatever command demonstrates the bug. Do not change code until you have seen the failure yourself."</blockquote>
+        <blockquote><strong>chat:</strong> "The snippet below is the only material available to you: there is no repository, no test runner, no ability to execute anything. Verify by reasoning, since you cannot run anything. If nothing in the snippet is actually broken, say so instead of manufacturing a fix."</blockquote>
+        <p>
+          Given t4 as a bare snippet with the chat-context render, Opus 5 found the real cause: <code>performClick</code>
+          sends the button's action to its target, so it re-enters the click handler instead of opening the menu. It
+          also caught the teardown as a secondary issue rather than mistaking it for the cause, and stated its
+          assumptions explicitly. One task, one model, one run: it shows the context field addresses the measured
+          failure, not that chat context is better in general.
+        </p>
+        <ul class="files">
+          <li><a href="/evidence/context/render-agent.md">render-agent.md</a> <span>agent context</span></li>
+          <li><a href="/evidence/context/render-chat.md">render-chat.md</a> <span>chat context</span></li>
+          <li><a href="/evidence/context/t4-C-chat-context.txt">t4-C-chat-context.txt</a> <span>Opus 5, chat render</span></li>
+        </ul>
+
+        <h2>What this does and does not settle</h2>
+        <ul>
+          <li><strong>Settles:</strong> tailoring a prompt to a weak model measurably improves its output, mostly by suppressing fabrication and by making it comply with instructions it otherwise ignores. Combined with the flat Opus result: the enhancer earns its cost on weak models and not on strong ones.</li>
+          <li><strong>Does not settle:</strong> the weak-model run is one 30B vision-language model, not the 70B text model first planned. One run at temperature 0, scored by one reader, four tasks. A second person reproducing it would be worth more than this page.</li>
+          <li><strong>Not claimed anywhere on this site:</strong> that Seedbed saves time (never measured; the tool counts copies, not minutes), that it improves any model (measured false on Opus 5), or that anyone but its author uses it.</li>
+        </ul>
+        <p style="margin-top:28px" class="back"><a href="/">Back to seedbed.dev</a></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="shell">
+    <div class="foot">
+      <span>Seedbed · a seedbed is where you raise seeds into what you actually plant out</span>
+      <nav aria-label="Footer">
+        <a href="/">Home</a>
+        <a href="https://github.com/anatoliv/seedbed">GitHub</a>
+        <a href="https://github.com/anatoliv/seedbed/blob/main/LICENSE">MIT</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

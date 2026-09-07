@@ -138,6 +138,7 @@ guidance moved. You review a diff rather than trusting a black box.
     rendered/<model>/<id>.md  generated expansions, with provenance
     .cache/guides/            fetched guidance (gitignored, machine-local)
     assets/brand/README.md    which icon/mark belongs in each product context
+    site/                     the public site, seedbed.dev; deployed by Scripts/publish-site.sh
 
 ## Same seed, two targets
 

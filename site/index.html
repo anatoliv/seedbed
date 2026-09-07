@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seedbed: keep the short prompt, generate the long one</title>
+<meta name="description" content="Seedbed is a prompt library for the Mac menu bar. You keep five-word seeds like 'fix this bug and test'; it grows each one into the prompt a particular model wants, ahead of time, into plain files in git. Free, open source, MIT.">
+<meta name="theme-color" content="#f7f5f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0e11" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://seedbed.dev/">
+<meta property="og:title" content="Seedbed: keep the short prompt, generate the long one">
+<meta property="og:description" content="A prompt library for the Mac menu bar. Keep the seed; Seedbed grows the version each model wants, into plain files in git.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://seedbed.dev/">
+<meta property="og:image" content="https://seedbed.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Seedbed mark: a sprout growing from a bed of three text rows, beside the words keep the short prompt, generate the long one.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Seedbed: keep the short prompt, generate the long one">
+<meta name="twitter:description" content="A prompt library for the Mac menu bar. Keep the seed; Seedbed grows the version each model wants, into plain files in git.">
+<meta name="twitter:image" content="https://seedbed.dev/og.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/site.css?v=20260907">
+<style>
+  /* ---- Hero ---- */
+  .hero { padding: clamp(48px, 8vw, 96px) 0 clamp(40px, 6vw, 72px); position: relative; }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: clamp(32px, 6vw, 80px); align-items: center; }
+  @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; } }
+  .eyebrow { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; color: var(--dim); margin-bottom: 22px; }
+  .eyebrow .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 0 4px color-mix(in srgb, var(--leaf) 16%, transparent); }
+  .hero .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+  .fineprint { margin-top: 14px; font-size: 13px; color: var(--faint); }
+  .trust { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 34px; }
+  .trust span { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--dim); }
+  .trust svg { width: 14px; height: 14px; stroke: var(--dim); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* The growth: a seed card, a stem, and a render whose lines come up one by one. */
+  .grow { position: relative; display: grid; gap: 0; }
+  .seedcard, .rendercard { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sheet); box-shadow: var(--shadow); }
+  .seedcard { padding: 16px 18px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: center; width: fit-content; max-width: 100%; }
+  .seedcard .k, .rendercard .k { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+  .seedcard code { font-size: 15px; background: none; border: 0; padding: 0; color: var(--ink); }
+  .seedcard .meta { grid-column: 2; font-size: 12px; color: var(--faint); }
+  .stem { height: 64px; margin-left: 40px; position: relative; }
+  .stem svg { position: absolute; left: 0; top: -4px; height: 72px; width: 64px; overflow: visible; }
+  .stem path { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 120; stroke-dashoffset: 120; animation: draw 900ms 500ms ease-out forwards; }
+  .stem .leaf { fill: var(--leaf); transform-origin: 0 100%; transform: scale(0); animation: unfurl 600ms 1100ms cubic-bezier(.2,.9,.3,1.2) forwards; }
+  .stem .tag { position: absolute; left: 78px; top: 20px; font-size: 12px; color: var(--dim); display: grid; gap: 2px; opacity: 0; animation: fade 500ms 900ms ease-out forwards; }
+  .stem .tag b { color: var(--ink); font-weight: 600; }
+  .rendercard { padding: 0; overflow: hidden; }
+  .rendercard header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; background: var(--chrome); border-bottom: 1px solid var(--line); font-size: 12px; color: var(--dim); }
+  .rendercard header .k { color: var(--accent); }
+  .rendercard header .path { font-family: var(--font-mono); font-size: 11.5px; }
+  .rendercard .lines { padding: 14px 16px 16px; display: grid; gap: 9px; }
+  .ln { font-size: 13px; line-height: 1.5; color: var(--ink); opacity: 0; transform: translateY(6px); animation: sprout 480ms ease-out forwards; animation-delay: calc(1300ms + var(--i) * 210ms); }
+  .ln.dim { color: var(--dim); }
+  .ln .hl { background: color-mix(in srgb, var(--leaf) 22%, transparent); border-radius: 3px; padding: 0 3px; }
+  .rendercard footer { display: flex; justify-content: space-between; gap: 10px; padding: 9px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--faint); background: var(--chrome); }
+  .rendercard footer b { color: var(--leaf); font-weight: 600; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes unfurl { to { transform: scale(1); } }
+  @keyframes fade { to { opacity: 1; } }
+  @keyframes sprout { to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .stem path { stroke-dashoffset: 0; animation: none; }
+    .stem .leaf { transform: none; animation: none; }
+    .stem .tag, .ln { opacity: 1; transform: none; animation: none; }
+  }
+
+  /* ---- Equation strip ---- */
+  .equation { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1.2fr; align-items: stretch; gap: 10px; margin-top: 40px; }
+  .equation .term { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+  .equation .term .k { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+  .equation .term .v { font-size: 14px; font-weight: 560; }
+  .equation .term .s { font-size: 12.5px; color: var(--dim); }
+  .equation .term.result { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--card)); }
+  .equation .op { align-self: center; font-family: var(--font-display); font-size: 22px; color: var(--faint); }
+  @media (max-width: 860px) { .equation { grid-template-columns: 1fr; } .equation .op { justify-self: center; } }
+
+  /* ---- Diff block ---- */
+  .diff { font-size: 12.5px; line-height: 1.55; }
+  .diff .h { color: var(--faint); }
+  .diff .m { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+  .diff .p { color: var(--leaf); background: color-mix(in srgb, var(--leaf) 12%, transparent); }
+
+  /* ---- Targets: radio-driven tabs, no script ---- */
+  .targets { margin-top: 32px; border: 1px solid var(--line); border-radius: var(--r-sheet); background: var(--card); overflow: hidden; }
+  .targets input { position: absolute; opacity: 0; pointer-events: none; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 0; background: var(--chrome); border-bottom: 1px solid var(--line); }
+  .tabs label { flex: 1 1 auto; cursor: pointer; padding: 12px 14px; font-size: 13.5px; font-weight: 560; color: var(--dim); text-align: center; border-bottom: 2px solid transparent; transition: color var(--m), border-color var(--m); display: grid; gap: 3px; }
+  .tabs label small { font-weight: 400; font-size: 12px; color: var(--faint); }
+  .tabs label:hover { color: var(--ink); }
+  .pane { display: none; padding: 20px; grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.6fr); gap: 24px; }
+  @media (max-width: 760px) { .pane { grid-template-columns: 1fr; } }
+  #t-opus:checked ~ .tabs label[for="t-opus"], #t-gpt:checked ~ .tabs label[for="t-gpt"], #t-qwen:checked ~ .tabs label[for="t-qwen"], #t-llama:checked ~ .tabs label[for="t-llama"] { color: var(--ink); border-bottom-color: var(--accent); }
+  #t-opus:checked ~ .pane.opus, #t-gpt:checked ~ .pane.gpt, #t-qwen:checked ~ .pane.qwen, #t-llama:checked ~ .pane.llama { display: grid; }
+  .targets input:focus-visible ~ .tabs { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .pane pre { white-space: pre-wrap; font-size: 12.5px; max-height: 330px; overflow: auto; }
+  .pane .side { display: grid; gap: 14px; align-content: start; }
+  .pane .side .k { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+  .pane .side .v { font-size: 14px; }
+  .pane .side .v.mono { font-size: 12.5px; }
+  .bars { display: grid; gap: 8px; margin-top: 4px; }
+  .bars .b { display: grid; grid-template-columns: 96px 1fr 44px; align-items: center; gap: 10px; font-size: 12.5px; color: var(--dim); }
+  .bars .b i { display: block; height: 8px; border-radius: 4px; background: var(--line-strong); }
+  .bars .b i::before { content: ""; display: block; height: 100%; width: var(--w); border-radius: 4px; background: var(--faint); }
+  .bars .b.on { color: var(--ink); }
+  .bars .b.on i::before { background: var(--accent); }
+  .bars .b span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ---- Evidence ---- */
+  .verdicts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 32px; }
+  @media (max-width: 760px) { .verdicts { grid-template-columns: 1fr; } }
+  .verdict { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sheet); padding: 22px; display: grid; gap: 12px; align-content: start; }
+  .verdict .who { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .verdict .who .model { font-family: var(--font-mono); font-size: 13px; }
+  .verdict .who .tag { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; border-radius: 99px; }
+  .verdict .tag.flat { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+  .verdict .tag.won { color: var(--leaf); background: color-mix(in srgb, var(--leaf) 16%, transparent); }
+  .verdict .big { font-family: var(--font-display); font-size: 30px; font-weight: 640; letter-spacing: -0.02em; line-height: 1.05; }
+  .verdict .big small { display: block; font-family: var(--font-body); font-size: 13px; font-weight: 400; color: var(--dim); letter-spacing: 0; margin-top: 4px; }
+  .verdict p { font-size: 14px; color: var(--dim); }
+  .verdict blockquote { margin: 0; padding: 10px 14px; border-left: 3px solid var(--line-strong); font-size: 13.5px; color: var(--ink); background: var(--sunken); border-radius: 0 var(--r-card) var(--r-card) 0; }
+  .verdict blockquote.bad { border-left-color: var(--warn); }
+  .verdict blockquote.good { border-left-color: var(--leaf); }
+  .quotecmp { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .quotecmp { grid-template-columns: 1fr; } }
+  .quotecmp .lbl { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); margin-bottom: 6px; }
+  .honest { margin-top: 20px; padding: 18px 20px; border: 1px dashed var(--line-strong); border-radius: var(--r-card); font-size: 14px; color: var(--dim); }
+  .honest b { color: var(--ink); }
+
+  /* ---- Front ends ---- */
+  .fronts { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; margin-top: 32px; }
+  @media (max-width: 900px) { .fronts { grid-template-columns: 1fr; } }
+  .fronts .stack { display: grid; gap: 16px; }
+  .mock { border: 1px solid var(--line-strong); border-radius: var(--r-sheet); background: var(--card); overflow: hidden; box-shadow: var(--shadow); font-size: 13px; }
+  .mock .cap { padding: 12px 16px 0; font-size: 12.5px; color: var(--dim); }
+  .mock .cap b { color: var(--ink); font-weight: 600; }
+  .hud { margin: 12px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--raised); overflow: hidden; }
+  .hud .search { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--faint); }
+  .hud .search .sort { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .hud .r { padding: 8px 12px; margin: 0 6px; border-radius: 6px; display: grid; gap: 3px; }
+  .hud .r.sel { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .hud .r .t { display: flex; align-items: center; gap: 6px; font-weight: 560; }
+  .hud .r .t .pin { width: 9px; height: 9px; fill: var(--accent); }
+  .hud .r .t .n { margin-left: auto; font-size: 9px; color: var(--faint); }
+  .hud .r .b { font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hud .chips { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 4px; }
+  .hud .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 99px; background: color-mix(in srgb, var(--dim) 14%, transparent); font-size: 10px; }
+  .hud .chip .key { font-family: var(--font-mono); color: var(--dim); }
+  .hud .chip .d { width: 5px; height: 5px; border-radius: 50%; background: var(--leaf); }
+  .hud .chip .d.stale { background: var(--warn); }
+  .hud .foot { display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--faint); background: var(--chrome); }
+  .hud .foot .ok { color: var(--leaf); }
+  .menubar { display: flex; align-items: center; gap: 14px; padding: 6px 12px; background: var(--chrome); border-bottom: 1px solid var(--line); font-size: 11px; color: var(--dim); }
+  .menubar .sp { flex: 1; }
+  .menubar svg.leaf { width: 14px; height: 14px; fill: var(--ink); }
+  .webrow { display: grid; gap: 8px; padding: 12px; }
+  .webrow .wr { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--raised); }
+  .webrow .wr .tx { flex: 1; min-width: 0; }
+  .webrow .wr .tt { font-weight: 560; }
+  .webrow .wr .bb { font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .webrow .wr .sel { font-size: 11px; border: 1px solid var(--line); border-radius: var(--r-btn); padding: 4px 8px; background: var(--sunken); color: var(--ink); display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+  .webrow .wr .ok { font-size: 10.5px; color: var(--leaf); white-space: nowrap; }
+  .tty { white-space: pre-wrap; background: #15161a; color: #e6e1da; border-radius: var(--r-sheet); padding: 16px 18px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; overflow-x: auto; border: 1px solid #2a2b31; }
+  .tty .p { color: #83a97a; }
+  .tty .c { color: #8a8580; }
+  .tty .a { color: #df865d; }
+  .tty .w { color: #e0a84a; }
+
+  /* ---- Agents ---- */
+  .mcp { margin-top: 20px; }
+  .mcp .arrow { color: #8a8580; }
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
+  .tools li code { font-size: 12.5px; padding: 4px 9px; }
+  .tools li.spend code { border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); }
+
+  /* ---- Install ---- */
+  .get { border: 1px solid var(--line-strong); border-radius: var(--r-sheet); padding: clamp(28px, 5vw, 56px) clamp(20px, 4vw, 40px); background: var(--card); position: relative; overflow: hidden; }
+  .get::before { content: ""; position: absolute; inset: 0; background: radial-gradient(closest-side at 50% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%); pointer-events: none; }
+  .get > * { position: relative; }
+  .get .top { display: grid; grid-template-columns: 64px 1fr; gap: 20px; align-items: center; }
+  .get .top img { width: 64px; height: 64px; }
+  .get .ver { font-family: var(--font-mono); font-size: 12.5px; color: var(--dim); }
+  .get .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+  .get .half { margin-top: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .get .half { grid-template-columns: 1fr; } .get .top { grid-template-columns: 48px 1fr; } .get .top img { width: 48px; height: 48px; } }
+  .get .half .box { background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-card); padding: 16px 18px; }
+  .get .half .box h3 { margin: 0 0 6px; font-size: 14.5px; }
+  .get .half .box p { font-size: 13.5px; color: var(--dim); }
+  .get .half .box pre { margin-top: 10px; background: var(--card); font-size: 12px; }
+  .specs { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 22px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--dim); }
+  .specs li::before { content: "·"; margin-right: 8px; color: var(--faint); }
+  .specs li:first-child::before { content: none; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="shell">
+    <div class="bar">
+      <a class="lockup" href="/" aria-label="Seedbed home">
+        <img src="/seedbed-mark.svg" alt="" width="30" height="30">
+        Seedbed
+      </a>
+      <nav class="nav" aria-label="Site">
+        <a class="link" href="#idea">How it works</a>
+        <a class="link" href="#targets">Targets</a>
+        <a class="link" href="#evidence">Evidence</a>
+        <a class="link" href="#agents">Agents</a>
+        <a class="link" href="#faq">FAQ</a>
+        <a class="link" href="https://github.com/anatoliv/seedbed" rel="noopener">Source</a>
+        <a class="btn btn-primary btn-small" href="/Seedbed_0.1.8_universal.dmg" data-version="0.1.8">Download</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ======================= HERO ======================= -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="shell">
+      <div class="hero-grid">
+        <div>
+          <p class="eyebrow"><span class="dot" aria-hidden="true"></span>A prompt library for the Mac menu bar</p>
+          <h1 id="hero-title" class="t-display">Keep the short prompt.<br><em>Generate the long one.</em></h1>
+          <p class="t-lede" style="margin-top:24px">
+            You keep seeds like <code>fix this bug and test</code>. Seedbed feeds each seed, plus the prompting
+            guidance for a target model, to an enhancer, and stores the tailored expansion as a file in git.
+            Press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>P</kbd> anywhere, pick the model, and the long version is on your clipboard.
+          </p>
+          <div class="row">
+            <a class="btn btn-primary" href="/Seedbed_0.1.8_universal.dmg" data-version="0.1.8">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M7 12l5 5 5-5"/><path d="M5 21h14"/></svg>
+              Download for macOS
+            </a>
+            <a class="btn btn-ghost" href="#evidence">What we measured</a>
+          </div>
+          <p class="fineprint">Free and open source (MIT) · macOS 14 or later · Apple Silicon and Intel · Developer ID signed and notarized · updates itself</p>
+          <div class="trust">
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V5h16v2"/><path d="M9 20h6"/><path d="M12 5v15"/></svg>Plain markdown, in a git repository</span>
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>Copy is a file read: instant, offline</span>
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>No account, no telemetry, no server</span>
+          </div>
+        </div>
+
+        <div class="grow" aria-label="A five-word seed growing into a rendered prompt">
+          <div class="seedcard">
+            <span class="k">Seed</span>
+            <code>fix this bug and test</code>
+            <span class="meta">5 words · prompts/fix-bug-and-test.md</span>
+          </div>
+          <div class="stem" aria-hidden="true">
+            <svg viewBox="0 0 64 72">
+              <path d="M18 2 C 14 24, 30 34, 24 58 L 24 70"/>
+              <path class="leaf" d="M25 40 c 4 -12, 14 -18, 26 -18 c -1 12 -8 19 -20 20 c -2 0 -4 1 -6 3 Z"/>
+            </svg>
+            <div class="tag"><b>+ Claude Opus 5 guidance</b><span>+ the enhancer, once, ahead of time</span></div>
+          </div>
+          <div class="rendercard">
+            <header>
+              <span class="k">Rendered</span>
+              <span class="path">rendered/claude-opus-5/fix-bug-and-test.md</span>
+            </header>
+            <div class="lines">
+              <p class="ln" style="--i:0">You have this repository open and can read files, run commands, and execute the test suite.</p>
+              <p class="ln" style="--i:1">Fix the bug described below, and cover it with a test.</p>
+              <p class="ln" style="--i:2"><span class="hl">Reproduce it first</span>: find the failing behavior in the actual code and confirm you can trigger it before changing anything. If you cannot reproduce it, say so and describe what you tried instead of guessing at a fix.</p>
+              <p class="ln" style="--i:3">Fix the underlying cause, not the symptom. Keep the change minimal: no refactoring, no extra error handling, and no restructuring of code the bug does not touch.</p>
+              <p class="ln" style="--i:4">Add a test that fails against the old code and passes against the fix, written in the style and location of the existing tests for that area.</p>
+              <p class="ln dim" style="--i:5">Done means: the bug is reproduced, the cause is fixed, a regression test exists, and the relevant tests pass. Report in a few sentences…</p>
+            </div>
+            <footer><span>182 words · built 2026-09-05</span><span><b>current</b> · seed and guidance unchanged</span></footer>
+          </div>
+        </div>
+      </div>
+
+      <div class="equation" aria-label="How a prompt is made">
+        <div class="term"><span class="k">Seed</span><span class="v">The short version you maintain</span><span class="s">Five words, or a line with <code>{{PLACEHOLDER}}</code> blanks</span></div>
+        <span class="op" aria-hidden="true">+</span>
+        <div class="term"><span class="k">Guidance</span><span class="v">How that model wants to be prompted</span><span class="s">The vendor's own docs, fetched and cached, plus a note per model</span></div>
+        <span class="op" aria-hidden="true">+</span>
+        <div class="term"><span class="k">Enhancer</span><span class="v">An LLM that writes the long version</span><span class="s">Defaults to the <code>claude</code> CLI already on your Mac; any OpenAI-compatible endpoint works</span></div>
+        <span class="op" aria-hidden="true">=</span>
+        <div class="term result"><span class="k">Rendered prompt</span><span class="v">One file per seed per model</span><span class="s">With provenance: which seed, which guidance, which enhancer, when</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="shell"><hr class="hr"></div>
+
+  <!-- ======================= 01 THE IDEA ======================= -->
+  <section id="idea" aria-labelledby="idea-title">
+    <div class="shell">
+      <div class="cue"><span class="rows" aria-hidden="true"><i></i><i></i><i></i></span><span class="n">01</span><span>Ahead of time, not at copy time</span></div>
+      <h2 id="idea-title" class="t-h2">A good prompt is long, specific and model-shaped.<br>Writing one every time is why you don't.</h2>
+      <p class="t-lede" style="margin-top:16px">
+        So in practice you type the short version and accept a worse answer. Seedbed splits the two jobs: you own
+        the seeds, and the tool owns the expansions. Rendering happens in <code>build</code>, not between
+        <kbd>⌘C</kbd> and <kbd>⌘V</kbd>.
+      </p>
+      <div class="grid">
+        <div class="card">
+          <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M5 10l7-7 7 7"/></svg></div>
+          <h3 class="t-h3">Copy is a file read</h3>
+          <p>The render already exists, so copying is instant, works on a plane, and puts no API call between you and the paste. A bad render is caught before it reaches a worker agent, not after.</p>
+        </div>
+        <div class="card">
+          <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h10"/><path d="M4 17h13"/></svg></div>
+          <h3 class="t-h3">One file per seed per model</h3>
+          <p>Editing a seed marks its renders stale; it never overwrites them. Each render records the seed hash, the guidance hash, the enhancer and the date, so <code>build</code> only spends on what moved.</p>
+        </div>
+        <div class="card">
+          <div class="ic"><svg viewBox="0 0 24 24"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></div>
+          <h3 class="t-h3">Placeholders survive</h3>
+          <p>A seed like <code>fix {{BUG}} in {{PROJECT}}</code> keeps its blanks through the render. Copying opens a small form, one field per blank, each remembering the values you used before.</p>
+        </div>
+      </div>
+
+      <div class="split">
+        <div>
+          <h3 class="t-h3" style="font-size:20px">Why files and git</h3>
+          <p class="t-mute" style="margin-top:10px">
+            Prompts change slowly and need to exist on more than one computer. Git gives sharing, history, backup and
+            conflict resolution with no server, and it works away from your own network. Renders are committed too,
+            so when a vendor's guidance moves, <code>git diff</code> shows exactly how the expansion changed. You review
+            a diff rather than trusting a black box.
+          </p>
+          <ul class="checks">
+            <li><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span><b>No dependencies.</b> Standard library only; TOML frontmatter parsed with <code>tomllib</code>. Python 3.11 or newer.</span></li>
+            <li><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span><b>Degraded guidance is refused, not absorbed.</b> If a vendor page cannot be read, <code>build</code> stops rather than quietly rendering on less input than it had.</span></li>
+            <li><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span><b>Machine-local by design.</b> Copy counts and the values you typed into placeholders stay out of the repository, so two Macs never fight over them.</span></li>
+          </ul>
+        </div>
+        <pre class="diff" aria-label="An illustrative git diff of a rendered prompt after the vendor guidance changed"><code><span class="h"># illustrative: what a guidance change looks like in review</span>
+<span class="h">$ git diff rendered/claude-opus-5/fix-bug-and-test.md</span>
+<span class="h">@@ -2,4 +2,4 @@</span>
+ seed = "fix-bug-and-test"
+ model = "claude-opus-5"
+<span class="m">-guide_hash = "9a4c1e0b2d7f"</span>
+<span class="p">+guide_hash = "45195e0f127e"</span>
+<span class="h">@@ -12,3 +12,3 @@</span>
+<span class="m">-Work through the following steps in order, and report each one.</span>
+<span class="p">+Done means: the bug is reproduced, the cause is fixed, a regression</span>
+<span class="p">+test exists, and the relevant tests pass. Skip the narration.</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <div class="shell"><hr class="hr"></div>
+
+  <!-- ======================= 02 TARGETS ======================= -->
+  <section id="targets" aria-labelledby="targets-title">
+    <div class="shell">
+      <div class="cue"><span class="rows" aria-hidden="true"><i></i><i></i><i></i></span><span class="n">02</span><span>Same seed, four targets</span></div>
+      <h2 id="targets-title" class="t-h2">Four models, four different prompts.<br><em>That difference is the point.</em></h2>
+      <p class="t-lede" style="margin-top:16px">
+        A frontier model degrades when you over-specify; an open-weight model needs numbered steps, an output
+        format and an example. The same five words render as 182 words of outcome-focused prose for one and
+        698 words of procedure for another. A target is data, not a vendor account: rendering for GPT or Llama
+        never calls OpenAI or Meta.
+      </p>
+
+      <div class="targets">
+        <input type="radio" name="target" id="t-opus" checked>
+        <input type="radio" name="target" id="t-gpt">
+        <input type="radio" name="target" id="t-qwen">
+        <input type="radio" name="target" id="t-llama">
+        <div class="tabs" role="tablist" aria-label="Target model">
+          <label for="t-opus">Claude Opus 5<small>182 words</small></label>
+          <label for="t-gpt">GPT-5.4 mini<small>338 words</small></label>
+          <label for="t-qwen">Qwen3-VL 30B, local<small>472 words</small></label>
+          <label for="t-llama">Llama 3.3 70B, local<small>698 words</small></label>
+        </div>
+
+        <div class="pane opus">
+          <pre><code>You have this repository open and can read files, run commands, and execute the test suite.
+
+Fix the bug described below, and cover it with a test.
+
+Reproduce it first: find the failing behavior in the actual code and confirm you can trigger it before changing anything. If you cannot reproduce it, say so and describe what you tried instead of guessing at a fix.
+
+Fix the underlying cause, not the symptom. Keep the change minimal: no refactoring, no extra error handling, and no restructuring of code the bug does not touch.
+
+Add a test that fails against the old code and passes against the fix, written in the style and location of the existing tests for that area. Run the tests covering the affected area, plus the fix's own test.
+
+Done means: the bug is reproduced, the cause is fixed, a regression test exists, and the relevant tests pass. Report in a few sentences: the root cause, the change, the test you added, and the test command with its result. Keep the report brief; skip the step-by-step narration.
+
+Bug:</code></pre>
+          <div class="side">
+            <div><div class="k">Registry note</div><div class="v">Adaptive thinking is on by default. Over-prescriptive prompts written for older models reduce output quality: say what done looks like, not every step.</div></div>
+            <div><div class="k">Shape</div><div class="v">Outcome first. One "done means" sentence. No headings, no example.</div></div>
+            <div><div class="k">Length</div><div class="bars">
+              <div class="b on"><span>Opus 5</span><i style="--w:26%"></i><span>182</span></div>
+              <div class="b"><span>GPT-5.4 mini</span><i style="--w:48%"></i><span>338</span></div>
+              <div class="b"><span>Qwen3-VL 30B</span><i style="--w:68%"></i><span>472</span></div>
+              <div class="b"><span>Llama 3.3 70B</span><i style="--w:100%"></i><span>698</span></div>
+            </div></div>
+          </div>
+        </div>
+
+        <div class="pane gpt">
+          <pre><code>You are a software engineering agent working in a repository you can read and modify. Fix the bug described below, and add a test that covers it.
+
+Work in this order, and do not skip ahead:
+
+1. **Reproduce first.** Locate the relevant code by searching the repo. Run the failing case, the existing test, the command, or a minimal script you write, and capture the actual output. Do not edit any source file until you have observed the failure yourself.
+2. **Diagnose.** Read the surrounding code, not just the failing line. State the root cause in one or two sentences before changing anything.
+3. **Fix.** Make the smallest change that addresses the root cause. Match the conventions already in the file.
+4. **Test.** Add a regression test in the project's existing test suite and style. It must fail against the original code and pass against your fix: verify this by reverting the fix and running the new test. A test that passes either way proves nothing.
+5. **Verify.** Run the new test plus the existing suite for the affected area, and paste the actual command output.
+
+Before each tool call that changes a file or runs a command, say in one line why you are doing it.
+
+You are done when: the failure reproduces before the fix and not after, the new test is confirmed to fail without the fix, the affected suite passes…</code></pre>
+          <div class="side">
+            <div><div class="k">Registry note</div><div class="v">Cheaper worker tier. Benefits from more explicit acceptance criteria.</div></div>
+            <div><div class="k">Shape</div><div class="v">Five numbered steps, each with a stop condition. A "say why before each tool call" rule.</div></div>
+            <div><div class="k">Length</div><div class="bars">
+              <div class="b"><span>Opus 5</span><i style="--w:26%"></i><span>182</span></div>
+              <div class="b on"><span>GPT-5.4 mini</span><i style="--w:48%"></i><span>338</span></div>
+              <div class="b"><span>Qwen3-VL 30B</span><i style="--w:68%"></i><span>472</span></div>
+              <div class="b"><span>Llama 3.3 70B</span><i style="--w:100%"></i><span>698</span></div>
+            </div></div>
+          </div>
+        </div>
+
+        <div class="pane qwen">
+          <pre><code>You are fixing a bug in a repository you have open. Work through the numbered steps in order. Do not skip a step.
+
+1. Read the bug report at the end of this prompt. Restate the bug in one sentence: what happens now, and what should happen instead. If the report does not say what the expected behaviour is, write down the expected behaviour you inferred and say that you inferred it.
+
+2. Locate the code. Search the repository for the file, function, error message, or symbol named in the bug report. List every file path you opened and why. Do not guess at file contents: read the files.
+
+3. Reproduce the bug BEFORE changing any code. Run the failing command, test, or script and paste the exact output you got. If you cannot reproduce it, stop and report what you ran, what happened instead, and what you would need in order to reproduce it.
+
+4. Find the root cause. State the specific line or lines that cause the wrong behaviour, and explain in two or three sentences why that code produces the observed output. Do not describe the symptom again: name the defect.
+
+5. Write a failing test first. Add a test that fails because of this bug, in the repository's existing test framework and in the directory where its tests already live. Run it. Paste the output showing it fails.
+
+6. Fix the bug. Change only the code needed to fix this defect…</code></pre>
+          <div class="side">
+            <div><div class="k">Registry note</div><div class="v">Open-weight, served locally. Needs explicit structure rather than trusted judgement, and literal instructions: it is a vision-language model being used for text.</div></div>
+            <div><div class="k">Shape</div><div class="v">Numbered steps. "Say that you inferred it." "Do not guess: read the files."</div></div>
+            <div><div class="k">Length</div><div class="bars">
+              <div class="b"><span>Opus 5</span><i style="--w:26%"></i><span>182</span></div>
+              <div class="b"><span>GPT-5.4 mini</span><i style="--w:48%"></i><span>338</span></div>
+              <div class="b on"><span>Qwen3-VL 30B</span><i style="--w:68%"></i><span>472</span></div>
+              <div class="b"><span>Llama 3.3 70B</span><i style="--w:100%"></i><span>698</span></div>
+            </div></div>
+          </div>
+        </div>
+
+        <div class="pane llama">
+          <pre><code>You are working in a repository you have full access to: you can read files, run shell commands, and run the test suite. Fix the bug described below. Follow these steps in order. Do not skip a step.
+
+STEP 1: REPRODUCE THE BUG BEFORE CHANGING ANY CODE.
+1a. Read the bug report at the end of this prompt.
+1b. Locate the relevant files. Use search commands (`grep -rn "&lt;symbol&gt;" .`, `rg "&lt;symbol&gt;"`, `find . -name "&lt;file&gt;"`) to find the code named in the report.
+1c. Run the failing case: run the existing test suite, or the specific test, or the exact command from the report.
+1d. Paste the real, unedited failure output into your answer. If you cannot reproduce the failure, STOP and report exactly what you ran and what happened instead.
+
+STEP 2: FIND THE ROOT CAUSE.
+2a. Read the failing function and the code that calls it.
+2b. State, in one or two sentences, the exact line or lines that cause the wrong behaviour and why they are wrong. Name the file and line number.
+
+STEP 3: WRITE A FAILING TEST FIRST.
+…
+
+OUTPUT FORMAT: use exactly these six headings, in this order:
+
+## 1. Reproduction
+## 2. Root cause
+## 3. Failing test
+## 4. Fix
+## 5. Verification
+## 6. Summary
+
+EXAMPLE of the level of detail expected (abbreviated, for shape only):
+
+## 1. Reproduction
+`$ pytest tests/test_cart.py::test_total -q`
+E   assert 0 == 10.0 …</code></pre>
+          <div class="side">
+            <div><div class="k">Registry note</div><div class="v">Local and offline. Open-weight models need the most explicit structure: numbered steps, an output format, and an example.</div></div>
+            <div><div class="k">Shape</div><div class="v">Lettered sub-steps, a fixed six-heading output schema, and a worked example of what a good answer looks like.</div></div>
+            <div><div class="k">Length</div><div class="bars">
+              <div class="b"><span>Opus 5</span><i style="--w:26%"></i><span>182</span></div>
+              <div class="b"><span>GPT-5.4 mini</span><i style="--w:48%"></i><span>338</span></div>
+              <div class="b"><span>Qwen3-VL 30B</span><i style="--w:68%"></i><span>472</span></div>
+              <div class="b on"><span>Llama 3.3 70B</span><i style="--w:100%"></i><span>698</span></div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+      <p class="t-small t-faint" style="margin-top:14px">Openings of the real renders in the starter library, counted on the prompt body. Claude Sonnet 5 is a fifth registered target; add your own with <code>promptlib model</code>.</p>
+    </div>
+  </section>
+
+  <div class="shell"><hr class="hr"></div>
+
+  <!-- ======================= 03 EVIDENCE ======================= -->
+  <section id="evidence" aria-labelledby="evidence-title">
+    <div class="shell">
+      <div class="cue"><span class="rows" aria-hidden="true"><i></i><i></i><i></i></span><span class="n">03</span><span>What we measured</span></div>
+      <h2 id="evidence-title" class="t-h2">Does a tailored prompt beat the raw seed?<br><em>It depends on the model, and that is the finding.</em></h2>
+      <p class="t-lede" style="margin-top:16px">
+        The premise was checked before this page was written: four tasks with known right answers, each given to
+        the same model twice, once as the five-word seed and once as that model's render. Criteria were registered
+        before anything ran. Both results are published, including the one that did not support the tool.
+      </p>
+
+      <div class="verdicts">
+        <div class="verdict">
+          <div class="who"><span class="model">claude-opus-5</span><span class="tag flat">No advantage</span></div>
+          <div class="big">0 of 4<small>tasks where the render beat the seed on correctness</small></div>
+          <p>Both conditions found the true mechanism wherever it was findable. The render explained more thoroughly and refused more; the seed delivered more working code. On a strong model, tailoring changed risk posture, not correctness.</p>
+          <blockquote class="bad">If you already pay for a frontier model, the honest advice is: type the short prompt. Seedbed is not going to make it answer better.</blockquote>
+        </div>
+        <div class="verdict">
+          <div class="who"><span class="model">qwen3-vl-30b</span><span class="tag won">Render won</span></div>
+          <div class="big">3 of 4<small>tasks won by the render · 9 of 12 criteria against 5 of 12</small></div>
+          <p>The raw seed produced five confident fabrications on one task and skipped the requested test on both fix tasks. The render invented nothing, named nine things it could not see, wrote real tests both times, and did it in 44% fewer words.</p>
+          <div class="quotecmp">
+            <div><div class="lbl">Raw seed</div><blockquote class="bad">"likely using SHA-256 … the file format is likely YAML-like … the <code>save</code> method would likely…"</blockquote></div>
+            <div><div class="lbl">Render</div><blockquote class="good">"The <code>Render</code> class is declared but not defined in the provided code." Nine times, in different words.</blockquote></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="honest">
+        <b>What this does and does not settle.</b> It settles that the enhancer earns its cost where the model needs
+        scaffolding and not where it does not. It is one run per model at temperature 0, scored by one reader
+        against pre-registered criteria, on four tasks. Both runs failed the same task in the same way, which led to
+        a design change: a seed now declares whether it will be pasted into an agent with a checkout or a chat
+        window with a snippet, and the render is built for that context. The raw outputs, inputs and scoring are on
+        the <a href="/evidence/">evidence page</a>, so the scoring can be disagreed with rather than taken on trust.
+      </div>
+    </div>
+  </section>
+
+  <div class="shell"><hr class="hr"></div>
+
+  <!-- ======================= 04 FRONT ENDS ======================= -->
+  <section id="fronts" aria-labelledby="fronts-title">
+    <div class="shell">
+      <div class="cue"><span class="rows" aria-hidden="true"><i></i><i></i><i></i></span><span class="n">04</span><span>Three front ends, one library</span></div>
+      <h2 id="fronts-title" class="t-h2">Summon it over anything.<br>Type, pick, paste.</h2>
+      <p class="t-lede" style="margin-top:16px">
+        The menu-bar app is a SwiftUI panel that appears over any window on any Space. It shells out to the same
+        Python package the command line and the web page use, so staleness, guidance and the enhancer have exactly
+        one implementation.
+      </p>
+
+      <div class="fronts">
+        <div class="mock" aria-label="The Seedbed panel, drawn to scale">
+          <div class="menubar" aria-hidden="true">
+            <span class="sp"></span>
+            <svg class="leaf" viewBox="0 0 24 24"><path d="M12.5 20 c -0.5 -6, 1 -10, 5 -14 c 4 -1, 6 -1, 6 -1 c -1 6, -4 10, -9 12 c -1 .4 -1.5 1 -2 3 Z"/><path d="M12 21 c 0 -4, 1 -7, 2 -9" stroke="currentColor" stroke-width="1.6" fill="none"/></svg>
+            <span>Mon 09:41</span>
+          </div>
+          <div class="hud">
+            <div class="search"><span>Search prompts…</span><span class="sort">Most used</span></div>
+            <div class="r sel">
+              <div class="t"><svg class="pin" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2h6v2l-1 1v5l3 3v2h-4v7h-2v-7H7v-2l3-3V5L9 4z"/></svg>Fix this bug and test<span class="n">5×</span></div>
+              <div class="b">fix this bug and test</div>
+              <div class="chips">
+                <span class="chip"><span class="key">⌘1</span><span class="d"></span>Opus 5</span>
+                <span class="chip"><span class="key">⌘2</span><span class="d"></span>GPT-5.4 mini</span>
+                <span class="chip"><span class="key">⌘3</span><span class="d"></span>Llama 3.3 70B</span>
+                <span class="chip"><span class="key">⌘4</span><span class="d stale"></span>Qwen3-VL 30B</span>
+              </div>
+            </div>
+            <div class="r">
+              <div class="t"><svg class="pin" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2h6v2l-1 1v5l3 3v2h-4v7h-2v-7H7v-2l3-3V5L9 4z"/></svg>Fix a bug in a project<span class="n">4×</span></div>
+              <div class="b">fix {{BUG}} in {{PROJECT}} and add a regression test</div>
+            </div>
+            <div class="r">
+              <div class="t">Review my diff<span class="n">2×</span></div>
+              <div class="b">review my changes before I merge</div>
+            </div>
+            <div class="r">
+              <div class="t">Explain this code<span class="n">1×</span></div>
+              <div class="b">explain what this code does</div>
+            </div>
+            <div class="r">
+              <div class="t">Write a regression test</div>
+              <div class="b">write a regression test for this</div>
+            </div>
+            <div class="foot"><span class="ok">Copied the Opus 5 version and pasted it</span><span>⏎ paste · ⇧⏎ copy · ⌘1 to 9 model · ⎋</span></div>
+          </div>
+          <p class="cap" style="padding-bottom:14px"><b>⌥⌘P</b> anywhere. Type to filter, <b>⏎</b> pastes into the app you came from, <b>⌘1 to ⌘9</b> picks a model and builds the render first if it has never been made. A stale dot means the seed or the guidance changed since.</p>
+        </div>
+
+        <div class="stack">
+          <div class="mock" aria-label="The local web page">
+            <p class="cap"><b>The web page</b> · <code>python3 -m promptlib serve --open</code></p>
+            <div class="webrow">
+              <div class="wr"><div class="tx"><div class="tt">Fix this bug and test</div><div class="bb">fix this bug and test</div></div><span class="sel">Claude Opus 5 ▾</span><span class="ok">Copied</span></div>
+              <div class="wr"><div class="tx"><div class="tt">Review my diff</div><div class="bb">review my changes before I merge</div></div><span class="sel">Claude Opus 5 ▾</span><span class="ok"></span></div>
+            </div>
+            <p class="cap" style="padding-top:0;padding-bottom:12px">Every seed on a row, a model dropdown beside it. Bound to localhost, for your own library.</p>
+          </div>
+          <div class="tty" aria-label="The command line">
+<span class="p">$</span> python3 -m promptlib list
+<span class="a">fix-bug-and-test</span>  ·  Fix this bug and test
+    claude-opus-5      current (2026-09-05)
+    gpt-5.4-mini       current (2026-09-05)
+    llama-3.3-70b      current (2026-09-05)
+    qwen3-vl-30b       <span class="w">STALE: seed or guidance changed</span>
+<span class="a">review-my-diff</span>  ·  Review my diff
+    claude-opus-5      current (2026-09-05)
+<span class="p">$</span> python3 -m promptlib build      <span class="c"># renders only what is stale</span>
+<span class="p">$</span> python3 -m promptlib copy fix-bug-and-test --model claude-opus-5
+<span class="p">$</span> python3 -m promptlib match "reviewing a diff before I merge"
+decided by: semantic
+→ <span class="a">review-my-diff</span>  (0.25 on body)  Review my diff
+    It is exactly a prompt for reviewing changes before merging.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="shell"><hr class="hr"></div>
+
+  <!-- ======================= 05 AGENTS ======================= -->
+  <section id="agents" aria-labelledby="agents-title">
+    <div class="shell">
+      <div class="cue"><span class="rows" aria-hidden="true"><i></i><i></i><i></i></span><span class="n">05</span><span>Let an agent ask for a prompt</span></div>
+      <div class="split" style="margin-top:0">
+        <div>
+          <h2 id="agents-title" class="t-h2">Your agent fetches the prompt it needs,<br><em>instead of you copying one across.</em></h2>
+          <p class="t-mute" style="margin-top:16px">
+            The Mac app can run an <a href="https://modelcontextprotocol.io" rel="external">MCP</a> server. Switch it on
+            in Settings, press <em>Copy configuration</em>, paste that into Claude Code, Cursor or Claude Desktop, and
+            the agent has a library it can search.
+          </p>
+          <p class="t-mute">
+            <strong><code>find_prompt</code> takes a description, not a name.</strong> An agent asking for "something for
+            reviewing a diff before I merge" gets the prompt titled <em>Review my diff</em>. A text match answers most
+            asks on its own in well under a tenth of a second; only when it cannot choose does the ask go to the
+            enhancer to be settled. Every prompt is also exposed through MCP's own <code>prompts/list</code> and
+            <code>prompts/get</code>.
+          </p>
+          <ul class="tools" aria-label="The MCP tools">
+            <li><code>find_prompt</code></li>
+            <li><code>get_prompt</code></li>
+            <li><code>list_prompts</code></li>
+            <li><code>list_models</code></li>
+            <li class="spend"><code>build_prompt</code></li>
+          </ul>
+          <ul class="checks">
+            <li><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span><b>Loopback only, and a bearer token.</b> Both, not either. Nothing on your network can reach it, and every request must carry the token, which lives in the login Keychain.</span></li>
+            <li><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span><b>A second, read-only token</b> can look prompts up but can never call <code>build_prompt</code>, so a client you have not decided to trust cannot spend an LLM call. It is not even shown that tool.</span></li>
+            <li><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span><b>Wrong tokens lock out</b> after ten tries, doubling from one minute to fifteen, while a correct token is still always served. A request whose Host or Origin is not this Mac is refused, with the reason in the response.</span></li>
+          </ul>
+        </div>
+        <div class="tty mcp" aria-label="An agent calling find_prompt">
+<span class="c">// Claude Code, mid-task, over MCP</span>
+<span class="arrow">→</span> <span class="a">find_prompt</span> { "ask": "something for reviewing a diff before I merge",
+                "model": "claude-opus-5" }
+
+<span class="arrow">←</span> { "decided_by": "lexical",
+    "confident": true,
+    "matches": [ { "id": "review-my-diff",
+                   "title": "Review my diff",
+                   "matched_on": "title",
+                   "reason": "…" } ],
+    "model": "claude-opus-5",
+    "render_state": "current",
+    "render": "You are reviewing a set of uncommitted or unmerged
+               changes in a repository you have open. Your job is to
+               decide whether these changes are safe to merge…" }
+
+<span class="c">// the agent puts the render in its own context and carries on</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="shell"><hr class="hr"></div>
+
+  <!-- ======================= 06 INSTALL ======================= -->
+  <section id="install" aria-labelledby="install-title">
+    <div class="shell">
+      <div class="get">
+        <div class="top">
+          <img src="/apple-touch-icon.png" alt="" width="64" height="64">
+          <div>
+            <p class="ver">Seedbed <span data-version-label>0.1.8</span> · universal DMG · signed and notarized · updates itself through Sparkle</p>
+            <h2 id="install-title" class="t-h2" style="margin-top:6px">Plant it.</h2>
+          </div>
+        </div>
+        <div class="row">
+          <a class="btn btn-primary" href="/Seedbed_0.1.8_universal.dmg" data-version="0.1.8">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M7 12l5 5 5-5"/><path d="M5 21h14"/></svg>
+            Download for macOS
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/anatoliv/seedbed" rel="noopener">Source on GitHub</a>
+        </div>
+        <p class="t-small t-mute" style="margin-top:16px">Or with Homebrew, from the public repository, which is also the tap:</p>
+        <pre style="margin-top:8px"><code>brew tap anatoliv/seedbed https://github.com/anatoliv/seedbed
+brew trust anatoliv/seedbed        # Homebrew 6 and later requires this for third-party taps
+brew install --cask seedbed</code></pre>
+
+        <div class="half">
+          <div class="box">
+            <h3>Installing the app is half the job</h3>
+            <p>Seedbed is a front end and does not carry the prompts. It needs a checkout of the repository, which is the library, and Python 3.11 or newer for <code>tomllib</code>. The DMG says so in <em>Before you start.txt</em>, and a copy with neither reports an empty library rather than pretending it has one.</p>
+            <pre><code>mkdir -p "$HOME/Library/Application Support/Seedbed"
+git clone https://github.com/anatoliv/seedbed \
+  "$HOME/Library/Application Support/Seedbed/Library"</code></pre>
+          </div>
+          <div class="box">
+            <h3>What it asks for, and what it never sends</h3>
+            <p>Pasting into the app you came from needs the Accessibility permission, which macOS asks for the first time you use it. Without it Seedbed copies to the clipboard and tells you why it did not paste.</p>
+            <p style="margin-top:8px">Crash reports are off. If you turn them on, they carry the stack trace and the versions, and never a prompt, a render, a value you filled in, or a token. There is no other telemetry, and no account.</p>
+          </div>
+        </div>
+        <ul class="specs" aria-label="At a glance">
+          <li>MIT licence</li>
+          <li>macOS 14 Sonoma or later</li>
+          <li>Apple Silicon and Intel</li>
+          <li>No dependencies beyond Python 3.11</li>
+          <li>CLI and web page work without the app</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= FAQ ======================= -->
+  <section id="faq" aria-labelledby="faq-title" style="padding-top:0">
+    <div class="shell">
+      <div class="cue"><span class="rows" aria-hidden="true"><i></i><i></i><i></i></span><span class="n">06</span><span>Questions</span></div>
+      <h2 id="faq-title" class="t-h2">The questions worth asking first.</h2>
+      <div class="faq">
+        <details>
+          <summary>Why not paste the short prompt and let the model work it out?<span class="pl">+</span></summary>
+          <div class="ans">On a strong model, do exactly that. We measured no correctness gain on Claude Opus 5, and the page above says so. On a cheap or local model the picture is different: the raw seed fabricated details it could not see and skipped the test it was asked for, and the render stopped both. If you run open-weight models and find them unreliable, that is who this is for.</div>
+        </details>
+        <details>
+          <summary>Does targeting GPT or Llama call OpenAI or Meta?<span class="pl">+</span></summary>
+          <div class="ans">No. A target is data: a profile saying how to prompt that model, built from the vendor's published guidance. The only thing that calls a model is the enhancer, and you choose it. The default shells out to the <code>claude</code> CLI already on your Mac, so there is no API key and no extra spend. <code>--enhancer anthropic</code> uses the official SDK; <code>--enhancer openai</code> takes any OpenAI-compatible endpoint, including one on your own machine.</div>
+        </details>
+        <details>
+          <summary>What does it cost?<span class="pl">+</span></summary>
+          <div class="ans">Nothing to install; the code is MIT. Building a render is one enhancer call, about a minute of wall clock, using whatever backend you configured. Copying costs nothing and works offline, because the render is already a file. <code>build</code> skips anything whose seed and guidance have not changed.</div>
+        </details>
+        <details>
+          <summary>What leaves my Mac?<span class="pl">+</span></summary>
+          <div class="ans">Two things, both on your command: fetching a vendor's guidance page when you refresh it, and the enhancer call when you build. The MCP server binds to loopback and cannot be reached from the network. The app checks for updates through a Sparkle feed. Crash reporting is off unless you opt in, and never includes prompt text.</div>
+        </details>
+        <details>
+          <summary>Can I use it without the app?<span class="pl">+</span></summary>
+          <div class="ans">Yes. The Python package is the product; the app is a front end to it. <code>python3 -m promptlib</code> gives you list, build, copy, match and the local web page, with no dependencies beyond the standard library. The app adds the global hotkey, pasting into the frontmost window, and the MCP server.</div>
+        </details>
+        <details>
+          <summary>Why files in git and not a database or a sync service?<span class="pl">+</span></summary>
+          <div class="ans">Prompts change slowly and need to be on several computers, including ones that were asleep when a change happened. Git already does history, backup, sharing and conflict resolution without a server, and a render is prose, so a diff of it is readable. A database would add a schema, a migration path, and a second way for two machines to disagree.</div>
+        </details>
+        <details>
+          <summary>Who is this for, and who made it?<span class="pl">+</span></summary>
+          <div class="ans">One person built it for their own daily use, and the repository is open so you can see exactly what it does. There is no company, no support desk and no roadmap promise. If it is useful to you, the issue tracker is where to say so, and that is also how it will get better.</div>
+        </details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="shell">
+    <div class="foot">
+      <span>Seedbed · a seedbed is where you raise seeds into what you actually plant out</span>
+      <nav aria-label="Footer">
+        <a href="/evidence/">Evidence</a>
+        <a href="https://github.com/anatoliv/seedbed">GitHub</a>
+        <a href="https://github.com/anatoliv/seedbed/blob/main/README.md">Docs</a>
+        <a href="https://github.com/anatoliv/seedbed/blob/main/LICENSE">MIT</a>
+        <a href="/appcast.xml">Update feed</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

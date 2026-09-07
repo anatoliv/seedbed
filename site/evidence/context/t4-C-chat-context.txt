@@ -1,0 +1,152 @@
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+## 1. The bug
+
+`showMenu()` never shows anything because it drives the menu through `statusItem.menu` + `performClick(nil)` while the button already owns a custom `target`/`action`.
+
+Trigger: any right-click on the status item (the `.rightMouseUp` branch of `statusClicked`).
+
+Trace:
+
+1. `buildStatusItem()` sets `button.action = #selector(statusClicked)` and `button.target = self`. That is the *manual* status-item idiom — it deliberately opts out of AppKit's built-in menu handling.
+2. `showMenu()` then uses the *automatic* idiom (`statusItem.menu = menu`, click the button, menu pops). The two are mutually exclusive. With a custom target/action installed, `performClick(nil)` does what `NSControl.performClick` always does: it sends `action` to `target` — i.e. it re-enters `statusClicked`, rather than asking the status item to pop its menu.
+3. Even if step 2 had popped a menu, the very next line sets `statusItem.menu = nil`, tearing the menu down in the same call stack. `performClick` is not guaranteed to block for the full tracking session here, so the menu is destroyed before it can be displayed.
+
+Net effect: the click does nothing visible, exactly as reported.
+
+**Assumptions** (not shown in the snippet): `statusItem` is a stored `NSStatusItem` property; `togglePanel()` and `open` are methods on `self`; `#selector(open)` resolves unambiguously (if `open` is overloaded you need `#selector(open as () -> Void)`).
+
+## 2. The fix
+
+Pop the menu directly from the button. `statusItem.menu` is never involved, so the custom action keeps working for left-clicks.
+
+```swift
+private func showMenu() {
+    guard let button = statusItem.button else { return }
+    let menu = NSMenu()
+    let openItem = menu.addItem(withTitle: "Open", action: #selector(open), keyEquivalent: "")
+    openItem.target = self
+    menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    present(menu, from: button)
+}
+
+// Seam so tests can observe presentation without a window server. No behavior change.
+func present(_ menu: NSMenu, from button: NSStatusBarButton) {
+    menu.popUp(positioning: nil,
+               at: NSPoint(x: 0, y: button.bounds.height + 5),
+               in: button)
+}
+```
+
+Two small things beyond the presentation change, both one line and both part of "the menu works":
+
+- `openItem.target = self` — with a `nil` target the item goes to the responder chain, and unless `self` is the app delegate the item renders **disabled**. `Quit` is left targetless on purpose: `terminate(_:)` is answered by `NSApp`.
+- `showMenu` / `present` / `togglePanel` need to be non-`private` (and the class non-`final`) for the tests below to subclass them.
+
+**Noted, not fixed:** macOS convention treats control-left-click as a secondary click, and `statusClicked` sends it to `togglePanel()`. If you want it, test `event.modifierFlags.contains(.control)` alongside the type check.
+
+## 3. Tests
+
+XCTest assumed — no framework is visible in the snippet. `StatusController` stands in for the class holding these methods.
+
+```swift
+import XCTest
+import AppKit
+@testable import MenuBarApp
+
+final class StatusMenuTests: XCTestCase {
+
+    private final class MenuKeyObserver: NSObject {
+        private let item: NSStatusItem
+        var changeCount = 0
+        init(_ item: NSStatusItem) {
+            self.item = item
+            super.init()
+            item.addObserver(self, forKeyPath: "menu", options: [], context: nil)
+        }
+        override func observeValue(forKeyPath keyPath: String?, of object: Any?,
+                                   change: [NSKeyValueChangeKey: Any]?,
+                                   context: UnsafeMutableRawPointer?) {
+            changeCount += 1
+        }
+        deinit { item.removeObserver(self, forKeyPath: "menu") }
+    }
+
+    private final class SpyController: StatusController {
+        var togglePanelCount = 0
+        var presented: [NSMenu] = []
+        override func togglePanel() { togglePanelCount += 1 }
+        override func present(_ menu: NSMenu, from button: NSStatusBarButton) {
+            presented.append(menu)
+        }
+    }
+
+    private func makeController() -> SpyController {
+        let c = SpyController()
+        c.buildStatusItem()
+        return c
+    }
+
+    func testShowMenuPresentsExactlyOneMenu() {
+        let c = makeController()
+        c.showMenu()
+        XCTAssertEqual(c.presented.count, 1)
+    }
+
+    func testShowMenuNeverAssignsStatusItemMenu() {
+        let c = makeController()
+        let observer = MenuKeyObserver(c.statusItem)
+        c.showMenu()
+        XCTAssertEqual(observer.changeCount, 0,
+                       "showMenu must not route through statusItem.menu")
+        XCTAssertNil(c.statusItem.menu)
+    }
+
+    func testShowMenuDoesNotReenterTheButtonAction() {
+        let c = makeController()
+        c.showMenu()
+        XCTAssertEqual(c.togglePanelCount, 0,
+                       "showMenu must not click the button and re-enter statusClicked")
+    }
+
+    func testPresentedMenuItemsAreRoutedAndEnabled() throws {
+        let c = makeController()
+        c.showMenu()
+        let menu = try XCTUnwrap(c.presented.first)
+        XCTAssertEqual(menu.items.map(\.title), ["Open", "Quit"])
+
+        let openItem = menu.items[0]
+        XCTAssertEqual(openItem.action, #selector(StatusController.open))
+        XCTAssertTrue(openItem.target as AnyObject? === c,
+                      "Open with a nil target renders disabled")
+
+        let quitItem = menu.items[1]
+        XCTAssertEqual(quitItem.action, #selector(NSApplication.terminate(_:)))
+        XCTAssertNil(quitItem.target, "terminate is answered by the responder chain")
+    }
+
+    func testRepeatedShowMenuBuildsFreshMenusAndLeavesNoState() {
+        let c = makeController()
+        c.showMenu()
+        c.showMenu()
+        XCTAssertEqual(c.presented.count, 2)
+        XCTAssertFalse(c.presented[0] === c.presented[1])
+        XCTAssertNil(c.statusItem.menu)
+    }
+}
+```
+
+Assumptions in the tests: `NSStatusItem.menu` is automatically KVO-compliant (standard ObjC property; if it turned out not to be, `testShowMenuDoesNotReenterTheButtonAction` still carries the regression on its own), and `NSApp.currentEvent` is `nil` in a headless test run.
+
+## 4. Verification by reasoning
+
+**Fixed code, right-click:** `statusClicked` sees `event.type == .rightMouseUp` → `showMenu()` → `statusItem.button` unwraps → a fresh `NSMenu` with `Open` (target `self`, so enabled) and `Quit` (targetless, validated by `NSApp`) → `present` calls `menu.popUp(positioning:at:in:)` anchored just below the button, which runs its own tracking loop and returns when the user picks an item or dismisses. `statusItem.menu` stays `nil` throughout, so left-click still reaches `statusClicked` → `togglePanel()`.
+
+**Tests against the original:**
+
+- `testShowMenuPresentsExactlyOneMenu` — original never calls `present`; `presented.count == 0`. **Fails.**
+- `testShowMenuNeverAssignsStatusItemMenu` — original assigns `menu` then `nil`; observer sees 2 changes. **Fails** (the trailing `XCTAssertNil` passes, which is why the KVO count is the load-bearing assertion).
+- `testShowMenuDoesNotReenterTheButtonAction` — original calls `performClick(nil)`, which sends `statusClicked` to `self`; with `NSApp.currentEvent` nil in tests the guard falls to the `else` branch and `togglePanelCount == 1`. **Fails.** (Under a real right-mouse-up event it would recurse instead — also a failure, just a louder one.)
+- `testPresentedMenuItemsAreRoutedAndEnabled` — `XCTUnwrap` on an empty `presented` throws. **Fails**; and were the menu reachable, `openItem.target` is `nil` in the original.
+- `testRepeatedShowMenuBuildsFreshMenusAndLeavesNoState` — `presented.count == 0`. **Fails.**
+
+All five pass against the fix.

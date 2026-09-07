@@ -378,6 +378,14 @@ fi
 echo "==> Syncing the Homebrew cask"
 Scripts/sync-cask.sh
 
+# 5c. The public site is the third version-pinned surface, beside the cask and
+#     the appcast: its download links name the DMG file. Synced here for the
+#     same reason and checked by the same gate, so a page that still advertises
+#     the previous release cannot pass. Publishing it is Scripts/publish-site.sh,
+#     which refuses to deploy until this release's DMG is actually served.
+echo "==> Syncing the public site"
+Scripts/sync-site.sh
+
 # 6. The other half of the gate, now that there are artifacts to check: the
 #    bundle matches the plist, both tickets staple, Gatekeeper accepts the app,
 #    and a configured DSN actually made it into the bundle.
@@ -435,4 +443,5 @@ Homebrew keeps offering the PREVIOUS release until the public tap is updated,
 which is a separate step on its own schedule:
   Scripts/publish.sh          put the DMG and the feed on the download host
   ../Scripts/publish-repo.sh  push the sanitized snapshot, cask included
+  ../Scripts/publish-site.sh  deploy site/ once the DMG above is served
 SUMMARY

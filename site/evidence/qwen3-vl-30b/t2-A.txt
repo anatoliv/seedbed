@@ -1,0 +1,150 @@
+This code defines two dataclasses in Python: `Seed` and `Render`. Let's go through what each part does, focusing on the `Seed` class first, since it's fully defined here.
+
+---
+
+### 🔹 `@dataclass` Decorator
+The `@dataclass` decorator from the `dataclasses` module automatically generates special methods like `__init__`, `__repr__`, `__eq__`, etc., based on the class fields. It makes defining simple classes easier and more readable.
+
+---
+
+### 🔹 `Seed` Class
+
+```python
+@dataclass
+class Seed:
+    """A short prompt you maintain by hand."""
+```
+
+This class represents a **hand-maintained prompt** (likely used in a system for generating content, such as AI prompts, templates, or documentation). The `Seed` is a structured representation of a prompt with metadata.
+
+#### Fields:
+- `id: str` – A unique identifier for the seed.
+- `body: str` – The actual content or prompt text.
+- `title: str = ""` – Optional title (default empty).
+- `targets: list[str] = field(default_factory=list)` – List of target models or systems this seed applies to (e.g., "gpt-4", "llama-3").
+- `tags: list[str] = field(default_factory=list)` – Tags for categorization or filtering.
+- `category: str = ""` – A category (e.g., "coding", "creative-writing").
+- `pinned: bool = False` – Whether the seed is pinned (not affected by staleness).
+- `path: Path | None = None` – Optional file path where this seed is stored (used for loading/saving).
+
+> ⚠️ Note: `Path` comes from `pathlib.Path`, and `field` is from `dataclasses`.
+
+---
+
+#### `@property def hash(self) -> str`:
+```python
+@property
+def hash(self) -> str:
+    """Only the body decides staleness — pinning or retitling must not
+    invalidate a render that is still correct."""
+    return digest(self.body)
+```
+
+- This computes a **hash of the `body`** (likely using a cryptographic or checksum function like SHA-256).
+- The purpose is to **determine if the seed has changed** — only the `body` affects staleness.
+- Even if you change the title, tags, or pin status, the hash stays the same **if the body is unchanged**, so renders based on this seed remain valid.
+
+> This is useful in systems where you want to cache or re-render content only when the prompt itself changes.
+
+---
+
+#### `@classmethod def load(cls, path: Path) -> "Seed":`
+```python
+@classmethod
+def load(cls, path: Path) -> "Seed":
+    meta, body = _split(path.read_text(encoding="utf-8"), path.name)
+    if not body:
+        raise FormatError(f"{path.name}: seed body is empty")
+    return cls(
+        id=meta.get("id") or path.stem,
+        body=body,
+        title=meta.get("title", ""),
+        targets=list(meta.get("targets", [])),
+        tags=list(meta.get("tags", [])),
+        category=meta.get("category", ""),
+        pinned=bool(meta.get("pinned", False)),
+        path=path,
+    )
+```
+
+- This method **loads a Seed from a file**.
+- It reads the file at `path`, splits it into **metadata** (like `id`, `title`, etc.) and **body** using a helper function `_split`.
+- The file format is likely **YAML-like** or **Markdown with frontmatter**, where metadata is at the top (e.g., in a `---` block).
+- If the body is empty, it raises a `FormatError`.
+- It creates and returns a `Seed` instance with all fields populated from the file.
+
+> Example of what the file might look like:
+```markdown
+id: my-prompt
+title: My Prompt
+targets: ["gpt-4", "llama-3"]
+tags: ["ai", "prompt"]
+category: creative
+pinned: true
+
+This is the actual prompt body.
+It can span multiple lines.
+```
+
+---
+
+#### `def write(self, path: Path) -> None:`
+```python
+def write(self, path: Path) -> None:
+```
+
+- This method is **incomplete** in the snippet — it's defined but not implemented.
+- It would likely **save the Seed object back to a file** at the given `path`, writing both metadata and body in the same format as `load` expects.
+
+> This suggests the system supports **reading and writing seeds to disk**, possibly for persistence or version control.
+
+---
+
+### 🔹 `Render` Class (incomplete)
+```python
+@dataclass
+class Render:
+    """A seed expanded for one target model."""
+```
+
+- This class is **not fully defined** in the snippet.
+- It likely represents the **result of expanding a `Seed`** for a specific target model (e.g., "gpt-4").
+- It might include fields like:
+  - `seed_id: str`
+  - `target: str`
+  - `expanded_body: str`
+  - `timestamp: datetime`
+  - `status: str` (e.g., "success", "failed")
+
+> This suggests a system where:
+> - You have **seeds** (prompts)
+> - You **render** them for different models
+> - The `Render` stores the output of that expansion
+
+---
+
+### ✅ Summary
+
+This code defines a system for managing **hand-written prompts** (`Seed`) with metadata, stored in files. Key features:
+
+- **Persistent storage**: Seeds can be loaded/saved from files.
+- **Metadata-driven**: Each seed has title, tags, targets, etc.
+- **Staleness detection**: Only the prompt body affects whether a render is outdated.
+- **Extensible**: Can be used in a larger system to generate or cache outputs (`Render`) for different models.
+
+This is likely part of a **prompt engineering tool**, **AI content generation system**, or **template engine** where users maintain reusable prompts and generate outputs based on them.
+
+---
+
+### 🧩 Example Use Case
+
+```python
+seed = Seed.load(Path("prompts/my-prompt.md"))
+print(seed.title)  # "My Prompt"
+print(seed.targets)  # ["gpt-4", "llama-3"]
+
+# Later, render it for a specific model
+render = Render(seed=seed, target="gpt-4", expanded_body="...")
+```
+
+Let me know if you'd like help completing the `Render` class or implementing `write()`!

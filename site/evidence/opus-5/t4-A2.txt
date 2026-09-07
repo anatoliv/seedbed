@@ -1,0 +1,29 @@
+**Files** (in `/private/var/folders/.../tmp.zA8FuWEQ6f/`):
+- `Sources/StatusMenuFix/StatusItemController.swift` — the fixed controller
+- `Tests/StatusMenuFixTests/StatusItemControllerTests.swift` — 11 tests
+- `Package.swift` — so it runs standalone
+
+**Key change in `showMenu()`:**
+
+```swift
+private func showMenu() {
+    guard let button = statusItem.button else { return }
+    button.highlight(true)
+    makeMenu().popUp(positioning: nil,
+                     at: NSPoint(x: 0, y: button.bounds.height + 5),
+                     in: button)
+    button.highlight(false)
+}
+```
+
+`popUp` runs its own tracking loop and returns when the menu is dismissed, so it's safe to call from inside the button's action — and `statusItem.menu` never gets touched, which removes the assign/clear race entirely.
+
+**What the tests cover:** the six click-routing cases (right up/down, control-left, plain left, option/command-left, nil event), and menu structure — titles, that "Open" is targeted at the controller and the controller actually responds to the selector, that "Quit" is deliberately untargeted with `terminate(_:)`, and that each call builds a fresh menu.
+
+**I have not run them.** The shell needs approval I can't obtain in this session, so nothing was compiled. Run:
+
+```
+swift test --package-path /private/var/folders/mb/jhx79j5n03760097trwvfty40000gn/T/tmp.zA8FuWEQ6f
+```
+
+Two things the unit tests can't reach, so verify by hand once you've pasted this into the real app: that the menu actually renders on right-click, and that the highlight clears after dismissal. Those need a live status bar. Also note `handleOpen(_:)` and `togglePanel()` are stubs here — wire them back to your real implementations.

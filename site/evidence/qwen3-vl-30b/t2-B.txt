@@ -1,0 +1,40 @@
+**Summary**  
+The code defines two dataclasses, `Seed` and `Render`, where `Seed` represents a structured prompt with metadata and content, and includes methods to load from a file and write back to a file. The `Render` class is declared but not fully defined in the provided code.
+
+**Inputs**  
+- `path` (Path): passed to the `load` class method of `Seed`, representing a file path on the filesystem.  
+- The file at `path` on the local filesystem, read as text with UTF-8 encoding.  
+- `body` (str): extracted from the file content during parsing.  
+- `meta` (dict): extracted from the file content during parsing.  
+- `path.name` (str): used to determine the filename during parsing.  
+- `path.stem` (str): used as a fallback ID if no ID is present in the metadata.  
+
+**Outputs and side effects**  
+- Returns a `Seed` instance populated with data from the file.  
+- Raises a `FormatError` if the seed body is empty.  
+- Reads from the filesystem when `load` is called.  
+- Writes to the filesystem when `write` is called (though the implementation of `write` is not shown).  
+- Returns a `str` hash value via the `hash` property, derived from the `body` field.  
+
+**Step by step**  
+1. The `Seed` class is defined with fields including `id`, `body`, `title`, `targets`, `tags`, `category`, `pinned`, and `path`.  
+2. The `hash` property is defined to return a digest of the `body` field.  
+3. The `load` class method is defined to read a file at `path`, parse its content into `meta` and `body`, and validate that `body` is not empty.  
+4. The `load` method constructs and returns a `Seed` instance using values from `meta` and `body`.  
+5. The `write` method is defined to write the `Seed` instance to a file at a given `path`, but its implementation is not shown.  
+6. The `Render` class is declared but not defined in the provided code.  
+
+**Branches and edge cases**  
+- If the `body` extracted from the file is empty, a `FormatError` is raised.  
+- If `meta` does not contain a key, default values are used (e.g., empty string for `title`, empty list for `targets` and `tags`, `False` for `pinned`).  
+- If `id` is not in `meta`, `path.stem` is used as the `id`.  
+- The `write` method is defined but not implemented in the provided code.  
+- The `Render` class is not fully defined.  
+- No error handling is shown for file read failures beyond the `FormatError` for empty body.  
+- No exception handling is shown for parsing errors in `meta`.  
+- The `digest` function is used in the `hash` property but is not defined in the provided code.  
+- The `_split` function is used in `load` but is not defined in the provided code.  
+- The `FormatError` exception is used but not defined in the provided code.  
+- The `Path` type is used but not imported in the provided code.  
+- The `field` function is used but not imported in the provided code.  
+- The `dataclass` decorator is used but not imported in the provided code.

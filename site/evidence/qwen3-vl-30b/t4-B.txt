@@ -1,0 +1,76 @@
+## Root cause
+The `showMenu` function sets the menu on the status item but then immediately sets it to `nil` after calling `performClick`, which causes the menu to disappear before it can be displayed. The issue is on line 10 in the `showMenu` function: `statusItem.menu = nil` is executed right after showing the menu, which cancels the menu display.
+
+## Fix
+```swift
+private func showMenu() {
+    let menu = NSMenu()
+    menu.addItem(withTitle: "Open", action: #selector(open), keyEquivalent: "")
+    menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    statusItem.menu = menu
+    statusItem.button?.performClick(nil)
+}
+```
+
+## Tests
+```swift
+import XCTest
+@testable import YourAppModule // Replace with actual module name
+
+class StatusItemTests: XCTestCase {
+    func testStatusItemShowsMenuOnRightClick() {
+        let app = NSApplication.shared
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let testObject = TestStatusItem()
+        
+        // Set up the status item
+        statusItem.button?.image = NSImage(systemSymbolName: "star", accessibilityDescription: nil)
+        statusItem.button?.action = #selector(testObject.statusClicked)
+        statusItem.button?.target = testObject
+        statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        
+        // Simulate right mouse up event
+        let rightMouseUpEvent = NSEvent.mouseEvent(with: .rightMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)!
+        NSApp.currentEvent = rightMouseUpEvent
+        
+        // Call the action
+        testObject.statusClicked()
+        
+        // Verify menu is shown (this is a simplified test - in practice you'd need to check menu visibility)
+        XCTAssertTrue(testObject.menuWasShown, "Menu should be shown on right click")
+    }
+}
+
+class TestStatusItem: NSObject {
+    @objc private func statusClicked() {
+        if let event = NSApp.currentEvent, event.type == .rightMouseUp {
+            showMenu()
+        } else {
+            togglePanel()
+        }
+    }
+    
+    private func showMenu() {
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Open", action: #selector(open), keyEquivalent: "")
+        menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+    }
+    
+    private func togglePanel() {}
+    
+    @objc private func open() {}
+    
+    var menuWasShown = false
+    var statusItem: NSStatusItem!
+}
+```
+
+## Verification
+- Input: Right mouse click on status item
+- Before fix: Menu appears briefly then disappears because `statusItem.menu = nil` is called immediately after
+- After fix: Menu remains visible after click because the menu is not immediately cleared
+
+## Notes
+None
