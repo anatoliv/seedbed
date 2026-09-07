@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # Named explicitly, because a product name has no shape. Add to this when
 # another project in the same estate acquires a name.
 SIBLINGS = re.compile(
-    r"\b(Reference|the task tracker|a sibling app|a sibling app|a sibling app|a sibling app|a sibling app|a sibling app)\b",
+    r"\b(tandemclip|tonebox|baton|keepfloat|receipt-sync|clockface|fleetview|amnesia-ops)\b",
     re.IGNORECASE,
 )
 
