@@ -27,6 +27,26 @@ enum MCPConstants {
     static let legacyDefaultPort: UInt16 = 8787
 }
 
+/// Resumes a continuation at most once, from whichever of several callbacks
+/// arrives first. A state handler and a deadline can both fire, and resuming a
+/// checked continuation twice is a crash rather than a warning.
+private final class ResumeOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Bool, Never>?
+
+    init(_ continuation: CheckedContinuation<Bool, Never>) {
+        self.continuation = continuation
+    }
+
+    func resume(_ value: Bool) {
+        lock.lock()
+        let pending = continuation
+        continuation = nil
+        lock.unlock()
+        pending?.resume(returning: value)
+    }
+}
+
 /// Caps how many connections are in flight at once, so nothing that can reach
 /// the socket can open them until the process runs out of room.
 private actor MCPConnectionLimiter {
@@ -68,6 +88,56 @@ enum MCPServerError: Error {
     case requestTooLarge
     case malformedRequest
     case timedOut
+}
+
+/// What the server can say about a client it just refused, beyond "401".
+///
+/// The refusal is the only signal a person gets, and it reaches them through
+/// the client rather than through this app, as a bare authentication error. The
+/// server knows more than that. It knows whether a credential arrived at all,
+/// and it knows the same client has been refused eleven times in a row, which
+/// is what a retry loop holding a token from before a regeneration looks like.
+/// None of that was surfaced anywhere until this type existed, so the person
+/// reading "401" had no way to tell a wrong token from a wrong address.
+///
+/// Carries no part of the presented token. A token that is wrong for this
+/// server may well be right for another one, and a diagnostic pane is exactly
+/// the kind of place a secret gets read out of.
+struct MCPAuthAlert: Equatable, Sendable {
+    enum Cause: Equatable, Sendable {
+        /// A bearer token arrived and is not either of this server's two.
+        case wrongToken
+        /// No `Authorization` header at all, which is a differently shaped
+        /// mistake: the entry is missing its `headers` block, or its `type` is
+        /// not `http`, so the client never sends one.
+        case noCredential
+    }
+
+    var cause: Cause
+    /// Consecutive refusals of this same shape. Reset by any request that
+    /// authenticates, so it counts one failing client rather than a lifetime.
+    var attempts: Int
+    var lastAttempt: Date
+
+    var title: String {
+        let count = attempts == 1 ? "once" : "\(attempts) times"
+        let time = lastAttempt.formatted(date: .omitted, time: .shortened)
+        return "A client was refused \(count), most recently at \(time)."
+    }
+
+    var detail: String {
+        switch cause {
+        case .wrongToken:
+            return "It sent an access token this server is not using. Either that client "
+                + "kept a token from before you regenerated one, or it is dialling a port "
+                + "some other program answers on. Copy the configuration below and replace "
+                + "that client's entry with it."
+        case .noCredential:
+            return "It sent no authorization header at all, so its entry is probably "
+                + "missing the headers block, or its type is not set to http. Copy the "
+                + "configuration below, which carries both."
+        }
+    }
 }
 
 /// Runs `work`, or throws if it has not finished in `seconds`.
@@ -112,9 +182,30 @@ final class MCPServer: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var lastError: String?
     @Published private(set) var boundPort: UInt16 = MCPConstants.defaultPort
+    /// The most recent authentication failure, or nil once something has
+    /// authenticated. Published so Settings can say what the client's 401
+    /// cannot.
+    @Published private(set) var authAlert: MCPAuthAlert?
+    /// Something other than this app is listening on the port Seedbed used to
+    /// default to. A client left pointed there is not talking to Seedbed at
+    /// all, and the error it reports is an authentication error, so the address
+    /// is the last thing anyone suspects.
+    @Published private(set) var legacyPortHeldByAnother = false
 
     init(client: LibraryClient) {
         handler = MCPRequestHandler(client: client)
+        observeAuthFailures()
+    }
+
+    /// Bridges the handler actor's view of a refusal onto the main actor, where
+    /// a view can observe it.
+    private func observeAuthFailures() {
+        let handler = self.handler
+        Task { [weak self] in
+            await handler.setAuthAlertObserver { alert in
+                Task { @MainActor in self?.authAlert = alert }
+            }
+        }
     }
 
     /// A fresh access token — two CSPRNG-backed UUIDs as lowercase hex, about
@@ -221,10 +312,58 @@ final class MCPServer: ObservableObject {
             }
             listener.start(queue: ioQueue)
             self.listener = listener
+            await refreshLegacyPortCheck(currentPort: port)
         } catch {
             lastError = error.localizedDescription
             log.error("MCP server failed to start: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Asks whether the port Seedbed no longer uses is answered by something
+    /// else, so Settings can warn that a client still aimed there is talking to
+    /// a different program. Skipped when this app is itself on that port, where
+    /// a listener is the app doing its job rather than a collision.
+    func refreshLegacyPortCheck(currentPort: UInt16) async {
+        guard currentPort != MCPConstants.legacyDefaultPort else {
+            legacyPortHeldByAnother = false
+            return
+        }
+        let held = await Self.isSomethingListening(on: MCPConstants.legacyDefaultPort)
+        legacyPortHeldByAnother = held
+        if held {
+            log.info("MCP: another program holds port \(MCPConstants.legacyDefaultPort, privacy: .public)")
+        }
+    }
+
+    /// One loopback connect, opened and closed at once, which is the only way
+    /// to learn this without asking for a privilege the app does not have:
+    /// enumerating other processes' sockets needs `lsof` or root, and binding
+    /// the port to see it fail would steal it from whoever holds it.
+    ///
+    /// A refused connect surfaces as `.waiting`, not `.failed`: Network
+    /// framework treats "nothing there yet" as something to retry. So `.ready`
+    /// is the only state that means occupied, and the deadline covers the case
+    /// where none of them arrives.
+    nonisolated static func isSomethingListening(
+        on port: UInt16, timeout: TimeInterval = 0.4
+    ) async -> Bool {
+        guard let nwPort = NWEndpoint.Port(rawValue: port) else { return false }
+        let connection = NWConnection(host: "127.0.0.1", port: nwPort, using: .tcp)
+        let queue = DispatchQueue(label: "net.amnesia.seedbed.mcp.probe")
+        let answer = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            let once = ResumeOnce(continuation)
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready: once.resume(true)
+                case .waiting, .failed, .cancelled: once.resume(false)
+                default: break
+                }
+            }
+            queue.asyncAfter(deadline: .now() + timeout) { once.resume(false) }
+            connection.start(queue: queue)
+        }
+        connection.cancel()
+        return answer
     }
 
     /// One connection: read the request, dispatch it, write the response, close.
@@ -515,12 +654,22 @@ actor MCPRequestHandler {
     /// This Mac's own name, so a request addressed to it is not a rebind. Read
     /// once: `ProcessInfo.hostName` is a syscall and this is per request.
     private let localHostName = ProcessInfo.processInfo.hostName
+    private var authAlert: MCPAuthAlert?
+    private var reportAuthAlert: (@Sendable (MCPAuthAlert?) -> Void)?
 
     init(client: LibraryClient) { self.client = client }
 
     func setTokens(full: String, readOnly: String) {
         token = full
         readOnlyToken = readOnly
+        // A restart is the point at which the person has just been told what
+        // the tokens and the port now are, so an alert from before it describes
+        // a state they have already been given the answer to.
+        clearAuthAlert()
+    }
+
+    func setAuthAlertObserver(_ observer: @escaping @Sendable (MCPAuthAlert?) -> Void) {
+        reportAuthAlert = observer
     }
 
     /// What a presented token may do.
@@ -535,8 +684,13 @@ actor MCPRequestHandler {
     }
 
     func handle(_ request: HTTPRequestData) async -> HTTPResponseData {
-        guard let access = access(for: request) else { return rejectUnauthenticated() }
+        guard let access = access(for: request) else {
+            return rejectUnauthenticated(
+                credentialPresented: request.headers["authorization"] != nil
+            )
+        }
         throttle.recordSuccess()
+        clearAuthAlert()
         guard MCPRequestGuard.isTrusted(request, localName: localHostName) else {
             log.error("MCP request rejected: untrusted Host/Origin")
             return HTTPResponseData(status: 403, body: jsonObject([
@@ -676,7 +830,8 @@ actor MCPRequestHandler {
 
     // MARK: - Auth
 
-    private func rejectUnauthenticated() -> HTTPResponseData {
+    private func rejectUnauthenticated(credentialPresented: Bool) -> HTTPResponseData {
+        recordAuthAlert(credentialPresented: credentialPresented)
         switch throttle.recordFailure(at: Date()) {
         case let .lockedOut(retryAfter):
             log.error("MCP auth locked out for \(retryAfter, privacy: .public)s after repeated bad tokens")
@@ -701,6 +856,26 @@ actor MCPRequestHandler {
                     + "Seedbed → MCP Server and update this client.",
             ]))
         }
+    }
+
+    /// Counts consecutive refusals of one shape and hands the running total to
+    /// whoever is watching. A run of these is the signal: one is a person
+    /// pasting a URL into a browser, a dozen is a configured client looping on
+    /// a credential or an address that stopped being right.
+    private func recordAuthAlert(credentialPresented: Bool) {
+        let cause: MCPAuthAlert.Cause = credentialPresented ? .wrongToken : .noCredential
+        let previous = authAlert?.cause == cause ? (authAlert?.attempts ?? 0) : 0
+        let alert = MCPAuthAlert(cause: cause, attempts: previous + 1, lastAttempt: Date())
+        authAlert = alert
+        reportAuthAlert?(alert)
+    }
+
+    /// Anything that authenticates clears the diagnosis, so the pane never
+    /// reports a client that has since been fixed.
+    private func clearAuthAlert() {
+        guard authAlert != nil else { return }
+        authAlert = nil
+        reportAuthAlert?(nil)
     }
 
     /// Both comparisons are constant-time and both always run, so the answer

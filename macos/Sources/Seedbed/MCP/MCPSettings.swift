@@ -94,6 +94,14 @@ struct MCPSettings: View {
             token = tokens.full
             readOnlyToken = tokens.readOnly
         }
+        // Re-probed whenever the pane opens or the port field changes, because
+        // whoever holds the old port can come and go while the app runs, and
+        // the answer is only interesting at the moment somebody is looking.
+        .task(id: port) {
+            await server.refreshLegacyPortCheck(
+                currentPort: UInt16(exactly: port) ?? MCPConstants.defaultPort
+            )
+        }
         .confirmationDialog("Regenerate the access token?",
                             isPresented: $confirmingRegenerate, titleVisibility: .visible) {
             Button("Regenerate", role: .destructive) {
@@ -158,6 +166,7 @@ struct MCPSettings: View {
                 Spacer()
             }
             statusRow
+            diagnosticRows
             SettingsBullets([
                 ("Run the MCP server",
                  "starts a small HTTP server on this Mac that an agent can call. It only runs "
@@ -170,7 +179,8 @@ struct MCPSettings: View {
                  "every client you already configured is now pointing at the old one and will "
                  + "fail to connect. Copy the configuration below again and replace the entry "
                  + "in that client. A stale entry reports an authentication error even when "
-                 + "the real problem is the address."),
+                 + "the real problem is the address, so when a refused client is looping "
+                 + "Seedbed says so above rather than leaving you the bare error."),
                 ("Why it is safe to leave on",
                  "it binds to loopback only, so nothing on your network can reach it, and "
                  + "every request must still carry a token. Both, not either. Ten wrong tokens "
@@ -194,6 +204,28 @@ struct MCPSettings: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+        }
+    }
+
+    /// What the server learned from the requests it turned away, said here
+    /// rather than left inside a 401 the person never sees in full.
+    ///
+    /// Both rows are absent when there is nothing to report, which is the
+    /// normal state. A permanent line saying "no problems" would be one more
+    /// thing to read past, and would make the warning easier to miss when it
+    /// does appear.
+    @ViewBuilder private var diagnosticRows: some View {
+        if let alert = server.authAlert {
+            warningRow(alert.title, alert.detail)
+        }
+        if server.legacyPortHeldByAnother {
+            warningRow(
+                "Another program is listening on port \(MCPConstants.legacyDefaultPort).",
+                "Seedbed used that port before and now uses \(port). A client still aimed at "
+                + "\(MCPConstants.legacyDefaultPort) is reaching that other program, not this "
+                + "one, and it will report an authentication failure because the token it "
+                + "sends means nothing there."
+            )
         }
     }
 
@@ -286,6 +318,25 @@ struct MCPSettings: View {
                 .fill(Tokens.Surface.sunken))
             .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.control)
                 .stroke(Tokens.Surface.hairline, lineWidth: 0.5))
+    }
+
+    private func warningRow(_ title: String, _ detail: String) -> some View {
+        HStack(alignment: .top, spacing: Tokens.Space.tight) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: Tokens.IconSize.compact))
+                .foregroundStyle(Tokens.warning)
+            VStack(alignment: .leading, spacing: Tokens.Space.row) {
+                Text(title).font(Tokens.FontScale.small.weight(.medium))
+                Text(detail).font(Tokens.FontScale.small).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(Tokens.Space.row6)
+        .background(RoundedRectangle(cornerRadius: Tokens.Radius.control)
+            .fill(Tokens.Surface.sunken))
+        .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.control)
+            .stroke(Tokens.warning.opacity(0.4), lineWidth: 0.5))
     }
 
     private func note(_ text: String) -> some View {
