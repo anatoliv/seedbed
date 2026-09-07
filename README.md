@@ -14,6 +14,19 @@ tailored expansion. Copying is then a file read.
 
     seed  +  that model's prompting guidance  +  an enhancer  =  a prompt to paste
 
+![The Seedbed panel: four seeds, and the model chips on the selected one](screenshots/panel.png)
+
+⌥⌘P over whatever you are working in. Type to filter, ⏎ to paste into the app you
+came from, ⌘1–9 to pick a model. The chips are that seed's targets; a dot says
+whether its render is current.
+
+![The library window comparing one seed rendered for five models](screenshots/compare.png)
+
+The same five words, built for five models. That difference is the point: a
+frontier model degrades when you over-specify, and an open-weight one needs
+numbered steps, an output format and a worked example. Both screenshots are the
+library in this repository, which is what you get when you clone it.
+
 ## Install
 
 Download the signed DMG from [seedbed.dev](https://seedbed.dev), or use Homebrew:
