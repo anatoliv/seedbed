@@ -160,7 +160,7 @@ enum Manual {
                   "mcpServers": {
                     "seedbed": {
                       "type": "http",
-                      "url": "http://127.0.0.1:8787",
+                      "url": "http://127.0.0.1:8789",
                       "headers": { "Authorization": "Bearer <token>" }
                     }
                   }
@@ -245,10 +245,10 @@ enum Manual {
                 drop it.
                 """,
             example: """
-                http://127.0.0.1:8787          answered
-                http://localhost:8787          answered
+                http://127.0.0.1:8789          answered
+                http://localhost:8789          answered
                 http://seedbed.example.com     forbidden
-                http://127.0.0.1:8787/mcp      not found, drop the path
+                http://127.0.0.1:8789/mcp      not found, drop the path
                 """,
             key: nil),
         ManualTopic(
@@ -530,7 +530,7 @@ enum Manual {
                   "mcpServers": {
                     "seedbed": {
                       "type": "http",
-                      "url": "http://127.0.0.1:8787",
+                      "url": "http://127.0.0.1:8789",
                       "headers": { "Authorization": "Bearer <token>" }
                     }
                   }

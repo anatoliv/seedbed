@@ -198,28 +198,39 @@ Nothing in the page plane receives a shadow. Hover may tint; it never lifts.
 - `seedbedProminent`: macOS prominent button explicitly tinted `accent`.
 - `chromeBar`: Reference spacing plus `Surface.chrome`.
 
+`chromeBar` always expands before painting its background. A title or short
+footer must not leave a partial-width chrome patch behind it.
+
+The prompt-fill modal is an in-window `SeedbedModalOverlay`, not a native
+SwiftUI sheet. Native sheet chrome imposes an oversized outer curve that does
+not match the HUD. The overlay blocks the HUD with a 15% black scrim and draws
+the 460pt `Surface.raised` panel with `Radius.sheet`, a 0.5pt hairline, and
+`Elevation.panel`; header and footer remain full-width `Surface.chrome` bars.
+
 ## Help, FAQ, and release notes
 
 The information window follows the reference app's browsable two-pane Help structure.
 The fixed sidebar is the index and owns search; the detail pane owns reading.
-Every detail page begins with the same compact two-row header: a 21pt title and
-neutral type chip on the first row, followed by a 12pt plain-language summary.
-The header uses `Space.regular` horizontal and `Space.medium` vertical padding,
-then an opaque `SeedbedDivider` before the scrolling content.
+Every detail page begins with the same 70pt two-row header as Reference: a 21pt
+title and neutral type chip on the first 22pt row, followed by a 12pt
+plain-language summary on the second 22pt row. The header uses `Space.regular`
+horizontal and `Space.medium` vertical padding, then an opaque
+`SeedbedDivider` before the scrolling content.
 
-Long-form content is held to `Width.reading` (616pt) and uses `Space.pane`
-horizontal plus `Space.wide` vertical inset. Help and FAQ remain
-typography-first: 18pt section headings, 13pt answers with 3pt line spacing,
-and hairlines only where the content has a real topic or section boundary.
-Release notes are discrete version objects, so What's New uses one flat
-`SeedbedCard` per release, marks the newest entry with a semantic positive
-chip, and uses the same New / Improved / Fixed palette as Reference: positive,
-secondary accent, and warning respectively.
+Long-form content is held to `Width.reading` (760pt) and uses `Space.pane`
+horizontal plus `Space.wide` vertical inset. Help and FAQ use the reference app's rendered
+Markdown hierarchy: 20pt section headings, 16pt topic headings, 15pt primary
+answers with 4pt line spacing, and spacing rather than ornamental rules between
+topics. Release notes use the narrower `Width.releaseNotes` (680pt), a 20pt
+inter-card gap, 16pt inset, 6pt radius, `primary` at 4% for the fill, and
+`primary` at 8% for the stroke. Change copy is primary 12pt text; the newest
+entry uses the reference app's solid positive Latest badge, while New / Improved / Fixed
+retain the positive, secondary-accent, and warning palette.
 
 The information window keeps one deliberate Seedbed brand layer over that
-shared structure: page-header glyphs and manual section headings use the
-contrast-safe terracotta `accent`, and the current release title uses the same
-accent while its change-kind chips remain semantic. What's New is the first
+shared structure: page-header glyphs and the selected What's New navigation
+glyph use the contrast-safe terracotta `accent`; headings and release copy keep
+the reference app's primary ink so their weight and edge contrast match. What's New is the first
 unsectioned sidebar row, ahead of the long guide index; About alone remains in
 the trailing “This build” section. This makes release notes discoverable at the
 window's opening height and keeps Help, FAQ, and What's New visibly Seedbed.
@@ -234,16 +245,17 @@ These are Seedbed layout decisions rather than shared visual tokens.
 
 | Token | Value |
 |---|---|
-| `Width.reading` | 616 |
-| `Width.sidebar` | 244 |
-| `Width.paged` | 860 computed |
+| `Width.reading` | 760 |
+| `Width.releaseNotes` | 680 |
+| `Width.sidebar` | 268 |
+| `Width.paged` | 1028 computed |
 | `Width.sheet` | 460 |
 | `Width.list` | 200 |
 | `Width.librarySidebar` | 240 |
 | `Size.library` | 900 × 540 |
 | `Size.panel` | 420 × 260 |
-| `Size.info` | 860 × 640 computed |
-| `Size.infoMin` | 620 × 420 |
+| `Size.info` | 1040 × 660 |
+| `Size.infoMin` | 760 × 420 |
 | `Size.settings` | 820 × 620 |
 | `Size.settingsMin` | 620 × 460 |
 

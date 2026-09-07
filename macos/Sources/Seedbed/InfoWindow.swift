@@ -51,9 +51,15 @@ enum InfoPage: String, CaseIterable, Identifiable {
         case .gettingStarted: return "sparkles"
         case .help:           return "questionmark.circle"
         case .faq:            return "text.bubble"
-        case .whatsNew:       return "gift"
+        case .whatsNew:       return "sparkles"
         case .about:          return "info.circle"
         }
+    }
+
+    /// Reference distinguishes the release-notes destination from its page
+    /// heading: a megaphone in navigation, sparkles over the releases.
+    var sidebarSymbol: String {
+        self == .whatsNew ? "megaphone" : symbol
     }
 }
 
@@ -127,20 +133,23 @@ struct InfoWindowView: View {
         Label {
             Text(page.title)
         } icon: {
-            Image(systemName: page.symbol)
-                .foregroundStyle(page == .whatsNew ? Tokens.accent : Color.secondary)
+            Image(systemName: page.sidebarSymbol)
+                .foregroundStyle(page == .whatsNew ? Tokens.accent : Color.primary)
         }
         .font(Tokens.FontScale.body)
         .tag(page.rawValue)
     }
 
     /// The scrolling half of a page, under the fixed header.
-    @ViewBuilder private func pageBody<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+    @ViewBuilder private func pageBody<C: View>(
+        maxWidth: CGFloat = Tokens.Width.reading,
+        @ViewBuilder _ content: () -> C
+    ) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Tokens.Space.regular) {
                 content()
             }
-            .frame(maxWidth: Tokens.Width.reading, alignment: .leading)
+            .frame(maxWidth: maxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Tokens.Space.pane)
             .padding(.vertical, Tokens.Space.wide)
@@ -158,9 +167,7 @@ struct InfoWindowView: View {
                 ManualSearchField(query: $model.query,
                                   resultCount: model.browsing ? resultCount : nil,
                                   onReturnToResults: { model.browsing = false })
-                    .padding(.horizontal, Tokens.Space.medium)
-                    .padding(.top, Tokens.Space.medium)
-                    .padding(.bottom, Tokens.Space.tight)
+                    .padding(Tokens.Space.medium)
                 SeedbedDivider()
                 List(selection: Binding(get: { model.selection },
                                         set: { model.selection = $0 ?? InfoPage.help.rawValue })) {
@@ -216,7 +223,9 @@ struct InfoWindowView: View {
                                symbol: model.page.symbol,
                                badge: model.page.badge,
                                subtitle: model.page.subtitle) {
-                        pageBody { page }
+                        pageBody(maxWidth: model.page == .whatsNew
+                            ? Tokens.Width.releaseNotes
+                            : Tokens.Width.reading) { page }
                     }
                 }
             }

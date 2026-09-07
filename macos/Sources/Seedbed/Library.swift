@@ -246,8 +246,33 @@ enum LibraryError: LocalizedError {
 struct LibraryClient {
     var root: URL
 
-    static let defaultRoot = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Projects/seedbed")
+    /// The shared per-user location a fresh install points at. Keeping the
+    /// checkout under Application Support gives the app, CLI, web UI, and MCP
+    /// one conventional library location without assuming a developer keeps a
+    /// `~/Projects` directory.
+    static let commonRoot = FileManager.default.urls(
+        for: .applicationSupportDirectory, in: .userDomainMask
+    )[0]
+        .appendingPathComponent("Seedbed/Library", isDirectory: true)
+
+    /// Releases through 0.1.7 silently defaulted here. It remains a fallback
+    /// when it is already a valid library so an upgrade never strands an
+    /// existing checkout merely because no explicit preference was saved.
+    static let legacyDefaultRoot = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Projects/seedbed", isDirectory: true)
+
+    static var defaultRoot: URL {
+        resolveDefaultRoot(isLibrary: isLibrary)
+    }
+
+    /// Resolution is separate from the filesystem predicate so the migration
+    /// order can be tested: common first, valid legacy second, common as the
+    /// first-run destination when neither checkout exists.
+    static func resolveDefaultRoot(isLibrary: (URL) -> Bool) -> URL {
+        if isLibrary(commonRoot) { return commonRoot }
+        if isLibrary(legacyDefaultRoot) { return legacyDefaultRoot }
+        return commonRoot
+    }
 
     /// Why a library folder is a whole checkout rather than a folder of prompts.
     ///

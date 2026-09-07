@@ -36,6 +36,11 @@ newer. The cask says so in its caveats and the DMG says so in *Before you start.
 — both generated from the same file — and a copy with neither reports an empty
 library rather than pretending it has one.
 
+On first load the Mac app points to
+`~/Library/Application Support/Seedbed/Library`. A library chosen in Settings
+always wins, and a valid legacy `~/Projects/seedbed` checkout remains an
+automatic fallback for upgrades.
+
 macOS 14 (Sonoma) or later, Apple Silicon or Intel. The cask is marked
 `auto_updates`, so Seedbed keeps itself current through Sparkle rather than
 through `brew upgrade`.

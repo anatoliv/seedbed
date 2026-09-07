@@ -56,7 +56,9 @@ class HelpContentFreshness(unittest.TestCase):
             self.assertRegex(self.manual, rf"{count} words")
 
     def test_help_pages_use_the_reference_reading_structure(self) -> None:
-        self.assertIn(".frame(maxWidth: Tokens.Width.reading", self.info)
+        self.assertIn("maxWidth: CGFloat = Tokens.Width.reading", self.info)
+        self.assertIn(".frame(maxWidth: maxWidth", self.info)
+        self.assertIn("Tokens.Width.releaseNotes", self.info)
         self.assertIn("subtitle: model.page.subtitle", self.info)
         self.assertIn("Tokens.FontScale.title", self.theme)
         self.assertIn("Tokens.FontScale.small", self.theme)
@@ -69,8 +71,13 @@ class HelpContentFreshness(unittest.TestCase):
         )
         self.assertIsNotNone(improved)
         self.assertEqual(improved.group(1), "Tokens.secondaryAccent")
-        self.assertIn('Text("Latest")', self.whats_new)
-        self.assertIn(".seedbedCard(", self.whats_new)
+        self.assertIn('Text("LATEST")', self.whats_new)
+        self.assertIn(".background(Tokens.positive, in: Capsule())", self.whats_new)
+        self.assertIn("Color.primary.opacity(0.04)", self.whats_new)
+        self.assertIn(".strokeBorder(Color.primary.opacity(0.08))", self.whats_new)
+        self.assertIn("Tokens.FontScale.sectionHeader.weight(.bold)", self.whats_new)
+        self.assertIn("Tokens.FontScale.small", self.whats_new)
+        self.assertNotIn("DefinitionRow(detail: change.text)", self.whats_new)
 
     def test_whats_new_is_visible_before_the_long_guide_index(self) -> None:
         whats_new = self.info.index("row(.whatsNew)")
@@ -102,11 +109,34 @@ class HelpContentFreshness(unittest.TestCase):
         self.assertIsNotNone(section_header)
         self.assertIn("Image(systemName: symbol)", page_header.group("body"))
         self.assertIn(".foregroundStyle(Tokens.accent)", page_header.group("body"))
-        self.assertIn(".foregroundStyle(Tokens.accent)", section_header.group("body"))
-        self.assertIn(
-            ".foregroundStyle(index == 0 ? Tokens.accent : Color.primary)",
-            self.whats_new,
+        self.assertIn(".foregroundStyle(.primary)", section_header.group("body"))
+        self.assertIn("page == .whatsNew ? Tokens.accent : Color.primary", self.info)
+
+    def test_info_geometry_matches_the_reference_help_canvas(self) -> None:
+        for declaration in (
+            "static let reading: CGFloat = 760",
+            "static let releaseNotes: CGFloat = 680",
+            "static let sidebar: CGFloat = 268",
+            "static let info = CGSize(width: 1040, height: 660)",
+            "static let infoMin = CGSize(width: 760, height: 420)",
+            "static let rowHeight: CGFloat = 22",
+            "static let releaseCardGap: CGFloat = 20",
+        ):
+            self.assertIn(declaration, self.theme)
+
+    def test_help_and_faq_use_the_reference_reading_hierarchy(self) -> None:
+        self.assertIn("? .system(size: 20, weight: .semibold", self.theme)
+        self.assertIn("Tokens.FontScale.subtitle", self.theme)
+        self.assertIn("Tokens.FontScale.transcript", self.theme)
+        self.assertIn(".lineSpacing(4)", self.theme)
+        info_windows = (SOURCES / "InfoWindows.swift").read_text()
+        manual_page = re.search(
+            r"struct ManualPage: View \{(?P<body>.*?)\n\}",
+            info_windows,
+            re.DOTALL,
         )
+        self.assertIsNotNone(manual_page)
+        self.assertNotIn("SeedbedDivider()", manual_page.group("body"))
 
 
 if __name__ == "__main__":

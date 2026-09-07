@@ -203,14 +203,13 @@ struct ManualSearchField: View {
     var body: some View {
         HStack(spacing: Tokens.Space.row6) {
             Image(systemName: "magnifyingglass")
-                .font(Tokens.FontScale.small)
                 .foregroundStyle(.secondary)
             // Short enough for the sidebar it now lives in. "Search Help and the
             // FAQ" fit the 560pt reading column and truncates to "Search Help
             // and the" at 178pt, which reads as a bug in the field rather than
             // as a label that is too long. Reference uses "Search Help & FAQ" for
             // the same reason.
-            TextField("Search help", text: $query)
+            TextField("Search Help & FAQ", text: $query)
                 .textFieldStyle(.plain)
                 .font(Tokens.FontScale.body)
                 .focused($focused)
@@ -234,7 +233,6 @@ struct ManualSearchField: View {
                     focused = true
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(Tokens.FontScale.small)
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)

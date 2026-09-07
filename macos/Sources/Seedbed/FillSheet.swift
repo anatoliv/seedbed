@@ -12,8 +12,6 @@ final class FillModel: ObservableObject, Identifiable {
     nonisolated let id = UUID()
 
     @Published var values: [String: String]
-    @Published var focusedIndex = 0
-
     let prompt: Prompt
     let target: Target
     let names: [String]
@@ -44,6 +42,16 @@ struct FillSheet: View {
     @ObservedObject var model: FillModel
     var onCancel: () -> Void
     var onCopy: () -> Void
+    @FocusState private var focusedName: String?
+
+    /// A ScrollView greedily takes its maximum height even when two compact
+    /// fields need half of it. Size the viewport to the actual rows and only
+    /// become scrollable once five or more variables would exceed the cap.
+    private var fieldsHeight: CGFloat {
+        let rows = CGFloat(max(model.names.count, 1)) * 42
+        let gaps = CGFloat(max(model.names.count - 1, 0)) * Tokens.Space.snug
+        return min(rows + gaps + (Tokens.Space.pane * 2), 320)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -57,13 +65,14 @@ struct FillSheet: View {
                 }
                 .padding(Tokens.Space.pane)
             }
-            .frame(maxHeight: 320)
+            .frame(height: fieldsHeight)
             SeedbedDivider()
             footer
         }
         .frame(width: Tokens.Width.sheet)
         .background(Tokens.Surface.raised)
         .tint(Tokens.accent)
+        .onAppear { focusedName = model.names.first }
     }
 
     private var header: some View {
@@ -87,6 +96,7 @@ struct FillSheet: View {
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(1...6)
                 .font(Tokens.FontScale.body)
+                .focused($focusedName, equals: name)
 
                 let past = model.history[name] ?? []
                 Menu {

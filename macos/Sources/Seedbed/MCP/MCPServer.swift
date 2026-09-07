@@ -19,7 +19,10 @@ enum MCPConstants {
     static let readTimeout: TimeInterval = 30
     /// Concurrent connections served at once. Real clients use one or two.
     static let maxConcurrentConnections = 16
-    static let defaultPort: UInt16 = 8787
+    /// Seedbed has its own fixed default. a sibling app owns 8787 and its gateway uses
+    /// 8788, so sharing either makes launch order decide which app works.
+    static let defaultPort: UInt16 = 8789
+    static let legacyDefaultPort: UInt16 = 8787
 }
 
 /// Caps how many connections are in flight at once, so nothing that can reach
@@ -361,13 +364,13 @@ final class MCPServer: ObservableObject {
 ///
 /// The attack the MCP spec singles out is **DNS rebinding**. A page served from
 /// `evil.com` re-points `evil.com` at `127.0.0.1`; the browser now treats
-/// `http://evil.com:8787` as same-origin with the page, so there is no CORS
+/// `http://evil.com:8789` as same-origin with the page, so there is no CORS
 /// preflight and the response is readable — the whole prompt library, read out
 /// by a page the user merely visited. The bearer token is why that does not
 /// already work, but "an unrelated control happens to stop it" is not a defence.
 ///
 /// Both halves of the rebind are visible in the request: `Host` becomes
-/// `evil.com:8787` and `Origin` becomes `http://evil.com`. So the rule is one
+/// `evil.com:8789` and `Origin` becomes `http://evil.com`. So the rule is one
 /// predicate over a hostname — a public DNS name this server has no reason to
 /// answer to is refused, and everything a real local client uses is not.
 enum MCPRequestGuard {
@@ -382,7 +385,7 @@ enum MCPRequestGuard {
         return allowedPaths.contains(trimmed)
     }
 
-    /// `Host: example.com:8787` / `[::1]:8787` / `example.com` → the bare,
+    /// `Host: example.com:8789` / `[::1]:8789` / `example.com` → the bare,
     /// lowercased hostname.
     static func hostname(fromHostHeader header: String) -> String {
         var value = header.trimmingCharacters(in: .whitespaces)

@@ -496,24 +496,31 @@ struct HUDView: View {
     @ObservedObject var model: HUDModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            searchLine
-            SeedbedDivider()
-            if model.filtered.isEmpty {
-                Text(model.prompts.isEmpty ? "No prompts yet." : "No matches.")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                list
+        ZStack {
+            VStack(alignment: .leading, spacing: 0) {
+                searchLine
+                SeedbedDivider()
+                if model.filtered.isEmpty {
+                    Text(model.prompts.isEmpty ? "No prompts yet." : "No matches.")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    list
+                }
+                SeedbedDivider()
+                footer
             }
-            SeedbedDivider()
-            footer
+            .disabled(model.filling != nil)
+            .accessibilityHidden(model.filling != nil)
+
+            if let fill = model.filling {
+                SeedbedModalOverlay {
+                    FillSheet(model: fill, onCancel: { model.cancelFill() },
+                              onCopy: { model.completeFill() })
+                }
+            }
         }
         .frame(minWidth: Tokens.Size.panel.width, minHeight: Tokens.Size.panel.height)
-        .sheet(item: $model.filling) { fill in
-            FillSheet(model: fill, onCancel: { model.cancelFill() },
-                      onCopy: { model.completeFill() })
-        }
         // Same guard the library window has: a delete destroys renders that
         // cost real LLM calls, so the count is on screen before you agree to it.
         .confirmationDialog(

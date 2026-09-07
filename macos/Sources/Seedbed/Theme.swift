@@ -184,6 +184,42 @@ struct SeedbedDivider: View {
     }
 }
 
+/// A modal surface that stays inside a Seedbed-owned window.
+///
+/// Native macOS sheets impose a large system curve that cannot be reconciled
+/// with the app's crisp geometry. Reference uses an in-window overlay for this
+/// class of focused interaction so the dimming, radius, border, and elevation
+/// remain part of the same visual system.
+struct SeedbedModalOverlay<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.15)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+            content
+                .background(Tokens.Surface.raised)
+                .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.sheet,
+                                            style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Tokens.Radius.sheet,
+                                     style: .continuous)
+                        .strokeBorder(Tokens.Surface.hairline, lineWidth: 0.5)
+                )
+                .shadow(color: Tokens.Elevation.panel.color,
+                        radius: Tokens.Elevation.panel.radius,
+                        y: Tokens.Elevation.panel.y)
+                .accessibilityAddTraits(.isModal)
+        }
+        .transition(.opacity)
+    }
+}
+
 /// Reference's canonical card recipe, named for this app at the call site.
 struct SeedbedCard: ViewModifier {
     enum Elevation {
@@ -277,9 +313,12 @@ extension Tokens {
     enum Width {
         /// A column of prose. Wide enough for a paragraph, narrow enough that a
         /// line does not tire the eye.
-        static let reading: CGFloat = 616
+        static let reading: CGFloat = 760
+        /// Release notes use Reference's narrower card measure inside the same
+        /// detail pane.
+        static let releaseNotes: CGFloat = 680
         /// The contents list beside it.
-        static let sidebar: CGFloat = 244
+        static let sidebar: CGFloat = 268
         /// A window that is a sidebar plus a reading column.
         static var paged: CGFloat { sidebar + reading }
         /// A sheet that asks for a few values and goes away.
@@ -289,7 +328,7 @@ extension Tokens {
         /// The library window's own sidebar, and a deliberate exemption from
         /// `sidebar` above.
         ///
-        /// `sidebar` (244) is the reading-navigation width. A library row is a
+        /// `sidebar` (268) is the reading-navigation width. A library row is a
         /// title over a metadata line, with
         /// a pin glyph indented left and, on the right, either a staleness dot
         /// or a four-button action strip (copy, rebuild, pin, delete) that
@@ -314,17 +353,16 @@ extension Tokens {
         static let library = CGSize(width: 900, height: 540)
         /// The floating panel, which is a list and nothing else.
         static let panel = CGSize(width: 420, height: 260)
-        /// A sidebar plus one reading column. The 860x640 product canvas stays
-        /// Seedbed-specific while its typography, surfaces and controls use the
-        /// shared Reference system.
-        static var info: CGSize { CGSize(width: Width.paged, height: 640) }
+        /// Matches the reference Help canvas so panes, line lengths and type
+        /// rasterise under the same geometry during side-by-side review.
+        static let info = CGSize(width: 1040, height: 660)
         /// How small those windows may be dragged.
         ///
         /// A minimum equal to the opening size is not a minimum — it is a fixed
-        /// window wearing a resize cursor. Seedbed opens Help at 860x640 and
-        /// lets it go to 620x420, so a reader on a small screen can put it
+        /// window wearing a resize cursor. Seedbed opens Help at 1040x660 and
+        /// lets it go to 760x420, so a reader on a small screen can put it
         /// beside the thing they are reading about.
-        static let infoMin = CGSize(width: 620, height: 420)
+        static let infoMin = CGSize(width: 760, height: 420)
         static let settingsMin = CGSize(width: 620, height: 460)
         /// Wider than `info` because the Models pane is a two-column editor
         /// rather than prose. It was the one window size still written as a raw
@@ -345,14 +383,25 @@ enum TextScale {
     case compact
     case reading
 
-    // Reference uses one named scale across dense and reading surfaces. Keeping
-    // this environment value avoids churn in the window hosts while ensuring
-    // both cases resolve to the same typography roles.
-    var heading: Font { Tokens.FontScale.sectionHeader }
-    var body: Font    { Tokens.FontScale.body }
+    // Reference's Markdown renderer draws Help at 20 / 16 / 15pt. Mapping those
+    // roles here keeps Seedbed's native manual on the same optical hierarchy
+    // without introducing a second token inventory.
+    var heading: Font {
+        self == .reading
+            ? .system(size: 20, weight: .semibold, design: .default)
+            : Tokens.FontScale.sectionHeader
+    }
+    var term: Font {
+        self == .reading ? Tokens.FontScale.subtitle : Tokens.FontScale.body
+    }
+    var body: Font {
+        self == .reading ? Tokens.FontScale.transcript : Tokens.FontScale.body
+    }
     var meta: Font    { Tokens.FontScale.small }
     var label: Font   { Tokens.FontScale.tiny }
-    var code: Font    { Tokens.FontScale.monoTiny }
+    var code: Font {
+        self == .reading ? Tokens.FontScale.monoSmall : Tokens.FontScale.monoTiny
+    }
 }
 
 private struct TextScaleKey: EnvironmentKey {
@@ -399,24 +448,30 @@ struct PageHeader<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: Tokens.Space.row6) {
-                HStack(spacing: Tokens.Space.tight) {
-                    Image(systemName: symbol)
-                        .font(.system(size: Tokens.IconSize.xlarge, weight: .medium))
-                        .foregroundStyle(Tokens.accent)
-                    Text(title)
+                HStack(alignment: .center, spacing: Tokens.Space.snug) {
+                    Label {
+                        Text(title)
+                    } icon: {
+                        Image(systemName: symbol)
+                            .foregroundStyle(Tokens.accent)
+                    }
                         .font(Tokens.FontScale.title)
                         .foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(1)
                     Spacer(minLength: Tokens.Space.tight)
                     Text(badge.uppercased())
-                        .tracking(0.5)
-                        .seedbedChip()
+                        .font(Tokens.FontScale.tiny.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, Tokens.ChipPadding.h)
+                        .padding(.vertical, Tokens.ChipPadding.v)
+                        .background(Color.primary.opacity(0.06), in: Capsule())
                 }
+                .frame(height: InfoMetrics.rowHeight)
                 Text(subtitle)
                     .font(Tokens.FontScale.small)
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
+                    .frame(height: InfoMetrics.rowHeight)
             }
             .padding(.horizontal, Tokens.Space.regular)
             .padding(.vertical, Tokens.Space.medium)
@@ -434,7 +489,7 @@ struct SectionHeader: View {
     var body: some View {
         Text(title)
             .font(scale.heading)
-            .foregroundStyle(Tokens.accent)
+            .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -485,13 +540,18 @@ struct Caption: View {
 /// A term and what it means: a keyboard shortcut, an FAQ question, a glossary
 /// entry, a line of release notes. Four files had four versions of this.
 struct DefinitionRow<Leading: View>: View {
+    @Environment(\.textScale) private var scale
     let detail: String
     @ViewBuilder let leading: Leading
 
     var body: some View {
         HStack(alignment: .top, spacing: Tokens.Space.tight) {
             leading
-            Caption(detail)
+            Text(detail)
+                .font(scale.body)
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -505,12 +565,12 @@ struct StackedDefinition: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.row) {
-            Text(term).font(scale.body.weight(.semibold))
+            Text(term).font(scale.term.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(detail)
                 .font(scale.body)
-                .lineSpacing(3)
+                .lineSpacing(4)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -526,13 +586,11 @@ struct KeyCap: View {
 
     var body: some View {
         Text(key)
-            .font(Tokens.FontScale.monoTiny)
+            .font(scale.code)
             .padding(.horizontal, Tokens.ChipPadding.h)
             .padding(.vertical, Tokens.ChipPadding.v)
-            .background(RoundedRectangle(cornerRadius: Tokens.Radius.control)
-                .fill(Tokens.Surface.sunken))
-            .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.control)
-                .stroke(Tokens.Surface.hairline, lineWidth: 0.5))
+            .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip)
+                .fill(Color.primary.opacity(0.08)))
             .frame(width: width, alignment: .leading)
     }
 }
@@ -555,15 +613,19 @@ struct ExampleBlock: View {
                 .font(scale.code)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: true, vertical: true)
-                .padding(.horizontal, Tokens.Space.tight)
-                .padding(.vertical, Tokens.Space.tight)
+                .padding(Tokens.Space.snug)
         }
-        .background(RoundedRectangle(cornerRadius: Tokens.Radius.control)
-            .fill(Tokens.Surface.sunken))
-        .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.control)
-            .stroke(Tokens.Surface.hairline, lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: Tokens.Radius.card)
+            .fill(Color.primary.opacity(0.05)))
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
+
+/// Both rows in Reference's Help header are pinned so their intrinsic content
+/// cannot change the chrome height or the font rasterisation context.
+enum InfoMetrics {
+    static let rowHeight: CGFloat = 22
+    static let releaseCardGap: CGFloat = 20
 }
 
 /// One manual entry as it draws on a page: the term, what it means, and the
@@ -600,6 +662,7 @@ extension View {
     func chromeBar() -> some View {
         padding(.horizontal, Tokens.Space.pane)
             .padding(.vertical, Tokens.Space.medium)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Tokens.Surface.chrome)
     }
 }

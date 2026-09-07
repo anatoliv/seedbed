@@ -46,10 +46,23 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private static let rootKey = "LibraryRoot"
     static let mcpEnabledKey = "MCPEnabled"
     static let mcpPortKey = "MCPPort"
+    private static let mcpDefaultPortMigrationKey = "MCPDefaultPortMigratedTo8789"
 
     static var mcpPort: UInt16 {
         let stored = UserDefaults.standard.integer(forKey: mcpPortKey)
         return stored > 0 && stored <= 65535 ? UInt16(stored) : MCPConstants.defaultPort
+    }
+
+    /// Releases a sibling app's port on upgrades without trampling a different port a
+    /// person deliberately selected. Missing preferences and the former
+    /// Seedbed default both become 8789 exactly once.
+    static func migrateMCPDefaultPortIfNeeded(_ defaults: UserDefaults = .standard) {
+        guard !defaults.bool(forKey: mcpDefaultPortMigrationKey) else { return }
+        let stored = defaults.object(forKey: mcpPortKey) as? NSNumber
+        if stored == nil || stored?.intValue == Int(MCPConstants.legacyDefaultPort) {
+            defaults.set(Int(MCPConstants.defaultPort), forKey: mcpPortKey)
+        }
+        defaults.set(true, forKey: mcpDefaultPortMigrationKey)
     }
 
     private var root: URL {
@@ -70,6 +83,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case "light": NSApp.appearance = NSAppearance(named: .aqua)
         default:       break
         }
+
+        Self.migrateMCPDefaultPortIfNeeded()
 
         // First, so a crash in anything below is the kind of crash that gets
         // reported. Starts only if the user opted in AND this build carries a
@@ -215,6 +230,12 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case "whatsnew":     openWhatsNew()
         case "faq":          openFAQ()
         case "help":         openHelp()
+        // Opens a real prompt-fill modal without synthetic typing or clicks.
+        // This is the visual-QA route for the dimming, panel chrome, fields,
+        // focus, history buttons, and footer in both appearances.
+        case "fill":
+            show()
+            openFillForVisualQA()
         // The search field with a query already in it. Typing into a window is
         // the one verification route this project will not use: synthetic
         // keystrokes reached another session's prompt during the build, which is
@@ -451,6 +472,25 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !panel.setFrameUsingName("SeedbedPanel") { positionUnderMenuBar() }
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
+    }
+
+    /// The library reload is asynchronous, so the modal QA hook waits for a
+    /// usable variable-bearing target instead of racing a fixed delay. Twelve
+    /// half-second attempts cover a cold Python start without slowing the
+    /// normal launch path, which never calls this method.
+    private func openFillForVisualQA(remainingAttempts: Int = 12) {
+        if let prompt = model.filtered.first(where: { prompt in
+            prompt.targets.contains { $0.isUsable && !$0.variables.isEmpty }
+        }), let target = prompt.targets.first(where: {
+            $0.isUsable && !$0.variables.isEmpty
+        }) {
+            model.copy(prompt, target: target, paste: false)
+            return
+        }
+        guard remainingAttempts > 1 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.openFillForVisualQA(remainingAttempts: remainingAttempts - 1)
+        }
     }
 
     private func hide() {

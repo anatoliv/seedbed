@@ -8,13 +8,16 @@ this Mac:
 
 1. The library. Seedbed reads and writes a git checkout of the seedbed
    repository, and it runs the Python package inside that checkout to do the
-   work. Clone it wherever you keep code:
+   work. Create Seedbed's common application-data folder, then clone the
+   library there:
 
-       git clone https://github.com/anatoliv/seedbed ~/Projects/seedbed
+       mkdir -p "$HOME/Library/Application Support/Seedbed"
+       git clone https://github.com/anatoliv/seedbed "$HOME/Library/Application Support/Seedbed/Library"
 
-   Seedbed looks in ~/Projects/seedbed by default. Anywhere else is fine:
-   menu bar icon, Settings, General, Choose. A folder without a promptlib
-   directory in it is refused, and says why.
+   On first load Seedbed points to ~/Library/Application Support/Seedbed/Library.
+   An existing valid ~/Projects/seedbed checkout remains an automatic fallback
+   for upgrades. Anywhere else is fine: menu bar icon, Settings, General,
+   Choose. A folder without a promptlib directory in it is refused, and says why.
 
 2. Python 3.11 or newer, for tomllib:
 

@@ -61,23 +61,25 @@ struct HelpPage: View {
 }
 
 /// The shared reading structure for Help and FAQ. Sections remain typographic
-/// rather than becoming a stack of decorative cards; hairlines mark the real
-/// boundaries in the content and match Reference's long-form Help treatment.
+/// rather than becoming a stack of decorative cards, matching Reference's
+/// long-form Help treatment.
 struct ManualPage: View {
     let page: InfoPage
 
     private var sections: [ManualSection] { Manual.sections(on: page) }
 
     var body: some View {
-        ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
-            SectionHeader(section.title)
-            VStack(alignment: .leading, spacing: Tokens.Space.regular) {
-                ForEach(Array(section.topics.enumerated()), id: \.element.id) { topicIndex, topic in
-                    ManualTopicView(topic: topic)
-                    if topicIndex < section.topics.count - 1 { SeedbedDivider() }
+        VStack(alignment: .leading, spacing: Tokens.Space.wide) {
+            ForEach(sections) { section in
+                VStack(alignment: .leading, spacing: Tokens.Space.tight) {
+                    SectionHeader(section.title)
+                    VStack(alignment: .leading, spacing: Tokens.Space.element) {
+                        ForEach(section.topics) { topic in
+                            ManualTopicView(topic: topic)
+                        }
+                    }
                 }
             }
-            if index < sections.count - 1 { SeedbedDivider() }
         }
     }
 }

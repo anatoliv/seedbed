@@ -163,7 +163,7 @@ enum CrashReporting {
         }
         // Show the scrubber doing its job on the two things that must never
         // leave, using the shipped function rather than a description of it.
-        let sample = "opening \(NSHomeDirectory())/Projects/seedbed with token "
+        let sample = "opening \(NSHomeDirectory())/Library/Application Support/Seedbed/Library with token "
                    + "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
         print("SEEDBED_TEST_SENTRY: scrubber in:  \(sample)")
         print("SEEDBED_TEST_SENTRY: scrubber out: \(redact(sample))")

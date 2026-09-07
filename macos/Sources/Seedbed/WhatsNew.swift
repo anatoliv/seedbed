@@ -48,6 +48,24 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.8",
+            date: "7 September 2026",
+            highlight: "Sharper reading pages, a cleaner fill window, and conflict-free local services.",
+            changes: [
+                WhatsNewChange(kind: .improved, text:
+                    "Help, FAQ, and What's New now match the reference app's window geometry, native "
+                    + "reading type, warm surfaces, spacing, and Seedbed brand treatment."),
+                WhatsNewChange(kind: .improved, text:
+                    "Prompt values now open in a compact in-window modal with focused input, "
+                    + "consistent chrome, and no oversized empty field area."),
+                WhatsNewChange(kind: .improved, text:
+                    "A first load points to the shared Seedbed library under Application Support, "
+                    + "while existing libraries and locations chosen in Settings keep working."),
+                WhatsNewChange(kind: .fixed, text:
+                    "Seedbed's MCP server now defaults to port 8789, clear of a sibling app's MCP "
+                    + "and gateway ports. Upgrades preserve every other custom port."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.7",
             date: "6 September 2026",
             highlight: "What's New is easy to find, and the reading pages visibly belong to Seedbed.",
@@ -297,38 +315,67 @@ enum WhatsNewAnnouncer {
 
 struct WhatsNewPage: View {
     var body: some View {
-        ForEach(Array(WhatsNewRelease.all.enumerated()), id: \.element.id) { index, release in
-            VStack(alignment: .leading, spacing: Tokens.Space.medium) {
-                HStack(spacing: Tokens.Space.tight) {
-                    Text("Version \(release.version)")
-                        .font(Tokens.FontScale.sectionHeader)
-                        .foregroundStyle(index == 0 ? Tokens.accent : Color.primary)
-                    if index == 0 {
-                        Text("Latest")
-                            .seedbedChip(tint: Tokens.positive)
-                    }
-                    Spacer(minLength: Tokens.Space.tight)
-                    Text(release.date)
-                        .font(Tokens.FontScale.small)
-                        .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: InfoMetrics.releaseCardGap) {
+            ForEach(Array(WhatsNewRelease.all.enumerated()), id: \.element.id) { index, release in
+                releaseCard(release, isLatest: index == 0)
+            }
+        }
+    }
+
+    private func releaseCard(_ release: WhatsNewRelease, isLatest: Bool) -> some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.snug) {
+            HStack(spacing: Tokens.Space.tight) {
+                Text("Version \(release.version)")
+                    .font(Tokens.FontScale.sectionHeader.weight(.bold))
+                if isLatest {
+                    Text("LATEST")
+                        .font(Tokens.FontScale.nano.weight(.bold))
+                        .tracking(0.5)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, Tokens.ChipPadding.h)
+                        .padding(.vertical, Tokens.ChipPadding.v)
+                        .background(Tokens.positive, in: Capsule())
                 }
-                Text(release.highlight)
+                Spacer(minLength: Tokens.Space.tight)
+                Text(release.date)
                     .font(Tokens.FontScale.small)
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                SeedbedDivider()
-                VStack(alignment: .leading, spacing: Tokens.Space.medium) {
-                    ForEach(release.changes) { change in
-                        DefinitionRow(detail: change.text) {
-                            Text(change.kind.label.uppercased())
-                                .tracking(0.4)
-                                .seedbedChip(tint: change.kind.ink)
-                                .frame(width: 72, alignment: .leading)
-                        }
-                    }
-                }
             }
-            .seedbedCard(padding: Tokens.Space.regular, radius: Tokens.Radius.card)
+            Text(release.highlight)
+                .font(Tokens.FontScale.small)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            SeedbedDivider()
+            VStack(alignment: .leading, spacing: Tokens.Space.medium) {
+                ForEach(release.changes) { changeRow($0) }
+            }
+        }
+        .padding(Tokens.Space.regular)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.primary.opacity(0.04),
+            in: RoundedRectangle(cornerRadius: Tokens.Radius.card)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Tokens.Radius.card)
+                .strokeBorder(Color.primary.opacity(0.08))
+        )
+    }
+
+    private func changeRow(_ change: WhatsNewChange) -> some View {
+        HStack(alignment: .top, spacing: Tokens.Space.medium) {
+            Text(change.kind.label.uppercased())
+                .font(Tokens.FontScale.nano.weight(.bold))
+                .foregroundStyle(change.kind.ink)
+                .padding(.horizontal, Tokens.ChipPadding.h)
+                .padding(.vertical, Tokens.ChipPadding.v)
+                .background(change.kind.ink.opacity(0.14), in: Capsule())
+                .frame(width: 72, alignment: .leading)
+                .padding(.top, 1)
+            Text(change.text)
+                .font(Tokens.FontScale.small)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
     }
 }

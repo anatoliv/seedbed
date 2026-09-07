@@ -129,7 +129,8 @@ is not this Mac, which is what stops a web page pointing its own domain here and
 reading the library through your browser; and a stray path on the URL.
 
 Settings live in `MCPEnabled` and `MCPPort` under `net.amnesia.seedbed`; the
-default port is 8787.
+default port is 8789. Upgrades migrate the former 8787 default once, while a
+different port chosen in Settings is preserved.
 
 ## The library window
 
@@ -228,8 +229,10 @@ Two consequences worth knowing:
   Xcode's 3.9 and every call fails. It probes known locations and picks the
   first interpreter that can actually `import tomllib`. Override with:
   `defaults write net.amnesia.seedbed PythonPath /path/to/python3`
-- **It needs the library checkout.** Defaults to `~/Projects/seedbed`;
-  change it from the menu-bar menu.
+- **It needs the library checkout.** A first load points to
+  `~/Library/Application Support/Seedbed/Library`; change it from the menu-bar
+  menu. A valid legacy `~/Projects/seedbed` checkout remains an automatic
+  fallback for upgrades.
 
 ## Check for Updates…
 
@@ -275,8 +278,10 @@ verified, which fails on a Mac that is offline or behind a filter.
 
 **The DMG is not the whole install.** This app is a front end; the prompts and
 the code that renders them are the checkout. On the other Mac you also need a
-clone of this repository and Python 3.11+, and Seedbed points at
-`~/Projects/seedbed` unless Settings → General → Choose says otherwise. That is
+clone of this repository and Python 3.11+, and a first load points at
+`~/Library/Application Support/Seedbed/Library` unless Settings → General →
+Choose says otherwise. A valid legacy `~/Projects/seedbed` checkout is still
+recognized. That is
 why `Packaging/dmg-readme.txt` rides along inside the image as *Before you start*.
 
 Guards worth knowing about before the first run, all of them ported from
