@@ -36,6 +36,43 @@ fi
 
 APP="build/Seedbed.app"
 
+# Crashbox and hosted Sentry both accept Sentry envelopes, so the SDK does not
+# choose the provider. Packaging does, exactly once. A configured reporting
+# build must come from a clean, exact commit; version/build is not enough to
+# identify the source or its dSYM later.
+#
+# A notarized build needs the same thing for a second, independent reason: it is
+# the artifact that leaves this Mac and outlives the tree that made it, and the
+# estate rule it must satisfy — link the exact live distribution to its source
+# revision — applies whether or not the build could report anything. Requiring
+# it only for reporting builds left the DMG built without a DSN as the one
+# artifact nobody could interrogate later.
+#
+# A caller who supplies SEEDBED_BUILD_REF is asking for a revision to be
+# recorded, so it is checked on the same terms whatever else is set. Without
+# that third clause an ordinary dev build with the variable exported skipped
+# every check here and still got a stamp — which is how a bundle came to name
+# a commit while containing uncommitted work.
+REPORTING_PROVIDER="$(Scripts/configure-crash-reporting.sh --provider-only)"
+if [[ "$REPORTING_PROVIDER" != "none" || -n "${NOTARY_PROFILE:-}" \
+      || -n "${SEEDBED_BUILD_REF:-}" ]]; then
+    if [[ -n "$(git status --porcelain --untracked-files=normal)" ]]; then
+        # A stamp from an uncommitted tree names a revision the build was not
+        # made from: authoritative-looking and false, and the next person to
+        # read it has no way to tell. Refused rather than warned about, because
+        # the artifact it produces is indistinguishable from a good one.
+        echo "error: refusing a distributable build from uncommitted source" >&2
+        echo "       The recorded revision would name source this build does not contain." >&2
+        exit 1
+    fi
+    SEEDBED_BUILD_REF="${SEEDBED_BUILD_REF:-$(git rev-parse HEAD)}"
+    if [[ ! "$SEEDBED_BUILD_REF" =~ ^[0-9a-f]{40}$ ]]; then
+        echo "error: a distributable build requires an exact 40-character source commit" >&2
+        exit 1
+    fi
+    export SEEDBED_BUILD_REF
+fi
+
 # The signing identity is discovered, never written down. A Team ID in a tracked
 # file is an identifier that follows the repo wherever it goes, and this one is
 # meant to be publishable. Exactly one Developer ID Application identity is used silently,
@@ -106,19 +143,30 @@ cp ../assets/brand/Seedbed.icns "$APP/Contents/Resources/Seedbed.icns"
 cp ../assets/brand/seedbed-menu-template.png "$APP/Contents/Resources/SeedbedMenuBar.png"
 cp ../assets/brand/seedbed-menu-template@2x.png "$APP/Contents/Resources/SeedbedMenuBar@2x.png"
 
-# Inject the Sentry DSN into the BUNDLE's Info.plist from a gitignored source.
-# The tracked Packaging/Info.plist keeps SentryDSN empty, so the DSN is never
-# committed and a build without a source cannot report at all — which is the
-# right state for every copy built on the machine it runs on.
-SENTRY_DSN_VALUE="${SEEDBED_SENTRY_DSN:-}"
-if [[ -z "$SENTRY_DSN_VALUE" && -f Packaging/sentry-dsn.local ]]; then
-    SENTRY_DSN_VALUE="$(tr -d ' \t\r\n' < Packaging/sentry-dsn.local)"
-fi
-if [[ -n "$SENTRY_DSN_VALUE" ]]; then
-    /usr/libexec/PlistBuddy -c "Set :SentryDSN $SENTRY_DSN_VALUE" "$APP/Contents/Info.plist"
-    echo "==> Injected Sentry DSN into the bundle (reporting still needs the user's opt-in)"
-else
-    echo "==> No Sentry DSN: this build cannot report crashes, whatever the toggle says"
+# Inject one provider without ever printing its DSN. The helper refuses a build
+# with both Crashbox and hosted-Sentry inputs, so rollback is a rebuild/swap and
+# can never accidentally become dual-send.
+Scripts/configure-crash-reporting.sh "$APP"
+
+# Re-assert the identity by reading the BUILT bundle back.
+#
+# Everything above consults the working tree, and the working tree is the one
+# witness that cannot testify about the artifact. The injection is a PlistBuddy
+# write into a copied file; if it silently does not happen the app looks
+# identical and carries an empty key, which is exactly the failure the DSN check
+# downstream exists to catch. This asks the bundle what it actually says, and it
+# is the only claim here that survives being handed to someone else.
+if [[ -n "${SEEDBED_BUILD_REF:-}" ]]; then
+    BAKED_RELEASE="$(/usr/libexec/PlistBuddy -c 'Print :CrashReportingRelease' \
+        "$APP/Contents/Info.plist" 2>/dev/null || true)"
+    if [[ "$BAKED_RELEASE" != "net.amnesia.seedbed@$SEEDBED_BUILD_REF" ]]; then
+        echo "error: the built bundle records its release as '${BAKED_RELEASE:-<empty>}'," >&2
+        echo "       not net.amnesia.seedbed@$SEEDBED_BUILD_REF. The injection did not" >&2
+        echo "       take, so this artifact could not be mapped back to a revision once" >&2
+        echo "       it is on someone else's Mac." >&2
+        exit 1
+    fi
+    echo "==> Identity verified from the bundle: $BAKED_RELEASE"
 fi
 
 # Bundle Sparkle.framework, which the app links and needs at runtime. The rpath

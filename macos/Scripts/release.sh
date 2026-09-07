@@ -213,9 +213,10 @@ fi
 #     them. Shipping reporting without dSYMs gets you stack traces with no
 #     function names or line numbers, which is most of the way to no reports at
 #     all — and the discovery happens months later, on the crash you needed.
+REPORTING_PROVIDER="$(Scripts/configure-crash-reporting.sh --provider-only)"
 HAS_DSN=0
-[[ -n "${SEEDBED_SENTRY_DSN:-}" || -f Packaging/sentry-dsn.local ]] && HAS_DSN=1
-if [[ -z "${SENTRY_AUTH_TOKEN:-}" ]]; then
+[[ "$REPORTING_PROVIDER" != "none" ]] && HAS_DSN=1
+if [[ "$REPORTING_PROVIDER" == "hosted-sentry" && -z "${SENTRY_AUTH_TOKEN:-}" ]]; then
     SENTRY_AUTH_TOKEN="$(security find-generic-password -s sentry-release-token -w 2>/dev/null || true)"
     export SENTRY_AUTH_TOKEN
 fi
@@ -227,7 +228,7 @@ SENTRY_ORG="${SENTRY_ORG:-}"
 if [[ -z "$SENTRY_ORG" && -f Packaging/sentry-org.local ]]; then
     SENTRY_ORG="$(tr -d ' \t\r\n' < Packaging/sentry-org.local)"
 fi
-if [[ "$HAS_DSN" == "1" && ( -z "${SENTRY_AUTH_TOKEN:-}" || -z "$(command -v sentry-cli)" || -z "$SENTRY_ORG" ) ]]; then
+if [[ "$REPORTING_PROVIDER" == "hosted-sentry" && ( -z "${SENTRY_AUTH_TOKEN:-}" || -z "$(command -v sentry-cli)" || -z "$SENTRY_ORG" ) ]]; then
     if [[ "${ALLOW_NO_SYMBOLS:-}" != "1" ]]; then
         cat >&2 <<'MSG'
 error: this build carries a Sentry DSN but cannot upload debug symbols, so its
@@ -247,6 +248,15 @@ MSG
         exit 1
     fi
     echo "WARNING: ALLOW_NO_SYMBOLS=1 — shipping without symbolicated crash reports" >&2
+fi
+if [[ "$REPORTING_PROVIDER" == "crashbox" ]]; then
+    cat >&2 <<'MSG'
+error: the public release script cannot publish a Crashbox build by itself.
+       Its dSYM must first be uploaded through the private, project-scoped
+       Crashbox artifact path and verified by UUID. Use the estate release
+       procedure; never bypass this gate or put an upload credential here.
+MSG
+    exit 1
 fi
 
 # 0g. Run the artifact-independent half of the gate NOW, before the build. A red
@@ -268,7 +278,7 @@ IDENTITY="$IDENTITY" NOTARY_PROFILE="$NOTARY_PROFILE" ./Scripts/make-app.sh
 #    Deliberately the .app plus the release dSYM, and NOT all of .build, which
 #    also holds sentry-cocoa's iOS, watchOS, tvOS and simulator slices. Those
 #    cannot be crashed in by a macOS app; they only burn upload time and quota.
-if [[ "$HAS_DSN" == "1" && -n "${SENTRY_AUTH_TOKEN:-}" ]] && command -v sentry-cli >/dev/null 2>&1; then
+if [[ "$REPORTING_PROVIDER" == "hosted-sentry" && -n "${SENTRY_AUTH_TOKEN:-}" ]] && command -v sentry-cli >/dev/null 2>&1; then
     echo "==> Uploading debug symbols to Sentry"
     UPLOAD_PATHS=("$APP")
     # Same flags make-app.sh used, or this resolves a different build directory
@@ -278,7 +288,7 @@ if [[ "$HAS_DSN" == "1" && -n "${SENTRY_AUTH_TOKEN:-}" ]] && command -v sentry-c
     sentry-cli debug-files upload \
         --org "$SENTRY_ORG" \
         --project "${SENTRY_PROJECT:-seedbed}" "${UPLOAD_PATHS[@]}" 2>&1 | tail -3 \
-        || echo "    symbol upload failed (non-fatal)"
+        || { echo "error: hosted-Sentry symbol upload failed" >&2; exit 1; }
 fi
 
 # 3. Stage and build the DMG: the app, a drop target, and the two things the

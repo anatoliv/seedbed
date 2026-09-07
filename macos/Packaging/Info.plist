@@ -46,7 +46,13 @@
 	<string>https://seedbed.dev/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>pDgN5Ibe6Q9QY5cxRpXmXLm/S2lBGbVLy/eBVEW1nTo=</string>
-	<key>SentryDSN</key>
+	<key>CrashReportingDSN</key>
+	<string></string>
+	<key>CrashReportingProvider</key>
+	<string></string>
+	<key>CrashReportingRelease</key>
+	<string></string>
+	<key>CrashReportingEnvironment</key>
 	<string></string>
 </dict>
 </plist>

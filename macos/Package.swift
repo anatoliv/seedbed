@@ -33,6 +33,7 @@ let package = Package(
                 // bundle, which is the only place it is ever run.
                 .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])
             ]
-        )
+        ),
+        .testTarget(name: "SeedbedTests", dependencies: ["Seedbed"])
     ]
 )

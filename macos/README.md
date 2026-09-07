@@ -297,7 +297,7 @@ Reference after they earned their place there:
 - **Notarization runs under an outer 15-minute wall clock, three attempts.**
   `notarytool --timeout` covers the wait for Apple's verdict and not the upload,
   and the upload is the half that hangs, so that flag never fires.
-- **A build carrying a Sentry DSN refuses to package without a symbol upload**
+- **A hosted-Sentry build refuses to package without a symbol upload**
   (`ALLOW_NO_SYMBOLS=1` to override). Crash reports with no function names or
   line numbers are most of the way to no crash reports at all, and you find out
   months later on the one that mattered.
@@ -356,11 +356,14 @@ same is true of a key rotation, for the same reason.
 
 Off. Two gates have to be open before anything leaves the Mac: the user turns
 **Settings → General → Diagnostics → Send crash reports** on, *and* the build
-carries a DSN. The tracked `Packaging/Info.plist` keeps `SentryDSN` empty;
-`make-app.sh` writes the real one into the bundle's copy from
-`Packaging/sentry-dsn.local` (gitignored, `*.local`) or `$SEEDBED_SENTRY_DSN`.
-So every locally built copy is incapable of reporting regardless of the toggle,
-and the toggle is disabled in Settings with a line saying why.
+carries one complete reporting configuration. The tracked `Packaging/Info.plist`
+keeps its reporting fields empty. `make-app.sh` chooses either Crashbox from
+`Packaging/crashbox-dsn.local` / `$SEEDBED_CRASHBOX_DSN`, or the hosted-Sentry
+rollback from `Packaging/sentry-dsn.local` / `$SEEDBED_SENTRY_DSN`. It refuses
+both together. A reporting build also refuses uncommitted source and records
+`net.amnesia.seedbed@<full-40-character-commit>` plus an explicit environment.
+Every ordinary local build is therefore incapable of reporting regardless of
+the toggle, and Settings says so.
 
 What is sent is the stack trace, the app version and the macOS version. What is
 never sent is the library: prompts, renders and filled-in values are the whole
@@ -371,6 +374,14 @@ replaced — that is the shape of an MCP bearer token, and a leaked one can spen
 LLM calls. `LibraryError.commandFailed` carries `promptlib` stderr, which can
 quote a prompt, and is deliberately shown to the user and never captured.
 
-`SEEDBED_TEST_SENTRY=1 build/Seedbed.app/Contents/MacOS/Seedbed` sends one event
-and exits, so the wiring can be checked against the real project rather than
-inferred from it having compiled.
+`SEEDBED_TEST_CRASH_REPORTING=1 build/Seedbed.app/Contents/MacOS/Seedbed` sends
+one event, prints its event id, selected provider, immutable release and flush
+completion, then exits. The operator must query that exact id in the durable
+store; flush completion proves only that the SDK drained its queue, not acceptance.
+
+The public release script continues to own hosted-Sentry dSYM upload. A Crashbox
+pilot uses the estate's private, project-scoped artifact procedure before the
+signed build is distributed; the public script fails closed rather than embed
+an upload credential or ship an unsymbolicated Crashbox build. Rollback removes
+the Crashbox input, restores the protected hosted-Sentry input, and rebuilds the
+exact retained source. Test that fallback before cutover; never dual-send.

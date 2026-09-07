@@ -139,9 +139,10 @@ app. Neither path updates the prompt library itself; that remains a git checkout
 you update with `git pull`.
 
 Crash reporting exists for builds that leave this machine, and is off twice
-over: the user has to opt in, *and* the build has to carry a DSN, which no
-locally built copy does. Prompts, renders and filled-in values are never
-captured. `macos/README.md` has the details.
+over: the user has to opt in, *and* the build has to carry exactly one reporting
+DSN, which no locally built copy does. A release can target the private Crashbox
+service or the retained hosted-Sentry fallback, never both. Prompts, renders and
+filled-in values are never captured. `macos/README.md` has the details.
 
 ## The web UI
 

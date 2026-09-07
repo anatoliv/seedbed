@@ -1,5 +1,5 @@
-Copy this file to sentry-dsn.local (gitignored) and put your Sentry DSN in it,
-on one line, if you want a build you distribute to be able to report crashes.
+Copy this file to sentry-dsn.local (gitignored) and put the hosted-Sentry
+fallback DSN in it, on one line, for a rollback build.
 
     https://<key>@o<org>.ingest.sentry.io/<project>
 
@@ -8,7 +8,7 @@ and they are all deliberate: `.gitignore` excludes `*.local`, the publish script
 excludes the same pattern from the snapshot, and its secrets guard matches a DSN
 by shape as a backstop.
 
-Without this file the packaged app carries an empty SentryDSN, and crash
-reporting cannot be switched on however the toggle is set. That is the correct
-state for a build made from a public checkout, and it is what the About page and
-Settings both say.
+Packaging refuses to continue if crashbox-dsn.local is also populated, so a
+release has exactly one destination and never dual-sends. Without either file
+the packaged app carries an empty reporting address, and crash reporting cannot
+be switched on however the toggle is set.

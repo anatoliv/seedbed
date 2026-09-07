@@ -92,11 +92,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // copy. See CrashReporting.
         CrashReporting.start()
 
-        // Sends one event and exits, so the wiring can be checked against the
-        // real Sentry project instead of inferred from it having compiled.
-        if ProcessInfo.processInfo.environment["SEEDBED_TEST_SENTRY"] == "1" {
-            CrashReporting.captureTestEvent()
-            NSApp.terminate(nil)
+        // Sends one event and exits, so the selected provider can be checked
+        // end to end instead of inferred from a successful build.
+        if ProcessInfo.processInfo.environment["SEEDBED_TEST_CRASH_REPORTING"] == "1" {
+            CrashReporting.captureTestEvent { NSApp.terminate(nil) }
             return
         }
 

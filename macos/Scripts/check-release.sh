@@ -150,6 +150,46 @@ if [[ -n "$NEWEST_SOURCE" ]]; then
     exit 1
 fi
 
+# The bundle must say which revision built it, and it must be the revision this
+# gate is looking at. Read from the BUILT bundle rather than from the tree: the
+# tree cannot testify about the artifact, and the whole value of the record is
+# that it survives being handed to a stranger.
+#
+# Checked for EVERY release, not only a reporting one. The block below verifies
+# the reporting fields when a provider is configured; identity is a property of
+# the artifact rather than of crash reporting, and the DMG built without a DSN
+# is precisely the one nobody can interrogate later.
+#
+# Everything shipped before this record existed is attributable only from
+# outside — the tag names a commit and the cask commit records the sha256 of the
+# bytes that were served. That chain is real, resolves only against the private
+# repository, and is attestation by bookkeeping: it trusts those records were
+# honest when written and breaks silently if a DMG is rebuilt and re-uploaded
+# without touching the cask. This makes the artifact answer for itself.
+#
+# Note what it CANNOT do, so nothing downstream leans on it: a commit is not a
+# freshness check. An unrebuilt tree carries a perfectly truthful HEAD, so this
+# says which revision was claimed and never whether the binary was rebuilt from
+# it. The staleness check above covers that and is deliberately left
+# unconditional — a bundle predating this record must not start passing a check
+# it was previously subject to.
+BUNDLE_RELEASE="$(/usr/libexec/PlistBuddy -c 'Print :CrashReportingRelease' \
+    "$APP/Contents/Info.plist" 2>/dev/null || true)"
+if [[ ! "$BUNDLE_RELEASE" =~ ^net\.amnesia\.seedbed@[0-9a-f]{40}$ ]]; then
+    echo "error: the bundle's CrashReportingRelease is '${BUNDLE_RELEASE:-<empty>}', not" >&2
+    echo "       net.amnesia.seedbed@<40-character lowercase hex>. This artifact could" >&2
+    echo "       not be traced back to source once it is on someone else's Mac." >&2
+    echo "       Scripts/make-app.sh records it; 'swift build' alone does not." >&2
+    exit 1
+fi
+HEAD_COMMIT="$(git rev-parse HEAD 2>/dev/null || true)"
+if [[ -n "$HEAD_COMMIT" && "$BUNDLE_RELEASE" != "net.amnesia.seedbed@$HEAD_COMMIT" ]]; then
+    echo "error: the bundle records ${BUNDLE_RELEASE#*@} but HEAD is $HEAD_COMMIT." >&2
+    echo "       Rebuild, or you will publish an artifact whose recorded origin is" >&2
+    echo "       not the source you are about to tag." >&2
+    exit 1
+fi
+
 # Notarization is the whole point of the exercise: without a stapled ticket on
 # the .app itself, the copy dragged out of the image has to reach Apple to be
 # verified, and fails on a Mac that is offline or behind a filter.
@@ -171,11 +211,21 @@ fi
 # PlistBuddy write into a copied file, and if it silently does not happen the
 # build looks identical, ships, reports nothing, and the first anyone knows is a
 # crash nobody hears about.
-if [[ -n "${SEEDBED_SENTRY_DSN:-}" || -f Packaging/sentry-dsn.local ]]; then
-    BUNDLED_DSN="$(/usr/libexec/PlistBuddy -c 'Print :SentryDSN' "$APP/Contents/Info.plist" 2>/dev/null || true)"
+REPORTING_PROVIDER="$(Scripts/configure-crash-reporting.sh --provider-only)"
+if [[ "$REPORTING_PROVIDER" != "none" ]]; then
+    BUNDLED_DSN="$(/usr/libexec/PlistBuddy -c 'Print :CrashReportingDSN' "$APP/Contents/Info.plist" 2>/dev/null || true)"
+    BUNDLED_PROVIDER="$(/usr/libexec/PlistBuddy -c 'Print :CrashReportingProvider' "$APP/Contents/Info.plist" 2>/dev/null || true)"
+    BUNDLED_RELEASE="$(/usr/libexec/PlistBuddy -c 'Print :CrashReportingRelease' "$APP/Contents/Info.plist" 2>/dev/null || true)"
+    BUNDLED_ENVIRONMENT="$(/usr/libexec/PlistBuddy -c 'Print :CrashReportingEnvironment' "$APP/Contents/Info.plist" 2>/dev/null || true)"
+    EXPECTED_RELEASE="net.amnesia.seedbed@$(git rev-parse HEAD)"
     if [[ -z "$BUNDLED_DSN" ]]; then
-        echo "error: a Sentry DSN is configured but the bundle's SentryDSN is empty." >&2
+        echo "error: a reporting DSN is configured but the bundle's CrashReportingDSN is empty." >&2
         echo "       This build cannot report crashes however anyone sets the toggle." >&2
+        exit 1
+    fi
+    if [[ "$BUNDLED_PROVIDER" != "$REPORTING_PROVIDER" || "$BUNDLED_RELEASE" != "$EXPECTED_RELEASE" \
+          || "$BUNDLED_ENVIRONMENT" != "${SEEDBED_ERROR_ENVIRONMENT:-production}" ]]; then
+        echo "error: the bundle's reporting provider/release/environment does not match this build." >&2
         exit 1
     fi
 fi

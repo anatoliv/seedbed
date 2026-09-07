@@ -1,0 +1,13 @@
+Copy this file to crashbox-dsn.local (gitignored) and put the dedicated
+Seedbed Crashbox DSN in it, on one line, for a distributed pilot build.
+
+    https://<public-key>@<crashbox-host>/<project-uuid>
+
+Never commit the real file. Packaging refuses to continue if this file and the
+hosted-Sentry fallback file are both populated, so a release has exactly one
+destination and never dual-sends.
+
+Without either local file the packaged app carries an empty reporting address
+and cannot send anything regardless of the user preference. Roll back by
+removing this file, restoring sentry-dsn.local, rebuilding the exact prior
+source commit, and repeating the same one-event proof before distribution.
