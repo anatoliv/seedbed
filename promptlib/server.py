@@ -108,6 +108,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, (BRAND / "apple-touch-icon.png").read_bytes(), "image/png")
         elif url.path == "/seedbed-mark.svg":
             self._send(200, (BRAND / "seedbed-mark.svg").read_bytes(), "image/svg+xml")
+        elif url.path == "/fonts/InterVariable.ttf":
+            self._send(200, (WEB / "fonts" / "InterVariable.ttf").read_bytes(), "font/ttf")
+        elif url.path == "/fonts/JetBrainsMono.ttf":
+            self._send(200, (WEB / "fonts" / "JetBrainsMono.ttf").read_bytes(), "font/ttf")
         elif url.path == "/api/library":
             try:
                 self._json(self.state.library_view())

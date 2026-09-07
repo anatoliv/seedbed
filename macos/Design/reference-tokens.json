@@ -1,0 +1,72 @@
+{
+  "ChipPadding": {"h": "6", "v": "2"},
+  "Elevation": {
+    "panel": "(color: Color.black.opacity(0.25), radius: 18.0, y: 6.0)",
+    "popover": "(color: Color.black.opacity(0.16), radius: 9.0, y: 3.0)"
+  },
+  "Fill": {
+    "active": "Color.referenceAccent.opacity(0.10)",
+    "dropTarget": "Color.referenceAccent.opacity(0.22)",
+    "selected": "Color.referenceAccent.opacity(0.16)",
+    "selectedBorder": "Color.referenceAccent.opacity(0.55)"
+  },
+  "FontScale": {
+    "body": "sans(size: 13)",
+    "display": "rounded(size: 32, weight: .semibold)",
+    "label": "sans(size: 14)",
+    "micro": "sans(size: 10)",
+    "monoSmall": "mono(size: 12)",
+    "monoTiny": "mono(size: 11)",
+    "nano": "sans(size: 9)",
+    "sectionHeader": "sans(size: 18, weight: .semibold)",
+    "small": "sans(size: 12)",
+    "subtitle": "sans(size: 16)",
+    "tiny": "sans(size: 11)",
+    "title": "sans(size: 21, weight: .semibold)",
+    "transcript": "sans(size: 15)",
+    "transcriptStrong": "sans(size: 15, weight: .medium)"
+  },
+  "IconSize": {
+    "compact": "12", "hero": "32", "large": "16", "medium": "13",
+    "mini": "8", "regular": "14", "small": "11", "tiny": "9", "xlarge": "22"
+  },
+  "Motion": {
+    "micro": "0.16", "microCurve": ".easeOut(duration: micro)",
+    "pane": "0.20", "paneCurve": ".easeOut(duration: pane)",
+    "pulse": "0.9", "pulseCurve": ".easeInOut(duration: pulse)",
+    "reducedCurve": ".easeInOut(duration: micro)",
+    "shell": "0.24", "shellCurve": ".spring(response: shell, dampingFraction: 0.86)",
+    "shimmer": "1.3", "stepCurve": ".spring(response: 0.34, dampingFraction: 0.85)"
+  },
+  "Radius": {"card": "6", "chip": "3", "control": "4", "sheet": "8"},
+  "Rounded": {
+    "nano": "rounded(size: 9, weight: .semibold)",
+    "numeral": "rounded(size: 24, weight: .bold)",
+    "small": "rounded(size: 12, weight: .semibold)"
+  },
+  "Space": {
+    "element": "14", "hero": "48", "medium": "10", "pane": "32",
+    "regular": "16", "row": "4", "row6": "6", "scene": "64",
+    "snug": "12", "tight": "8", "wide": "24"
+  },
+  "Surface": {
+    "canvas": "dynamic(light: 0xF7_F5_F3, dark: 0x0D_0E_11)",
+    "card": "dynamic(light: 0xFC_FB_FA, dark: 0x1C_1C_20)",
+    "chrome": "dynamic(light: 0xF1_EF_EA, dark: 0x17_17_1B)",
+    "hairline": "dynamic(light: 0xE2_DE_D8, dark: 0x33_33_39)",
+    "raised": "dynamic(light: 0xFF_FF_FF, dark: 0x2C_2C_31)",
+    "rowAlternate": "dynamic(light: 0xF0_EE_E9, dark: 0x14_15_1A)",
+    "sunken": "dynamic(light: 0xEF_ED_E8, dark: 0x08_08_0A)"
+  },
+  "Tokens": {
+    "accent": "Color(red: 0.78, green: 0.41, blue: 0.24)",
+    "aiAccent": "Surface.dynamic(light: 0xAD_74_D8, dark: 0xB8_7C_E6)",
+    "brandAccent": "Color(red: 0.949, green: 0.420, blue: 0.227)",
+    "danger": "Surface.dynamic(light: 0xA0_2F_3A, dark: 0xE8_62_6E)",
+    "positive": "Color(red: 0.40, green: 0.56, blue: 0.36)",
+    "searchHighlight": "Surface.dynamic(light: 0xF5_E0_8A, dark: 0x6B_5A_1E)",
+    "secondaryAccent": "Surface.dynamic(light: 0x4E_8F_DA, dark: 0x5C_A8_FF)",
+    "star": "Surface.dynamic(light: 0xC8_92_0A, dark: 0xF0_C0_4A)",
+    "warning": "Surface.dynamic(light: 0x96_74_1B, dark: 0xE0_A8_4A)"
+  }
+}

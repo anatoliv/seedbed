@@ -498,7 +498,7 @@ struct HUDView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             searchLine
-            Divider()
+            SeedbedDivider()
             if model.filtered.isEmpty {
                 Text(model.prompts.isEmpty ? "No prompts yet." : "No matches.")
                     .foregroundStyle(.secondary)
@@ -506,7 +506,7 @@ struct HUDView: View {
             } else {
                 list
             }
-            Divider()
+            SeedbedDivider()
             footer
         }
         .frame(minWidth: Tokens.Size.panel.width, minHeight: Tokens.Size.panel.height)
@@ -531,6 +531,8 @@ struct HUDView: View {
         // search line sits ~40pt below the top edge, which is the empty band
         // that made the panel look broken.
         .ignoresSafeArea(.container, edges: .top)
+        .background(.ultraThinMaterial)
+        .tint(Tokens.accent)
         .background(KeyCatcher(model: model).frame(width: 0, height: 0))
     }
 
@@ -542,8 +544,9 @@ struct HUDView: View {
     }
 
     private var searchLine: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.system(size: Tokens.CompactSize.rowText))
+        HStack(spacing: Tokens.Space.tight) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                .font(.system(size: Tokens.IconSize.compact))
             // The caret is part of the query, not a sibling of it: at the outer
             // spacing it floated a word-width away from the last letter typed.
             HStack(spacing: 1) {
@@ -551,11 +554,11 @@ struct HUDView: View {
                     .foregroundStyle(model.query.isEmpty ? .secondary : .primary)
                 Rectangle().fill(Tokens.accent.opacity(0.8)).frame(width: 1.5, height: 14)
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: Tokens.Space.tight)
             Button { model.cycleSort() } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "arrow.up.arrow.down").font(.system(size: Tokens.CompactSize.badge))
-                    Text(model.sort.label).font(.system(size: Tokens.CompactSize.label))
+                HStack(spacing: Tokens.Space.row) {
+                    Image(systemName: "arrow.up.arrow.down").font(.system(size: Tokens.IconSize.tiny))
+                    Text(model.sort.label).font(Tokens.FontScale.micro)
                 }
                 .foregroundStyle(.secondary)
             }
@@ -563,7 +566,7 @@ struct HUDView: View {
             .help("Sort order (⌘S)")
             Button { model.onClose() } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: Tokens.CompactSize.rowText)).foregroundStyle(.tertiary)
+                    .font(.system(size: Tokens.IconSize.compact)).foregroundStyle(.tertiary)
             }
             .buttonStyle(.plain)
             .help("Close (esc)")
@@ -574,7 +577,7 @@ struct HUDView: View {
     private var list: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: Tokens.ChipPadding.v) {
                     ForEach(Array(model.filtered.enumerated()), id: \.element.id) { index, prompt in
                         PromptRow(model: model, prompt: prompt, selected: index == model.selection)
                             .id(prompt.id)
@@ -582,7 +585,8 @@ struct HUDView: View {
                             .onTapGesture { model.selection = index }
                     }
                 }
-                .padding(.top, 6).padding(.bottom, 10)
+                .padding(.top, Tokens.Space.row6)
+                .padding(.bottom, Tokens.Space.medium)
             }
             .onChange(of: model.selection) { _, new in
                 let list = model.filtered
@@ -593,29 +597,32 @@ struct HUDView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: Tokens.Space.medium) {
             if model.status.isEmpty {
                 hint("↑↓", "move"); hint("⏎", "copy"); hint("⌘1–9", "model")
                 hint("⌘D", "pin"); hint("⌘L", "library"); hint("esc", "close")
             } else {
                 Text(model.status)
-                    .font(.system(size: Tokens.CompactSize.meta, weight: model.statusIsGood ? .medium : .regular))
-                    .foregroundStyle(model.statusIsError ? Color.red
-                                     : model.statusIsGood ? Color.green : Color.secondary)
+                    .font(Tokens.FontScale.tiny.weight(model.statusIsGood ? .medium : .regular))
+                    .foregroundStyle(model.statusIsError ? Tokens.danger
+                                     : model.statusIsGood ? Tokens.positive : Color.secondary)
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 4)
+            Spacer(minLength: Tokens.Space.row)
             if model.busy { ProgressView().controlSize(.small) }
         }
         .chromeBar()
     }
 
     private func hint(_ key: String, _ label: String) -> some View {
-        HStack(spacing: 3) {
-            Text(key).font(.system(size: Tokens.CompactSize.badge, design: .monospaced))
-                .padding(.horizontal, 4).padding(.vertical, 1)
-                .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(Color.secondary.opacity(0.15)))
-            Text(label).font(.system(size: Tokens.CompactSize.label)).foregroundStyle(.secondary)
+        HStack(spacing: Tokens.Space.row) {
+            Text(key).font(Tokens.FontScale.monoTiny)
+                .padding(.horizontal, Tokens.ChipPadding.h)
+                .padding(.vertical, Tokens.ChipPadding.v)
+                .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip).fill(Tokens.Surface.sunken))
+                .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.chip)
+                    .stroke(Tokens.Surface.hairline, lineWidth: 0.5))
+            Text(label).font(Tokens.FontScale.micro).foregroundStyle(.secondary)
         }
     }
 }
@@ -624,7 +631,7 @@ struct HUDView: View {
 ///
 /// A view rather than a `func row(...)` on HUDView because it needs `@State` for
 /// the hover, which a function returning a view cannot hold. Same shape as
-/// Reference's `HistoryRow`: the trailing slot carries the usage badge at rest
+/// Reference-style dense row: the trailing slot carries the usage badge at rest
 /// and the action strip while the pointer is over the row.
 ///
 /// The buttons act on THIS prompt and deliberately leave the selection where it
@@ -636,29 +643,30 @@ struct PromptRow: View {
     @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 5) {
+        VStack(alignment: .leading, spacing: Tokens.Space.row) {
+            HStack(spacing: Tokens.Space.row6) {
                 if prompt.pinned {
                     Image(systemName: "pin.fill")
-                        .font(.system(size: Tokens.CompactSize.badge)).foregroundStyle(Tokens.accent)
+                        .font(.system(size: Tokens.IconSize.tiny)).foregroundStyle(Tokens.accent)
                 }
-                Text(prompt.title).font(.system(size: Tokens.CompactSize.rowTitle, weight: .medium)).lineLimit(1)
-                Spacer(minLength: 4)
+                Text(prompt.title).font(Tokens.FontScale.body.weight(.medium)).lineLimit(1)
+                Spacer(minLength: Tokens.Space.row)
                 if hovering {
                     actions
                 } else if prompt.uses > 0 {
-                    Text("\(prompt.uses)×").font(.system(size: Tokens.CompactSize.badge)).foregroundStyle(.tertiary)
+                    Text("\(prompt.uses)×").font(Tokens.FontScale.nano).foregroundStyle(.tertiary)
                 }
             }
-            Text(prompt.body).font(.system(size: Tokens.CompactSize.meta)).foregroundStyle(.secondary).lineLimit(1)
+            Text(prompt.body).font(Tokens.FontScale.tiny).foregroundStyle(.secondary).lineLimit(1)
             if selected { chips }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12).padding(.vertical, 7)
-        .background(selected ? Tokens.accent.opacity(0.20)
+        .padding(.horizontal, Tokens.Space.snug)
+        .padding(.vertical, Tokens.Space.tight)
+        .background(selected ? Tokens.Fill.selected
                     : hovering ? Color.secondary.opacity(0.07) : .clear)
         .cornerRadius(Tokens.Radius.card)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, Tokens.Space.row6)
         .onHover { hovering = $0 }
     }
 
@@ -682,29 +690,31 @@ struct PromptRow: View {
     /// narrow enough for wrapping to work.
     private var chips: some View {
         LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 116), spacing: 5, alignment: .leading)],
-            alignment: .leading, spacing: 4
+            columns: [GridItem(.adaptive(minimum: 116), spacing: Tokens.Space.row6,
+                               alignment: .leading)],
+            alignment: .leading, spacing: Tokens.Space.row
         ) {
             ForEach(Array(prompt.targets.enumerated()), id: \.element.id) { index, target in
                 chip(target, shortcut: index + 1, favourite: target.model == prompt.favouriteModel)
             }
         }
-        .padding(.top, 3)
+        .padding(.top, Tokens.Space.row)
     }
 
     private func chip(_ target: Target, shortcut: Int, favourite: Bool) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Tokens.Space.row) {
             if shortcut <= 9 {
-                Text("⌘\(shortcut)").font(.system(size: Tokens.CompactSize.badge, design: .monospaced))
+                Text("⌘\(shortcut)").font(Tokens.FontScale.monoTiny)
                     .foregroundStyle(.secondary)
             }
             Circle().fill(target.dotColor).frame(width: 5, height: 5)
             Text(target.shortName)
-                .font(.system(size: Tokens.CompactSize.label, weight: favourite ? .semibold : .regular))
+                .font(Tokens.FontScale.micro.weight(favourite ? .semibold : .regular))
                 .lineLimit(1)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 6).padding(.vertical, 3)
+        .padding(.horizontal, Tokens.ChipPadding.h)
+        .padding(.vertical, Tokens.ChipPadding.v)
         .background(Capsule().fill(Color.secondary.opacity(target.isUsable ? 0.14 : 0.06)))
         .opacity(target.isUsable ? 1 : 0.7)
         .help("\(target.name): \(target.label). ⌘\(shortcut) copies, ⌥⌘\(shortcut) rebuilds.")

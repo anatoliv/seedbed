@@ -5,10 +5,9 @@ import SwiftUI
 /// **Why this exists beside `Manual`.** The manual is a glossary — a term and a
 /// sentence, forty of them, which is the right shape for "what does staleness
 /// mean" and the wrong shape for "how do I get a prompt out of this thing". Put
-/// Seedbed's Help beside Reference's and the difference is not the type size:
-/// Reference lists fifty-three subjects in its sidebar and gives each one a
-/// page, so a reader browses to what they want. Seedbed offered five pages, one
-/// of which was a table of key caps.
+/// Seedbed's Help follows Reference's browsable two-pane information architecture:
+/// each subject gets a page, so a reader browses to what they want. Seedbed once
+/// offered five pages, one of which was a table of key caps.
 ///
 /// A guide page is what the sidebar lists. The glossary stays, because a
 /// definition someone can scan is worth having and search reads both.
@@ -103,16 +102,16 @@ struct GuideMarkdown: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Tokens.Space.group + 3) {
+        VStack(alignment: .leading, spacing: Tokens.Space.element) {
             ForEach(blocks) { block in
                 switch block {
                 case .paragraph(let text):
                     styled(text)
                 case .bullets(let items):
-                    VStack(alignment: .leading, spacing: Tokens.Space.group - 2) {
+                    VStack(alignment: .leading, spacing: Tokens.Space.tight) {
                         ForEach(items, id: \.self) { item in
-                            HStack(alignment: .top, spacing: Tokens.Space.control) {
-                                Text("•").font(.system(size: scale.body))
+                            HStack(alignment: .top, spacing: Tokens.Space.tight) {
+                                Text("•").font(scale.body)
                                     .foregroundStyle(.secondary)
                                 styled(item)
                             }
@@ -130,7 +129,7 @@ struct GuideMarkdown: View {
     /// cannot parse falls back to the literal text rather than disappearing.
     private func styled(_ text: String) -> some View {
         Text((try? AttributedString(markdown: text)) ?? AttributedString(text))
-            .font(.system(size: scale.body))
+            .font(scale.body)
             .lineSpacing(3)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -216,8 +215,8 @@ extension Guide {
                   body: """
         Each row shows a small chip per model the prompt targets, with a coloured dot:
 
-        - **Green** means the render is current.
-        - **Orange** means it is stale: the seed, the vendor guidance, or the context changed after it was built.
+        - **Moss** means the render is current.
+        - **Amber** means it is stale: the seed, the vendor guidance, or the context changed after it was built.
         - **Grey** means it has never been built.
 
         **⌘1** through **⌘9** copy the version for the chip in that position, counting only the models you have chosen to show. **⇧⌘1–9** copies without pasting.

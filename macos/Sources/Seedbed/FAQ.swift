@@ -12,11 +12,6 @@ import SwiftUI
 /// the ones that have one.
 struct FAQPage: View {
     var body: some View {
-        ForEach(Manual.sections(on: .faq)) { section in
-            SectionHeader(section.title)
-            VStack(alignment: .leading, spacing: Tokens.Space.group) {
-                ForEach(section.topics) { ManualTopicView(topic: $0) }
-            }
-        }
+        ManualPage(page: .faq)
     }
 }

@@ -75,17 +75,17 @@ struct MCPSettings: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            Divider()
+            SeedbedDivider()
             ScrollView {
-                VStack(alignment: .leading, spacing: Tokens.Space.section) {
+                VStack(alignment: .leading, spacing: Tokens.Space.regular) {
                     intro
                     serverSection
                     tokenSection
                     configSection
                 }
-                .padding(Tokens.Space.page)
+                .padding(Tokens.Space.pane)
             }
-            Divider()
+            SeedbedDivider()
             footer
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -126,15 +126,15 @@ struct MCPSettings: View {
             Spacer()
             if let onDone { Button("Done", action: onDone).keyboardShortcut(.defaultAction) }
         }
-        .padding(.horizontal, Tokens.Space.page).padding(.vertical, 12)
+        .padding(.horizontal, Tokens.Space.pane).padding(.vertical, Tokens.Space.snug)
     }
 
     private var intro: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: Tokens.Space.tight) {
             Image(systemName: "info.circle.fill").foregroundStyle(Tokens.accent)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Tokens.Space.row) {
                 Text("Let an agent ask for a prompt")
-                    .font(Tokens.FontScale.bodyStrong)
+                    .font(Tokens.FontScale.body.weight(.medium))
                 Text("Claude Code, Cursor and Claude Desktop can search this library by "
                      + "description and read a prompt's tailored version, instead of you "
                      + "copying one out of the panel. The server binds to this Mac only, "
@@ -150,7 +150,7 @@ struct MCPSettings: View {
         section("Server") {
             Toggle("Run the MCP server", isOn: $enabled)
                 .onChange(of: enabled) { _, _ in onChange() }
-            HStack(spacing: 8) {
+            HStack(spacing: Tokens.Space.tight) {
                 Text("Port").font(Tokens.FontScale.body)
                 TextField("Port", value: $port, format: .number.grouping(.never))
                     .frame(width: 80).multilineTextAlignment(.trailing)
@@ -162,14 +162,14 @@ struct MCPSettings: View {
     }
 
     private var statusRow: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Tokens.Space.row6) {
             Circle()
                 .fill(server.isRunning ? Tokens.positive : Color.secondary.opacity(0.5))
                 .frame(width: 7, height: 7)
             if server.isRunning {
                 Text("Running at \(url)").font(Tokens.FontScale.small)
             } else if let error = server.lastError {
-                Text(error).font(Tokens.FontScale.small).foregroundStyle(.red)
+                Text(error).font(Tokens.FontScale.small).foregroundStyle(Tokens.danger)
             } else {
                 Text("Not running").font(Tokens.FontScale.small)
                     .foregroundStyle(.secondary)
@@ -179,10 +179,10 @@ struct MCPSettings: View {
     }
 
     private var tokenSection: some View {
-        VStack(alignment: .leading, spacing: Tokens.Space.section) {
+        VStack(alignment: .leading, spacing: Tokens.Space.regular) {
             section("Access token") {
                 secretRow(token)
-                HStack(spacing: 8) {
+                HStack(spacing: Tokens.Space.tight) {
                     Button("Copy token") { copy(token, as: "token") }.disabled(token.isEmpty)
                     Button("Regenerate") { confirmingRegenerate = true }
                     Spacer()
@@ -193,7 +193,7 @@ struct MCPSettings: View {
             }
             section("Read-only token") {
                 secretRow(readOnlyToken)
-                HStack(spacing: 8) {
+                HStack(spacing: Tokens.Space.tight) {
                     Button("Copy read-only token") { copy(readOnlyToken, as: "read-only token") }
                         .disabled(readOnlyToken.isEmpty)
                     Button("Regenerate") { confirmingRegenerateReadOnly = true }
@@ -212,13 +212,15 @@ struct MCPSettings: View {
             note("For a client on this Mac. There is no remote access and no tunnel: an "
                  + "agent that needs this library runs here.")
             Text(MCPClientSnippet.entry(name: "seedbed", url: url, token: token))
-                .font(Tokens.FontScale.small.monospaced())
+                .font(Tokens.FontScale.monoSmall)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(8)
+                .padding(Tokens.Space.tight)
                 .background(RoundedRectangle(cornerRadius: Tokens.Radius.control)
-                    .fill(Color.secondary.opacity(0.08)))
-            HStack(spacing: 8) {
+                    .fill(Tokens.Surface.sunken))
+                .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.control)
+                    .stroke(Tokens.Surface.hairline, lineWidth: 0.5))
+            HStack(spacing: Tokens.Space.tight) {
                 Button("Copy configuration") {
                     copy(MCPClientSnippet.entry(name: "seedbed", url: url, token: token),
                          as: "configuration")
@@ -238,7 +240,7 @@ struct MCPSettings: View {
                 .font(Tokens.FontScale.small).foregroundStyle(.secondary)
             Spacer()
         }
-        .padding(.horizontal, Tokens.Space.page).padding(.vertical, 8)
+        .padding(.horizontal, Tokens.Space.pane).padding(.vertical, Tokens.Space.tight)
     }
 
     // MARK: - Pieces
@@ -246,7 +248,7 @@ struct MCPSettings: View {
     private func section<Content: View>(
         _ title: String, @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: Tokens.Space.group) {
+        VStack(alignment: .leading, spacing: Tokens.Space.medium) {
             Text(title.uppercased())
                 .font(Tokens.FontScale.tiny)
                 .foregroundStyle(.secondary)
@@ -256,13 +258,15 @@ struct MCPSettings: View {
 
     private func secretRow(_ value: String) -> some View {
         Text(value.isEmpty ? "No token yet" : value)
-            .font(Tokens.FontScale.small.monospaced())
+            .font(Tokens.FontScale.monoSmall)
             .textSelection(.enabled)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(6)
+            .padding(Tokens.Space.row6)
             .background(RoundedRectangle(cornerRadius: Tokens.Radius.control)
-                .fill(Color.secondary.opacity(0.08)))
+                .fill(Tokens.Surface.sunken))
+            .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.control)
+                .stroke(Tokens.Surface.hairline, lineWidth: 0.5))
     }
 
     private func note(_ text: String) -> some View {

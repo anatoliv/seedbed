@@ -3,8 +3,8 @@ cask "seedbed" do
   # sparkle:version, and Homebrew's Sparkle livecheck strategy reports them as one
   # comma value. Pinning only the short version fails `brew audit --online` with
   # "differs from ... retrieved by livecheck" and breaks autobumping.
-  version "0.1.5,6"
-  sha256 "634bed69e533cc8e8120c06f1830a1b6867437fe80bbe24d5d9ade0fbfd1c2c0"
+  version "0.1.7,8"
+  sha256 "cf83683538a874811134c69b21aa940bf097154869b98da7d8af0a6599d66b6e"
 
   # No `verified:` parameter: Homebrew 6 deprecated it and `brew audit --online`
   # fails on one. It is unnecessary here anyway — the download host and the

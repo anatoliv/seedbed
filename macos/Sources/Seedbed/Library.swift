@@ -32,8 +32,8 @@ struct Target: Decodable, Identifiable, Hashable {
     /// that seven of them wrap tidily.
     var dotColor: Color {
         switch state {
-        case "current": return .green
-        case "stale":   return .orange
+        case "current": return Tokens.positive
+        case "stale":   return Tokens.warning
         default:        return .secondary.opacity(0.5)
         }
     }

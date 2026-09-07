@@ -94,9 +94,9 @@ enum Manual {
     //
     // Four of this app's words used to be defined in terms of each other, which
     // is fine for a glossary you already understand and useless for the person
-    // reading it to find out. This section is one path through all four, using a
-    // prompt that is really in the library, before the glossary defines any of
-    // them separately.
+    // reading it to find out. This section is one path through the core terms,
+    // using a prompt that is really in the library, before the glossary defines
+    // any of them separately.
 
     private static let walkthrough: [ManualTopic] = [
         ManualTopic(
@@ -108,15 +108,15 @@ enum Manual {
                 You write the SEED. Here it is five words long: "fix this bug and test". \
                 That is the whole thing you maintain, and it is the only text you ever edit.
 
-                You choose TARGET MODELS for it. This one targets three: Claude Opus 5, \
-                GPT-5.4 mini, and Llama 3.3 70B. A target is a prompting profile, not an \
-                account. Adding one costs nothing and calls nothing.
+                You choose TARGET MODELS for it. This one targets four: Claude Opus 5, \
+                GPT-5.4 mini, Llama 3.3 70B, and Qwen3-VL 30B. A target is a prompting \
+                profile, not an account. Adding one costs nothing and calls nothing.
 
                 The ENHANCER writes the long versions. It is the model doing the writing, \
                 and it is the only part of this app that spends anything. It reads each \
                 target's published prompting guidance and expands your five words into a \
-                prompt shaped for that model. From the same seed you get 233 words of \
-                ordered prose for Opus 5 and 433 words of numbered steps for the Llama. \
+                prompt shaped for that model. From the same seed you currently get 205 words \
+                of ordered prose for Opus 5 and 721 words of explicit structure for the Llama. \
                 That difference is the whole reason to keep a library rather than a file \
                 of snippets.
 
@@ -131,8 +131,8 @@ enum Manual {
                 """,
             example: """
                 prompts/fix-bug-and-test.md      the seed you edit
-                rendered/claude-opus-5/…         233 words, prose
-                rendered/llama-3.3-70b/…         433 words, numbered steps
+                rendered/claude-opus-5/…         205 words, prose
+                rendered/llama-3.3-70b/…         721 words, explicit structure
                 """,
             key: nil),
     ]
@@ -294,10 +294,10 @@ enum Manual {
                 that model well. Targeting a model does not call that vendor and does not \
                 need an account with them.
 
-                Seedbed ships with four. A prompt lists the ones it is built for, and most \
-                do not list all four.
+                Seedbed ships with five. A prompt lists the ones it is built for, and most \
+                do not list all five.
                 """,
-            example: "claude-opus-5 · claude-sonnet-5 · gpt-5.4-mini · llama-3.3-70b",
+            example: "claude-opus-5 · claude-sonnet-5 · gpt-5.4-mini · llama-3.3-70b · qwen3-vl-30b",
             key: nil),
         ManualTopic(
             page: .help, section: "The words this app uses",
@@ -321,8 +321,8 @@ enum Manual {
                 everything stale in one go.
 
                 Only two things cause it: editing the seed, or the vendor's prompting \
-                guidance changing under you. An orange dot on a chip is the neighbouring \
-                case, which is a model this prompt targets but has never been built for.
+                guidance changing under you. A grey dot is the neighbouring case, which is \
+                a model this prompt targets but has never been built for.
                 """,
             example: nil, key: nil),
         ManualTopic(
@@ -693,7 +693,7 @@ enum Manual {
                 prompts/fix-bug-and-test.md            the seed
                 rendered/claude-opus-5/…               its Opus version
                 rendered/llama-3.3-70b/…               its Llama version
-                models.toml                            the four target profiles
+                models.toml                            the five target profiles
                 """,
             key: nil),
         ManualTopic(
@@ -716,7 +716,7 @@ enum Manual {
 
                 Renaming a prompt, pinning it, or filing it in a different category never \
                 costs a rebuild, and that is deliberate. What you see is an amber dot in \
-                the library for stale, and an orange dot on a chip for a model this prompt \
+                the library for stale, and a grey dot on a chip for a model this prompt \
                 targets but has never been built for.
                 """,
             example: nil, key: nil),

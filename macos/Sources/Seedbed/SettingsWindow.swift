@@ -60,14 +60,17 @@ struct SettingsWindowView: View {
                 }
             }
             .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
             .frame(width: Tokens.Width.sidebar)
-            Divider()
+            SeedbedDivider()
             detail.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(minWidth: Tokens.Size.settingsMin.width, idealWidth: Tokens.Size.settings.width,
                maxWidth: .infinity,
                minHeight: Tokens.Size.settingsMin.height, idealHeight: Tokens.Size.settings.height,
                maxHeight: .infinity)
+        .background(Tokens.Surface.canvas)
+        .tint(Tokens.accent)
     }
 
     @ViewBuilder private var detail: some View {
@@ -109,7 +112,7 @@ struct GeneralSettings: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Tokens.Space.section) {
+            VStack(alignment: .leading, spacing: Tokens.Space.regular) {
                 SettingsGroup("Pasting") {
                     Toggle("Paste into the app you came from", isOn: $pasteEnabled)
                         .onChange(of: pasteEnabled) { _, new in
@@ -121,7 +124,7 @@ struct GeneralSettings: View {
                             + "frontmost when you summoned the panel. Hold ⇧ to copy without "
                             + "pasting, whichever way this is set.")
                     if pasteEnabled && !hasAccessibility {
-                        HStack(alignment: .top, spacing: Tokens.Space.control) {
+                        HStack(alignment: .top, spacing: Tokens.Space.tight) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundStyle(Tokens.warning)
                             VStack(alignment: .leading, spacing: Tokens.Space.row) {
@@ -151,20 +154,22 @@ struct GeneralSettings: View {
                     if !launchProblem.isEmpty {
                         Text(launchProblem)
                             .font(Tokens.FontScale.small)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Tokens.danger)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
                 SettingsGroup("Library folder") {
                     Text(libraryPath)
-                        .font(Tokens.FontScale.small.monospaced())
+                        .font(Tokens.FontScale.monoSmall)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(6)
+                        .padding(Tokens.Space.row6)
                         .background(RoundedRectangle(cornerRadius: Tokens.Radius.control)
-                            .fill(Color.secondary.opacity(0.08)))
-                    HStack(spacing: Tokens.Space.control) {
+                            .fill(Tokens.Surface.sunken))
+                        .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.control)
+                            .stroke(Tokens.Surface.hairline, lineWidth: 0.5))
+                    HStack(spacing: Tokens.Space.tight) {
                         Button("Reveal in Finder", action: onReveal)
                         Button("Choose…", action: onChoose)
                         Spacer()
@@ -193,7 +198,7 @@ struct GeneralSettings: View {
                     }
                 }
             }
-            .padding(Tokens.Space.page)
+            .padding(Tokens.Space.pane)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onAppear {
@@ -234,7 +239,7 @@ struct ModelsPane: View {
     var body: some View {
         VStack(spacing: 0) {
             ModelVisibility(models: library.allModels, onChange: onReloadLibrary)
-            Divider()
+            SeedbedDivider()
             ModelsEditor(model: editor, onDone: nil)
         }
         .onChange(of: library.allModels) { _, fresh in editor.adopt(fresh) }
@@ -272,7 +277,7 @@ struct ModelVisibility: View {
     @State private var revision = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Tokens.Space.group) {
+        VStack(alignment: .leading, spacing: Tokens.Space.medium) {
             SettingsGroup("Shown in the picker") {
                 ForEach(models, id: \.id) { entry in
                     Toggle(entry.name, isOn: Binding(
@@ -283,7 +288,7 @@ struct ModelVisibility: View {
                             onChange()
                         }))
                 }
-                HStack(spacing: Tokens.Space.control) {
+                HStack(spacing: Tokens.Space.tight) {
                     Button("Show all") {
                         ModelFilter.showAll()
                         revision += 1
@@ -295,7 +300,7 @@ struct ModelVisibility: View {
                         + "Hiding one keeps it in models.toml and keeps its renders.")
             }
         }
-        .padding(Tokens.Space.page)
+        .padding(Tokens.Space.pane)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

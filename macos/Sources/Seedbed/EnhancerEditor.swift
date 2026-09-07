@@ -6,7 +6,7 @@ import SwiftUI
 /// gets written; the enhancer is the model actually called to do the writing,
 /// and it is the only place in this app that spends money or needs a key.
 ///
-/// Mirrors Reference's Settings → AI: provider presets, auth modes,
+/// Uses the shared sibling-app Settings → AI structure: provider presets, auth modes,
 /// endpoint + model, a Keychain-held key, and a fallback tried once when the
 /// primary fails retryably.
 struct EnhancerConfigData: Decodable {
@@ -230,10 +230,10 @@ struct EnhancerEditor: View {
                 if let onDone { Button("Done", action: onDone).keyboardShortcut(.defaultAction) }
             }
             .chromeBar()
-            Divider()
+            SeedbedDivider()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: Tokens.Space.field) {
+                VStack(alignment: .leading, spacing: Tokens.Space.snug) {
                     FormField("Provider preset, which fills the rest in") {
                         Menu {
                             ForEach(model.data?.presets ?? []) { preset in
@@ -265,7 +265,7 @@ struct EnhancerEditor: View {
                                     .font(Tokens.FontScale.body)
                                     .foregroundStyle(model.codexAccount == nil
                                                      ? Color.secondary : .primary)
-                                HStack(spacing: Tokens.Space.control) {
+                                HStack(spacing: Tokens.Space.tight) {
                                     Button(model.codexAccount == nil
                                            ? "Sign in with ChatGPT…" : "Sign in again…") {
                                         model.codexLogin()
@@ -287,7 +287,7 @@ struct EnhancerEditor: View {
                             TextField("https://api.openai.com/v1/chat/completions",
                                       text: $model.endpoint)
                                 .textFieldStyle(.roundedBorder)
-                                .font(Tokens.FontScale.small.monospaced())
+                                .font(Tokens.FontScale.monoSmall)
                         }
                         FormField("Model") {
                             TextField("gpt-4o-mini", text: $model.model)
@@ -311,11 +311,11 @@ struct EnhancerEditor: View {
                     }
 
                     DisclosureGroup("Fallback, tried once if the primary fails retryably") {
-                        VStack(alignment: .leading, spacing: Tokens.Space.group) {
+                        VStack(alignment: .leading, spacing: Tokens.Space.medium) {
                             TextField("Fallback endpoint", text: $model.fallbackEndpoint)
                                 .textFieldStyle(.roundedBorder)
-                                .font(Tokens.FontScale.small.monospaced())
-                            HStack(spacing: Tokens.Space.control) {
+                                .font(Tokens.FontScale.monoSmall)
+                            HStack(spacing: Tokens.Space.tight) {
                                 TextField("Fallback model", text: $model.fallbackModel)
                                     .textFieldStyle(.roundedBorder).frame(maxWidth: 220)
                                 SecureField(model.data?.hasFallbackKey == true ? "••••••••" : "Fallback key",
@@ -326,7 +326,7 @@ struct EnhancerEditor: View {
                                  + "because the same body would fail there too.")
                                 .font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
                         }
-                        .padding(.top, Tokens.Space.control)
+                        .padding(.top, Tokens.Space.tight)
                     }
                     .font(Tokens.FontScale.small)
 
@@ -338,16 +338,16 @@ struct EnhancerEditor: View {
                 .padding(Tokens.Space.pane)
             }
 
-            Divider()
-            HStack(spacing: Tokens.Space.control) {
+            SeedbedDivider()
+            HStack(spacing: Tokens.Space.tight) {
                 if model.busy { ProgressView().controlSize(.small) }
                 Text(model.status).font(Tokens.FontScale.small)
-                    .foregroundStyle(model.statusIsError ? Color.red : .secondary)
+                    .foregroundStyle(model.statusIsError ? Tokens.danger : .secondary)
                     .lineLimit(2)
                 Spacer()
                 Button("Test") { model.save(thenTest: true) }.disabled(model.busy)
                 Button("Save") { model.save() }
-                    .disabled(model.busy).buttonStyle(.borderedProminent)
+                    .disabled(model.busy).seedbedProminent()
             }
             .chromeBar()
         }

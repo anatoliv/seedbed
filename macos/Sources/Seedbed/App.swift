@@ -62,6 +62,15 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)   // menu bar only, no Dock tile
 
+        // AppKit does not reliably honor AppleInterfaceStyle from the argument
+        // domain for accessory applications. Keep visual QA process-scoped and
+        // deterministic without changing the user's system appearance.
+        switch ProcessInfo.processInfo.environment["SEEDBED_FORCE_APPEARANCE"] {
+        case "dark":  NSApp.appearance = NSAppearance(named: .darkAqua)
+        case "light": NSApp.appearance = NSAppearance(named: .aqua)
+        default:       break
+        }
+
         // First, so a crash in anything below is the kind of crash that gets
         // reported. Starts only if the user opted in AND this build carries a
         // DSN; both are false by default, so this is a no-op on a self-built
@@ -265,7 +274,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // previous version put an action on the button and called performClick
         // to raise the menu, which re-enters that same action — so the menu
         // never appeared. The panel is reached by ⌥⌘P and by the menu's first
-        // item, which is also how Reference does it.
+        // item, which keeps the status item responsive while the panel is open.
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
@@ -461,7 +470,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Menu
 
-    /// The whole app in one menu, in Reference's shape: what it is doing, the
+    /// The whole app in one menu: what it is doing, the
     /// things you do most, the things you configure, then about/updates/help,
     /// then quit.
     /// The disabled lines at the top of the menu: what the app is doing right

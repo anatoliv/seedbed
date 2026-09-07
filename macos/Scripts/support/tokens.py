@@ -19,7 +19,7 @@ from pathlib import Path
 
 _ENUM = re.compile(r"^\s*enum (\w+) \{")
 _LET = re.compile(
-    r"^\s*static let (\w+)\s*(?::\s*[\w<>.]+)?\s*=\s*(.+?)\s*(?://.*)?$"
+    r"^\s*static (?:let|var) (\w+)\s*(?::\s*[\w<>.]+)?\s*=\s*(.+?)\s*(?://.*)?$"
 )
 _CLOSE = re.compile(r"^\s*\}\s*$")
 

@@ -7,52 +7,79 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<script>
+  // A URL-only visual-QA override. Normal visits continue to follow the
+  // operating system; ?appearance=dark|light makes both palettes capturable.
+  const requestedAppearance = new URLSearchParams(location.search).get("appearance");
+  if (requestedAppearance === "dark" || requestedAppearance === "light") {
+    document.documentElement.dataset.appearance = requestedAppearance;
+  }
+</script>
 <style>
+  @font-face { font-family:Inter; src:url('/fonts/InterVariable.ttf') format('truetype');
+               font-weight:100 900; font-style:normal; font-display:swap; }
+  @font-face { font-family:"JetBrains Mono"; src:url('/fonts/JetBrainsMono.ttf') format('truetype');
+               font-weight:100 800; font-style:normal; font-display:swap; }
   :root {
     color-scheme: light dark;
-    --bg: #faf9f7; --card: #fff; --ink: #1a1a19; --dim: #6b6a67;
-    --line: #e4e2dd; --accent: #c7693d; --ok: #4a7c59; --warn: #b8860b;
+    --bg:#f8f6f2; --sunken:#f2f0ea; --card:#fffdf9; --raised:#eae7e0;
+    --ink:#3a3a35; --dim:#64645c; --faint:#8c8c84;
+    --line:#e0dcd4; --line-strong:#c8c4ba; --accent:#e07a4b;
+    --ok:#6ea082; --warn:#c49a5c; --danger:#b4645a;
+    --r-chip:4px; --r-button:6px; --r-card:8px; --r-sheet:12px;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#17171a; --card:#1f1f23; --ink:#eceae6; --dim:#98968f;
-            --line:#32323a; --accent:#e08a5c; --ok:#7fb08d; --warn:#d9a441; }
+    :root:not([data-appearance="light"]) {
+      --bg:#0d0e11; --sunken:#08080a; --card:#1c1c20; --raised:#2c2c31;
+      --ink:#e8eaec; --dim:#8a8a94; --faint:#62626b;
+      --line:#26262c; --line-strong:#38383e;
+    }
+  }
+  :root[data-appearance="dark"] {
+    --bg:#0d0e11; --sunken:#08080a; --card:#1c1c20; --raised:#2c2c31;
+    --ink:#e8eaec; --dim:#8a8a94; --faint:#62626b;
+    --line:#26262c; --line-strong:#38383e;
   }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif; }
-  .wrap { max-width: 940px; margin: 0 auto; padding: 28px 20px 80px; }
-  h1 { font-size:19px; margin:0; letter-spacing:-0.01em; }
-  header { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+         font-feature-settings:'tnum','cv11'; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size:21px; font-weight:600; margin:0; letter-spacing:-0.02em; }
+  header { display:flex; align-items:center; gap:12px; margin-bottom:4px; }
   .brand-mark { width:30px; height:30px; flex:0 0 auto; }
   .brand-copy { display:flex; align-items:baseline; gap:12px; min-width:0; }
   .sub { color:var(--dim); font-size:13px; margin:0 0 22px; }
   .bar { display:flex; gap:8px; align-items:center; margin-bottom:18px; }
   button { font:inherit; font-size:13px; padding:6px 12px; border:1px solid var(--line);
-           background:var(--card); color:var(--ink); border-radius:6px; cursor:pointer; }
+           background:var(--card); color:var(--ink); border-radius:var(--r-button); cursor:pointer;
+           transition:border-color 150ms ease-out, background-color 150ms ease-out; }
   button:hover:not(:disabled) { border-color:var(--accent); }
   button:disabled { opacity:.5; cursor:default; }
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
   .row { display:flex; align-items:center; gap:14px; padding:12px 14px; background:var(--card);
-         border:1px solid var(--line); border-radius:8px; margin-bottom:8px; }
+         border:1px solid var(--line); border-radius:var(--r-card); margin-bottom:8px; }
   .row .text { flex:1; min-width:0; }
   .row .title { font-weight:590; }
   .row .body { color:var(--dim); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   select { font:inherit; font-size:13px; padding:6px 8px; border:1px solid var(--line);
-           border-radius:6px; background:var(--card); color:var(--ink); width:270px; flex:0 0 auto; }
+           border-radius:var(--r-button); background:var(--sunken); color:var(--ink); width:270px; flex:0 0 auto; }
   .flash { font-size:12px; color:var(--ok); min-width:96px; text-align:right; }
-  .flash.err { color:var(--accent); }
+  .flash.err { color:var(--danger); }
   .job { font-size:13px; color:var(--dim); margin-bottom:14px; min-height:20px; }
   .job b { color:var(--ink); font-weight:590; }
-  form { background:var(--card); border:1px solid var(--line); border-radius:8px;
+  form { background:var(--card); border:1px solid var(--line); border-radius:var(--r-card);
          padding:14px; margin-top:22px; display:none; }
   form.open { display:block; }
   label { display:block; font-size:12px; color:var(--dim); margin:10px 0 4px; }
   input[type=text], textarea { width:100%; font:inherit; padding:8px 10px; border:1px solid var(--line);
-                               border-radius:6px; background:var(--bg); color:var(--ink); }
+                               border-radius:var(--r-button); background:var(--sunken); color:var(--ink); }
   textarea { min-height:64px; resize:vertical; }
   .checks { display:flex; flex-wrap:wrap; gap:12px; font-size:13px; margin-top:6px; }
   .checks label { display:flex; align-items:center; gap:5px; margin:0; color:var(--ink); }
   .empty { color:var(--dim); padding:30px 0; }
-  .errors { color:var(--accent); font-size:12px; margin-top:6px; white-space:pre-wrap; }
+  .errors { color:var(--danger); font-size:12px; margin-top:6px; white-space:pre-wrap; }
+  @media (prefers-reduced-motion:reduce) { * { transition-duration:0ms !important; } }
 </style>
 </head>
 <body>
@@ -162,7 +189,7 @@ function render(data) {
   if (job.running) {
     el.innerHTML = `<b>Building ${job.done + 1} of ${job.total}</b> — ${job.current} · this takes about a minute per prompt`;
   } else if (job.errors.length) {
-    el.innerHTML = `<span style="color:var(--accent)">${job.errors.length} failed</span>: ${job.errors[0]}`;
+    el.innerHTML = `<span style="color:var(--danger)">${job.errors.length} failed</span>: ${job.errors[0]}`;
   } else {
     el.textContent = "";
   }
@@ -199,7 +226,7 @@ async function load() {
   try {
     render(await api("/api/library"));
   } catch (err) {
-    $("#job").innerHTML = `<span style="color:var(--accent)">${err.message}</span>`;
+    $("#job").innerHTML = `<span style="color:var(--danger)">${err.message}</span>`;
   }
 }
 
@@ -240,7 +267,7 @@ $("#add").addEventListener("submit", async (e) => {
 $("#refresh").addEventListener("click", async () => {
   $("#refresh").disabled = true;
   try { await api("/api/refresh", { method: "POST" }); } catch (err) {
-    $("#job").innerHTML = `<span style="color:var(--accent)">${err.message}</span>`;
+    $("#job").innerHTML = `<span style="color:var(--danger)">${err.message}</span>`;
   }
   await load();
 });

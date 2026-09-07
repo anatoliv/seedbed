@@ -48,9 +48,9 @@ struct FillSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            Divider()
+            SeedbedDivider()
             ScrollView {
-                VStack(alignment: .leading, spacing: Tokens.Space.field) {
+                VStack(alignment: .leading, spacing: Tokens.Space.snug) {
                     ForEach(model.names, id: \.self) { name in
                         field(name)
                     }
@@ -58,10 +58,12 @@ struct FillSheet: View {
                 .padding(Tokens.Space.pane)
             }
             .frame(maxHeight: 320)
-            Divider()
+            SeedbedDivider()
             footer
         }
         .frame(width: Tokens.Width.sheet)
+        .background(Tokens.Surface.raised)
+        .tint(Tokens.accent)
     }
 
     private var header: some View {
@@ -75,9 +77,9 @@ struct FillSheet: View {
 
     private func field(_ name: String) -> some View {
         VStack(alignment: .leading, spacing: Tokens.Space.row) {
-            Text(name).font(Tokens.FontScale.tiny.monospaced())
+            Text(name).font(Tokens.FontScale.monoTiny)
                 .foregroundStyle(.secondary)
-            HStack(spacing: Tokens.Space.control) {
+            HStack(spacing: Tokens.Space.tight) {
                 TextField("", text: Binding(
                     get: { model.values[name] ?? "" },
                     set: { model.values[name] = $0 }
@@ -109,7 +111,7 @@ struct FillSheet: View {
     }
 
     private var footer: some View {
-        HStack(spacing: Tokens.Space.control) {
+        HStack(spacing: Tokens.Space.tight) {
             Text("Blank values stay as {{NAME}} in the copied prompt")
                 .font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
             Spacer()
@@ -117,7 +119,7 @@ struct FillSheet: View {
                 .keyboardShortcut(.cancelAction)
             Button(Paster.isEnabled ? "Copy & Paste" : "Copy") { onCopy() }
                 .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
+                .seedbedProminent()
         }
         .chromeBar()
     }

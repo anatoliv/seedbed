@@ -5,7 +5,7 @@ import SwiftUI
 /// square and evenly spaced wherever the strip is used.
 ///
 /// **There is deliberately no `gutter`, and that is the interesting part.**
-/// Reference's version of this enum has one, because its picker OVERLAYS the
+/// An overlaid picker would need one, because it would cover the
 /// row and whatever sits underneath has to be inset far enough to clear the
 /// icons. Seedbed's strip **replaces** the trailing slot instead: the HUD row
 /// shows the usage badge or the strip, never both (`HUDView.PromptRow`), and
@@ -20,7 +20,7 @@ import SwiftUI
 /// the layout that needs it.
 enum RowActions {
     static let button: CGFloat = 17          // equal frames put the icons on one line
-    static let spacing: CGFloat = 8          // tighter than Reference's 10: up to six icons
+    static let spacing = Tokens.Space.tight  // product-specific density: up to six icons
 }
 
 /// Everything you can do to one prompt, on the prompt's own row.
@@ -29,7 +29,7 @@ enum RowActions {
 /// whichever row happened to be selected, or as a button in the library
 /// window's header. What was missing was doing any of it to the row under the
 /// pointer. So these buttons act on THEIR row and deliberately do not move the
-/// selection, which is how Reference's picker behaves.
+/// selection, which keeps row actions spatially stable.
 ///
 /// A nil closure hides its button rather than disabling it: that is how a row
 /// says an action does not apply to it — pasting with "paste into the frontmost
@@ -67,12 +67,12 @@ struct PromptRowActions: View {
                 button("pencil", "Edit in the library window (⌘E)", action: onEdit)
             }
             if let onPin {
-                // The pin glyph reads high in its box, as it does in Reference;
+                // The pin glyph reads high in its box;
                 // the half-point nudge puts it on the other icons' centre line.
                 button(pinned ? "pin.slash" : "pin",
                        pinned ? "Unpin: stop sorting it first (⌘D)"
                               : "Pin: sorts first whatever the sort order (⌘D)",
-                       size: Tokens.CompactSize.meta, offset: 0.5, action: onPin)
+                       size: Tokens.IconSize.small, offset: 0.5, action: onPin)
             }
             if let onDelete {
                 button("trash", deleteHelp, action: onDelete)
@@ -97,7 +97,7 @@ struct PromptRowActions: View {
     }
 
     private func button(_ symbol: String, _ help: String,
-                        size: CGFloat = Tokens.CompactSize.rowText,
+                        size: CGFloat = Tokens.IconSize.compact,
                         offset: CGFloat = 0,
                         action: @escaping () -> Void) -> some View {
         Button(action: action) {

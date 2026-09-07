@@ -17,21 +17,14 @@ struct WhatsNewChange: Identifiable {
         var tint: Color {
             switch self {
             case .added:    return Tokens.positive
-            case .improved: return Tokens.accent
-            // The undarkened amber: this is a fill, which is what it is for.
-            case .fixed:    return Tokens.brandWarning
+            case .improved: return Tokens.secondaryAccent
+            case .fixed:    return Tokens.warning
             }
         }
 
-        /// The label itself. Not `tint`, because the colour is already carrying
-        /// the meaning through the fill and repeating it in the ink cost every
-        /// one of these badges its 4.5:1 text contrast.
+        /// the reference app's chip recipe uses the semantic tint for both ink and wash.
         var ink: Color {
-            switch self {
-            case .added:    return Tokens.OnTint.positive
-            case .improved: return Tokens.OnTint.accent
-            case .fixed:    return Tokens.OnTint.warning
-            }
+            tint
         }
     }
 
@@ -54,6 +47,40 @@ struct WhatsNewRelease: Identifiable {
     var id: String { version }
 
     static let all: [WhatsNewRelease] = [
+        WhatsNewRelease(
+            version: "0.1.7",
+            date: "6 September 2026",
+            highlight: "What's New is easy to find, and the reading pages visibly belong to Seedbed.",
+            changes: [
+                WhatsNewChange(kind: .fixed, text:
+                    "What's New now stays at the top of the sidebar instead of hiding below "
+                    + "the 35-page guide index at the window's normal opening height."),
+                WhatsNewChange(kind: .improved, text:
+                    "Help, FAQ, and What's New now carry Seedbed's contrast-safe terracotta "
+                    + "through their page glyphs and section headings in light and dark mode."),
+                WhatsNewChange(kind: .improved, text:
+                    "The current release title is branded without replacing the semantic "
+                    + "New, Improved, and Fixed colors that explain each change."),
+            ]),
+        WhatsNewRelease(
+            version: "0.1.6",
+            date: "6 September 2026",
+            highlight: "Seedbed now shares the reference app's complete visual system on the Mac and in the browser.",
+            changes: [
+                WhatsNewChange(kind: .improved, text:
+                    "The Mac app now uses the reference app's Paper and Midnight surfaces, terracotta accent, "
+                    + "type scale, spacing, radii, icons, elevation, motion, and shared component "
+                    + "recipes throughout."),
+                WhatsNewChange(kind: .added, text:
+                    "The browser now carries the same visual family with the exact Inter and "
+                    + "JetBrains Mono files, warm light surfaces, and neutral graphite dark mode."),
+                WhatsNewChange(kind: .improved, text:
+                    "Help, FAQ, and What's New now use the reference app's compact two-row headers, a readable "
+                    + "line length, consistent section dividers, and clearer release cards."),
+                WhatsNewChange(kind: .fixed, text:
+                    "Every text call now uses a named type role. Thirteen ad-hoc monospaced variants "
+                    + "were replaced, and parity tests now guard all 76 shared Reference tokens."),
+            ]),
         WhatsNewRelease(
             version: "0.1.5",
             date: "6 September 2026",
@@ -270,11 +297,17 @@ enum WhatsNewAnnouncer {
 
 struct WhatsNewPage: View {
     var body: some View {
-        ForEach(WhatsNewRelease.all) { release in
-            VStack(alignment: .leading, spacing: Tokens.Space.group) {
-                HStack(spacing: 7) {
-                    Text(release.version)
+        ForEach(Array(WhatsNewRelease.all.enumerated()), id: \.element.id) { index, release in
+            VStack(alignment: .leading, spacing: Tokens.Space.medium) {
+                HStack(spacing: Tokens.Space.tight) {
+                    Text("Version \(release.version)")
                         .font(Tokens.FontScale.sectionHeader)
+                        .foregroundStyle(index == 0 ? Tokens.accent : Color.primary)
+                    if index == 0 {
+                        Text("Latest")
+                            .seedbedChip(tint: Tokens.positive)
+                    }
+                    Spacer(minLength: Tokens.Space.tight)
                     Text(release.date)
                         .font(Tokens.FontScale.small)
                         .foregroundStyle(.secondary)
@@ -283,23 +316,19 @@ struct WhatsNewPage: View {
                     .font(Tokens.FontScale.small)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Divider()
-                VStack(alignment: .leading, spacing: Tokens.Space.group) {
+                SeedbedDivider()
+                VStack(alignment: .leading, spacing: Tokens.Space.medium) {
                     ForEach(release.changes) { change in
                         DefinitionRow(detail: change.text) {
                             Text(change.kind.label.uppercased())
-                                .font(Tokens.FontScale.micro)
                                 .tracking(0.4)
-                                .foregroundStyle(change.kind.ink)
-                                .padding(.horizontal, Tokens.ChipPadding.h)
-                                .padding(.vertical, Tokens.ChipPadding.v)
-                                .fixedSize()
-                                .background(change.kind.tint.opacity(0.14), in: Capsule())
-                                .frame(width: 68, alignment: .leading)
+                                .seedbedChip(tint: change.kind.ink)
+                                .frame(width: 72, alignment: .leading)
                         }
                     }
                 }
             }
+            .seedbedCard(padding: Tokens.Space.regular, radius: Tokens.Radius.card)
         }
     }
 }

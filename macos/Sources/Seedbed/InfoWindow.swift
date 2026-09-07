@@ -22,9 +22,10 @@ enum InfoPage: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The capsule under the title. Reference badges a topic with its
-    /// category; these five pages are the categories, so the badge says what
-    /// kind of reading each one is rather than repeating its name.
+    /// The capsule under the title follows Reference's metadata-chip recipe. It
+    /// badges a topic with its category; these five pages are the categories,
+    /// so the badge says what kind of reading each one is rather than repeating
+    /// its name.
     var badge: String {
         switch self {
         case .gettingStarted: return "Overview"
@@ -32,6 +33,16 @@ enum InfoPage: String, CaseIterable, Identifiable {
         case .faq:            return "Reference"
         case .whatsNew:       return "Release notes"
         case .about:          return "This build"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .gettingStarted: return "The shortest path from a seed to a prompt you can paste."
+        case .help:           return "Shortcuts, workflow, vocabulary, and troubleshooting."
+        case .faq:            return "Straight answers about agents, security, and your library."
+        case .whatsNew:       return "Every Seedbed release, newest first."
+        case .about:          return "Version, library, and runtime details for this build."
         }
     }
 
@@ -113,19 +124,26 @@ struct InfoWindowView: View {
     var openSettings: () -> Void
 
     private func row(_ page: InfoPage) -> some View {
-        Label(page.title, systemImage: page.symbol)
-            .font(Tokens.FontScale.body)
-            .tag(page.rawValue)
+        Label {
+            Text(page.title)
+        } icon: {
+            Image(systemName: page.symbol)
+                .foregroundStyle(page == .whatsNew ? Tokens.accent : Color.secondary)
+        }
+        .font(Tokens.FontScale.body)
+        .tag(page.rawValue)
     }
 
     /// The scrolling half of a page, under the fixed header.
     @ViewBuilder private func pageBody<C: View>(@ViewBuilder _ content: () -> C) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Tokens.Space.section) {
+            VStack(alignment: .leading, spacing: Tokens.Space.regular) {
                 content()
             }
-            .padding(Tokens.Space.page)
+            .frame(maxWidth: Tokens.Width.reading, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Tokens.Space.pane)
+            .padding(.vertical, Tokens.Space.wide)
         }
     }
 
@@ -140,16 +158,21 @@ struct InfoWindowView: View {
                 ManualSearchField(query: $model.query,
                                   resultCount: model.browsing ? resultCount : nil,
                                   onReturnToResults: { model.browsing = false })
-                    .padding(.horizontal, Tokens.Space.group)
-                    .padding(.top, Tokens.Space.group)
-                    .padding(.bottom, Tokens.Space.control)
-                Divider()
+                    .padding(.horizontal, Tokens.Space.medium)
+                    .padding(.top, Tokens.Space.medium)
+                    .padding(.bottom, Tokens.Space.tight)
+                SeedbedDivider()
                 List(selection: Binding(get: { model.selection },
                                         set: { model.selection = $0 ?? InfoPage.help.rawValue })) {
+                    // Reference keeps What's New above the long help index. Putting
+                    // it after Seedbed's 35 guide pages made the release notes
+                    // disappear below the initial viewport at the normal window
+                    // size, which is indistinguishable from not shipping them.
+                    row(.whatsNew)
                     // The guide is what the sidebar is FOR. Before this it
                     // listed five pages, one of which was a table of key caps,
                     // and everything the app can do was inside them. Reference
-                    // lists fifty-three subjects and gives each a page; a reader
+                    // likewise gives each subject a page, so a reader
                     // browses rather than scrolls.
                     Section("Start here") {
                         ForEach([InfoPage.gettingStarted, .help, .faq]) { row($0) }
@@ -164,32 +187,35 @@ struct InfoWindowView: View {
                         }
                     }
                     Section("This build") {
-                        ForEach([InfoPage.whatsNew, .about]) { row($0) }
+                        row(.about)
                     }
                 }
                 .listStyle(.sidebar)
                 .scrollContentBackground(.hidden)
             }
             .frame(width: Tokens.Width.sidebar)
-            Divider()
+            SeedbedDivider()
             Group {
                 if searching {
                     PageHeader(title: "Search",
                                symbol: "magnifyingglass",
-                               badge: "\(resultCount) result\(resultCount == 1 ? "" : "s")") {
+                               badge: "\(resultCount ?? 0) result\(resultCount == 1 ? "" : "s")",
+                               subtitle: "Results across Help, FAQ, and the full guide.") {
                         pageBody { ManualSearchResults(query: model.query) { model.open($0) } }
                     }
                 } else if let id = model.guide,
                           let entry = Guide.pages.first(where: { $0.id == id }) {
                     PageHeader(title: entry.title,
                                symbol: Guide.symbol(for: entry.category),
-                               badge: entry.category) {
+                               badge: "Guide",
+                               subtitle: entry.category) {
                         pageBody { GuideMarkdown(entry.body) }
                     }
                 } else {
                     PageHeader(title: model.page.title,
                                symbol: model.page.symbol,
-                               badge: model.page.badge) {
+                               badge: model.page.badge,
+                               subtitle: model.page.subtitle) {
                         pageBody { page }
                     }
                 }
@@ -207,6 +233,8 @@ struct InfoWindowView: View {
                maxWidth: .infinity,
                minHeight: Tokens.Size.infoMin.height, idealHeight: Tokens.Size.info.height,
                maxHeight: .infinity)
+        .background(Tokens.Surface.canvas)
+        .tint(Tokens.accent)
     }
 
     /// A query of only whitespace is not a search, and blanking the page for one
@@ -246,7 +274,7 @@ struct GettingStartedPage: View {
 
     var body: some View {
         SectionHeader("Three ideas, and then it is just ⌥⌘P")
-        VStack(alignment: .leading, spacing: Tokens.Space.section) {
+        VStack(alignment: .leading, spacing: Tokens.Space.regular) {
             step(1, "Keep the prompt short",
                  "You write a seed, \"fix this bug and test\". That is all you maintain. Put "
                  + "{{PLACEHOLDER}} anywhere you will fill in a value later.")
@@ -259,9 +287,9 @@ struct GettingStartedPage: View {
                  + "in. If the prompt has placeholders you are asked for them first, with "
                  + "your previous answers on a menu.")
         }
-        Divider()
+        SeedbedDivider()
         SectionHeader("Worth doing once")
-        HStack(spacing: Tokens.Space.control) {
+        HStack(spacing: Tokens.Space.tight) {
             Button("Open Settings…", action: openSettings)
             Button("Open the library…", action: openLibrary)
         }
@@ -271,16 +299,17 @@ struct GettingStartedPage: View {
     }
 
     private func step(_ number: Int, _ title: String, _ body: String) -> some View {
-        HStack(alignment: .top, spacing: Tokens.Space.control) {
+        HStack(alignment: .top, spacing: Tokens.Space.tight) {
             Text("\(number)")
-                .font(Tokens.FontScale.bodyStrong)
+                .font(Tokens.FontScale.body.weight(.medium))
                 .frame(width: 20, height: 20)
                 .background(Circle().fill(Tokens.accent.opacity(0.18)))
             VStack(alignment: .leading, spacing: Tokens.Space.row) {
-                Text(title).font(Tokens.FontScale.bodyStrong)
+                Text(title).font(Tokens.FontScale.body.weight(.medium))
                 Caption(body)
             }
         }
+        .seedbedCard(padding: Tokens.Space.regular, radius: Tokens.Radius.card)
     }
 }
 
@@ -289,10 +318,10 @@ struct AboutPage: View {
     let enhancer: String
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Tokens.Space.snug) {
             Image(systemName: "text.badge.star")
-                .font(.system(size: Tokens.CompactSize.hero)).foregroundStyle(Tokens.accent)
-            VStack(alignment: .leading, spacing: 2) {
+                .font(.system(size: Tokens.IconSize.hero)).foregroundStyle(Tokens.accent)
+            VStack(alignment: .leading, spacing: Tokens.ChipPadding.v) {
                 Text("Seedbed").font(Tokens.FontScale.display)
                 Text("Version \(InfoWindows.version)")
                     .font(Tokens.FontScale.small).foregroundStyle(.secondary)
@@ -304,19 +333,19 @@ struct AboutPage: View {
              + "a git repository.")
             .font(Tokens.FontScale.body)
             .fixedSize(horizontal: false, vertical: true)
-        Divider()
-        VStack(alignment: .leading, spacing: Tokens.Space.group) {
+        SeedbedDivider()
+        VStack(alignment: .leading, spacing: Tokens.Space.medium) {
             row("Library", libraryPath)
             row("Builds with", enhancer)
             row("Signed", "locally, not notarized, built on this machine")
         }
-        Divider()
+        SeedbedDivider()
         Caption("Personal tool. No analytics, and no network traffic except the model endpoint "
                 + "you configure and the documentation it fetches.")
     }
 
     private func row(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .top, spacing: Tokens.Space.control) {
+        HStack(alignment: .top, spacing: Tokens.Space.tight) {
             Text(label).font(Tokens.FontScale.small)
                 .foregroundStyle(.secondary).frame(width: 78, alignment: .leading)
             Text(value).font(Tokens.FontScale.small).textSelection(.enabled)

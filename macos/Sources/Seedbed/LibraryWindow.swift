@@ -444,12 +444,12 @@ struct LibraryView: View {
     var body: some View {
         HStack(spacing: 0) {
             sidebar.frame(width: Tokens.Width.librarySidebar)
-            Divider()
+            SeedbedDivider()
             VStack(spacing: 0) {
                 header
-                Divider()
+                SeedbedDivider()
                 if model.prompts.isEmpty {
-                    VStack(spacing: 10) {
+                    VStack(spacing: Tokens.Space.medium) {
                         Text("No prompts yet").font(Tokens.FontScale.sectionHeader)
                         Text("A prompt starts as one short line. The library writes the "
                              + "long, model-shaped version.")
@@ -457,7 +457,7 @@ struct LibraryView: View {
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center).frame(maxWidth: 320)
                         Button("New prompt") { model.newPrompt() }
-                            .buttonStyle(.borderedProminent)
+                            .seedbedProminent()
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if model.current == nil {
@@ -468,11 +468,13 @@ struct LibraryView: View {
                 } else {
                     ComparePane(model: model)
                 }
-                Divider()
+                SeedbedDivider()
                 statusBar
             }
         }
         .frame(minWidth: Tokens.Size.library.width, minHeight: Tokens.Size.library.height)
+        .background(Tokens.Surface.canvas)
+        .tint(Tokens.accent)
         .onAppear { model.reload() }
         .confirmationDialog(
             "Delete \(model.pendingDelete?.title ?? "this prompt")?",
@@ -491,14 +493,15 @@ struct LibraryView: View {
     private var sidebar: some View {
         VStack(spacing: 0) {
             filters
-            Divider()
+            SeedbedDivider()
             List(selection: Binding(get: { model.selection }, set: { model.select($0) })) {
                 ForEach(model.visiblePrompts) { prompt in
                     SidebarRow(model: model, prompt: prompt).tag(prompt.id)
                 }
             }
-            Divider()
-            HStack(spacing: Tokens.Space.control) {
+            .scrollContentBackground(.hidden)
+            SeedbedDivider()
+            HStack(spacing: Tokens.Space.tight) {
                 Button { model.newPrompt() } label: { Image(systemName: "plus") }
                     .help("New prompt (⌘N)")
                     .disabled(model.busy)
@@ -519,8 +522,8 @@ struct LibraryView: View {
     }
 
     private var filters: some View {
-        VStack(alignment: .leading, spacing: Tokens.Space.group) {
-            HStack(spacing: Tokens.Space.control) {
+        VStack(alignment: .leading, spacing: Tokens.Space.medium) {
+            HStack(spacing: Tokens.Space.tight) {
                 Image(systemName: "magnifyingglass").font(Tokens.FontScale.small)
                     .foregroundStyle(.secondary)
                 TextField("Search", text: $model.search)
@@ -532,6 +535,16 @@ struct LibraryView: View {
                     .buttonStyle(.plain)
                 }
             }
+            .padding(.horizontal, Tokens.Space.medium)
+            .padding(.vertical, Tokens.Space.row6)
+            .background(
+                RoundedRectangle(cornerRadius: Tokens.Radius.control)
+                    .fill(Tokens.searchInputBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Tokens.Radius.control)
+                    .stroke(Tokens.searchInputBorder, lineWidth: 0.5)
+            )
             // A Picker centres itself in whatever it is given. fixedSize keeps
             // it at its content width and the Spacer holds it against the left
             // edge, in line with the search field and the rows below.
@@ -551,7 +564,7 @@ struct LibraryView: View {
     }
 
     private var header: some View {
-        HStack(spacing: Tokens.Space.control) {
+        HStack(spacing: Tokens.Space.tight) {
             Picker("", selection: $tab) {
                 ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
             }
@@ -569,11 +582,11 @@ struct LibraryView: View {
                             set: { _ in model.toggleVisible(entry.id) }))
                     }
                 }
-                Divider()
+                SeedbedDivider()
                 Button("Show all") { model.showAllModels() }
-                Divider()
+                SeedbedDivider()
                 Button("Add or configure models…") { model.onOpenSettings(.models) }
-                Divider()
+                SeedbedDivider()
                 Button("Build with… (the model that writes prompts)") {
                     model.onOpenSettings(.building)
                 }
@@ -602,22 +615,22 @@ struct LibraryView: View {
                 Button("Save") { model.save() }
                     .keyboardShortcut("s")
                     .disabled(!model.dirty || model.busy)
-                    .buttonStyle(.borderedProminent)
+                    .seedbedProminent()
             }
         }
         .chromeBar()
     }
 
     private var statusBar: some View {
-        HStack(spacing: Tokens.Space.control) {
+        HStack(spacing: Tokens.Space.tight) {
             if model.busy { ProgressView().controlSize(.small) }
             Text(model.status.isEmpty ? " " : model.status)
                 .font(Tokens.FontScale.small)
-                .foregroundStyle(model.statusIsError ? Color.red : .secondary)
+                .foregroundStyle(model.statusIsError ? Tokens.danger : .secondary)
                 .lineLimit(1)
             Spacer()
             if model.dirty {
-                Text("unsaved changes").font(Tokens.FontScale.small).foregroundStyle(.orange)
+                Text("unsaved changes").font(Tokens.FontScale.small).foregroundStyle(Tokens.warning)
             }
         }
         .chromeBar()
@@ -631,7 +644,7 @@ struct EditPane: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Tokens.Space.field) {
+            VStack(alignment: .leading, spacing: Tokens.Space.snug) {
                 FormField("Title") {
                     TextField("", text: $model.draftTitle)
                         .textFieldStyle(.roundedBorder)
@@ -639,15 +652,16 @@ struct EditPane: View {
 
                 FormField("The prompt: keep it short, the enhancer expands it") {
                     TextEditor(text: $model.draftBody)
-                    .font(Tokens.FontScale.body.monospaced())
+                    .font(Tokens.FontScale.monoSmall)
                     .frame(minHeight: 90)
-                    .padding(4)
+                    .padding(Tokens.Space.row)
+                    .background(Tokens.Surface.sunken)
                     .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card)
-                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1))
+                        .stroke(Tokens.Surface.hairline, lineWidth: 1))
                 }
 
                 FormField("Category: groups the list and narrows search") {
-                    HStack(spacing: Tokens.Space.control) {
+                    HStack(spacing: Tokens.Space.tight) {
                         TextField("e.g. Coding", text: $model.draftCategory)
                             .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: 240)
@@ -656,7 +670,7 @@ struct EditPane: View {
                                 ForEach(model.categories, id: \.self) { existing in
                                     Button(existing) { model.draftCategory = existing }
                                 }
-                                Divider()
+                                SeedbedDivider()
                                 Button("None") { model.draftCategory = "" }
                             } label: {
                                 Image(systemName: "chevron.down")
@@ -695,7 +709,7 @@ struct EditPane: View {
 
                 FormField("Models this prompt is built for") {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), alignment: .leading)],
-                              alignment: .leading, spacing: Tokens.Space.group) {
+                              alignment: .leading, spacing: Tokens.Space.medium) {
                         ForEach(model.allModels, id: \.id) { entry in
                             Toggle(entry.name, isOn: Binding(
                                 get: { model.draftTargets.contains(entry.id) },
@@ -711,7 +725,7 @@ struct EditPane: View {
                 if let prompt = model.current, prompt.body != model.draftBody {
                     Label("Changing the text makes every render of it stale. Rebuild after saving.",
                           systemImage: "exclamationmark.triangle")
-                        .font(Tokens.FontScale.small).foregroundStyle(.orange)
+                        .font(Tokens.FontScale.small).foregroundStyle(Tokens.warning)
                 }
 
                 Text("Use {{PLACEHOLDER}} for values you fill in at copy time.")
@@ -746,7 +760,7 @@ struct ComparePane: View {
         } else {
             VStack(spacing: 0) {
                 summaryBlock
-                Divider()
+                SeedbedDivider()
                 grid
             }
         }
@@ -760,15 +774,13 @@ struct ComparePane: View {
         if state == "not-applicable" {
             EmptyView()
         } else {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: Tokens.Space.row6) {
+                HStack(spacing: Tokens.Space.row6) {
                     Image(systemName: "sparkles").font(Tokens.FontScale.tiny)
                         .foregroundStyle(Tokens.accent)
                     Text("How these differ").font(Tokens.FontScale.small)
                     if state == "stale" {
-                        Text("out of date").font(.system(size: Tokens.CompactSize.badge))
-                            .padding(.horizontal, 5).padding(.vertical, 1)
-                            .background(Capsule().fill(Color.orange.opacity(0.2)))
+                        Text("out of date").seedbedChip(tint: Tokens.warning)
                     }
                     Spacer()
                     if model.comparisonBusy { ProgressView().controlSize(.small) }
@@ -812,7 +824,7 @@ struct ComparePane: View {
                     HStack(alignment: .top, spacing: 0) {
                         ForEach(columns) { target in
                             column(target, width: width)
-                            Divider()
+                            SeedbedDivider()
                         }
                     }
                 }
@@ -826,10 +838,10 @@ struct ComparePane: View {
 
     private func column(_ target: Target, width: Double) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 5) {
+            VStack(alignment: .leading, spacing: Tokens.Space.row6) {
+                HStack(spacing: Tokens.Space.row6) {
                     Circle().fill(target.dotColor).frame(width: 6, height: 6)
-                    Text(target.shortName).font(.system(size: Tokens.CompactSize.rowText, weight: .semibold))
+                    Text(target.shortName).font(Tokens.FontScale.small.weight(.semibold))
                     Spacer()
                     if model.rebuilding.contains(target.model) {
                         ProgressView().controlSize(.small)
@@ -848,33 +860,33 @@ struct ComparePane: View {
                     .help("Move this column right")
                 }
                 .buttonStyle(.borderless)
-                .font(.system(size: Tokens.CompactSize.label))
+                .font(Tokens.FontScale.micro)
                 Text(target.label + (target.generated.isEmpty ? "" : " · \(target.generated)"))
-                    .font(.system(size: Tokens.CompactSize.label)).foregroundStyle(.secondary)
+                    .font(Tokens.FontScale.micro).foregroundStyle(.secondary)
                 if !target.variables.isEmpty {
                     Text(target.variables.map { "{{\($0)}}" }.joined(separator: " "))
-                        .font(.system(size: Tokens.CompactSize.badge, design: .monospaced))
+                        .font(Tokens.FontScale.monoTiny)
                         .foregroundStyle(Tokens.accent)
                         .lineLimit(1)
                 }
-                HStack(spacing: 6) {
+                HStack(spacing: Tokens.Space.row6) {
                     Button("Copy") { model.copy(target) }
                         .disabled(!target.isUsable)
                     Button("Rebuild") { model.rebuild(model: target.model) }
                         .disabled(model.busy)
                         .help("Rebuilds only \(target.shortName)")
                 }
-                .font(.system(size: Tokens.CompactSize.meta))
+                .font(Tokens.FontScale.tiny)
                 .controlSize(.small)
             }
-            .padding(12)
-            Divider()
+            .padding(Tokens.Space.snug)
+            SeedbedDivider()
             ScrollView {
                 Text(bodyText(for: target))
-                    .font(.system(size: Tokens.CompactSize.meta))
+                    .font(Tokens.FontScale.tiny)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
+                    .padding(Tokens.Space.snug)
             }
         }
         .frame(width: width)
@@ -899,19 +911,19 @@ struct SidebarRow: View {
     @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: Tokens.Space.row6) {
             if prompt.pinned {
-                Image(systemName: "pin.fill").font(.system(size: Tokens.CompactSize.badge))
+                Image(systemName: "pin.fill").font(.system(size: Tokens.IconSize.tiny))
                     .foregroundStyle(Tokens.accent)
             }
             VStack(alignment: .leading, spacing: 1) {
-                Text(prompt.title).font(.system(size: Tokens.CompactSize.rowText, weight: .medium)).lineLimit(1)
+                Text(prompt.title).font(Tokens.FontScale.small.weight(.medium)).lineLimit(1)
                 Text((prompt.category.isEmpty ? "" : "\(prompt.category) · ")
                      + "\(prompt.targets.count) model\(prompt.targets.count == 1 ? "" : "s")"
                      + (prompt.uses > 0 ? " · \(prompt.uses)×" : ""))
-                    .font(.system(size: Tokens.CompactSize.label)).foregroundStyle(.secondary)
+                    .font(Tokens.FontScale.micro).foregroundStyle(.secondary)
             }
-            Spacer(minLength: 4)
+            Spacer(minLength: Tokens.Space.row)
             if hovering {
                 PromptRowActions(
                     targetName: prompt.defaultTarget?.shortName,
@@ -922,7 +934,7 @@ struct SidebarRow: View {
                     onPin: { model.togglePin(prompt) },
                     onDelete: { model.requestDelete(prompt) })
             } else if prompt.targets.contains(where: { $0.state != "current" }) {
-                Circle().fill(.orange).frame(width: 5, height: 5)
+                Circle().fill(Tokens.warning).frame(width: 5, height: 5)
                     .help("Some models are stale or not built")
             }
         }

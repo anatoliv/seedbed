@@ -142,20 +142,20 @@ struct ModelsEditor: View {
                 if let onDone { Button("Done", action: onDone).keyboardShortcut(.defaultAction) }
             }
             .chromeBar()
-            Divider()
+            SeedbedDivider()
 
             HStack(spacing: 0) {
                 list.frame(width: Tokens.Width.list)
-                Divider()
+                SeedbedDivider()
                 form.frame(maxWidth: .infinity)
             }
 
-            Divider()
-            HStack(spacing: Tokens.Space.control) {
+            SeedbedDivider()
+            HStack(spacing: Tokens.Space.tight) {
                 if model.busy { ProgressView().controlSize(.small) }
                 Text(model.status)
                     .font(Tokens.FontScale.small)
-                    .foregroundStyle(model.statusIsError ? Color.red : .secondary)
+                    .foregroundStyle(model.statusIsError ? Tokens.danger : .secondary)
                     .lineLimit(1)
                 Spacer()
             }
@@ -171,14 +171,14 @@ struct ModelsEditor: View {
                 set: { if let id = $0 { model.select(id) } })
             ) { entry in
                 VStack(alignment: .leading, spacing: Tokens.Space.row) {
-                    Text(entry.name).font(Tokens.FontScale.bodyStrong).lineLimit(1)
-                    Text(entry.id).font(Tokens.FontScale.tiny.monospaced())
+                    Text(entry.name).font(Tokens.FontScale.body.weight(.medium)).lineLimit(1)
+                    Text(entry.id).font(Tokens.FontScale.monoTiny)
                         .foregroundStyle(.secondary).lineLimit(1)
                 }
                 .tag(entry.id)
             }
-            Divider()
-            HStack(spacing: Tokens.Space.control) {
+            SeedbedDivider()
+            HStack(spacing: Tokens.Space.tight) {
                 Button { model.startNew() } label: { Image(systemName: "plus") }
                 Button { model.remove() } label: { Image(systemName: "minus") }
                     .disabled(model.selection == nil || model.busy)
@@ -191,12 +191,12 @@ struct ModelsEditor: View {
 
     private var form: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Tokens.Space.field) {
+            VStack(alignment: .leading, spacing: Tokens.Space.snug) {
                 FormField("Model id, used in file paths and on the chips") {
                     TextField("claude-opus-5", text: $model.draftID)
                         .textFieldStyle(.roundedBorder)
                         .disabled(!model.isNew)
-                        .font(Tokens.FontScale.body.monospaced())
+                        .font(Tokens.FontScale.monoSmall)
                 }
                 FormField("Display name") {
                     TextField("Claude Opus 5", text: $model.draftName)
@@ -208,24 +208,26 @@ struct ModelsEditor: View {
                 }
                 FormField("Prompting guidance: one URL or file path per line") {
                     TextEditor(text: $model.draftGuides)
-                        .font(Tokens.FontScale.small.monospaced())
+                        .font(Tokens.FontScale.monoSmall)
                         .frame(height: 70)
-                        .padding(4)
+                        .padding(Tokens.Space.row)
+                        .background(Tokens.Surface.sunken)
                         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card)
-                            .stroke(Color.secondary.opacity(0.3), lineWidth: 1))
+                            .stroke(Tokens.Surface.hairline, lineWidth: 1))
                 }
                 FormField("Notes, always part of this model's guidance") {
                     TextEditor(text: $model.draftNotes)
                         .font(Tokens.FontScale.small)
                         .frame(height: 60)
-                        .padding(4)
+                        .padding(Tokens.Space.row)
+                        .background(Tokens.Surface.sunken)
                         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card)
-                            .stroke(Color.secondary.opacity(0.3), lineWidth: 1))
+                            .stroke(Tokens.Surface.hairline, lineWidth: 1))
                 }
                 HStack {
                     Button(model.isNew ? "Add model" : "Save changes") { model.save() }
                         .disabled(!model.canSave)
-                        .buttonStyle(.borderedProminent)
+                        .seedbedProminent()
                     Text("Changing guidance or notes makes every render for this model stale.")
                         .font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
                 }

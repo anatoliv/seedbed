@@ -201,14 +201,14 @@ struct ManualSearchField: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(spacing: Tokens.Space.control - 2) {
+        HStack(spacing: Tokens.Space.row6) {
             Image(systemName: "magnifyingglass")
                 .font(Tokens.FontScale.small)
                 .foregroundStyle(.secondary)
             // Short enough for the sidebar it now lives in. "Search Help and the
             // FAQ" fit the 560pt reading column and truncates to "Search Help
             // and the" at 178pt, which reads as a bug in the field rather than
-            // as a label that is too long. Reference's says "Search help" for
+            // as a label that is too long. Reference uses "Search Help & FAQ" for
             // the same reason.
             TextField("Search help", text: $query)
                 .textFieldStyle(.plain)
@@ -223,11 +223,7 @@ struct ManualSearchField: View {
                     onReturnToResults()
                 } label: {
                     Text(count == 1 ? "1 result" : "\(count) results")
-                        .font(.system(size: Tokens.CompactSize.badge))
-                        .foregroundStyle(Tokens.OnTint.accent)
-                        .padding(.horizontal, 5).padding(.vertical, 1)
-                        .background(RoundedRectangle(cornerRadius: Tokens.Radius.chip)
-                            .fill(Tokens.accent.opacity(0.14)))
+                        .seedbedChip(tint: Tokens.accent)
                 }
                 .buttonStyle(.plain)
                 .help("Back to the results for this search")
@@ -248,10 +244,16 @@ struct ManualSearchField: View {
                 .keyboardShortcut(.cancelAction)
             }
         }
-        .padding(.horizontal, Tokens.Space.control)
-        .padding(.vertical, Tokens.Space.group - 3)
-        .background(RoundedRectangle(cornerRadius: Tokens.Radius.control)
-            .fill(Color.secondary.opacity(0.10)))
+        .padding(.horizontal, Tokens.Space.tight)
+        .padding(.vertical, Tokens.Space.row6)
+        .background(
+            RoundedRectangle(cornerRadius: Tokens.Radius.control)
+                .fill(Tokens.searchInputBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Tokens.Radius.control)
+                .stroke(Tokens.searchInputBorder, lineWidth: 0.5)
+        )
     }
 }
 
@@ -266,7 +268,7 @@ struct ManualSearchResults: View {
 
     var body: some View {
         if hits.isEmpty {
-            VStack(alignment: .leading, spacing: Tokens.Space.group) {
+            VStack(alignment: .leading, spacing: Tokens.Space.medium) {
                 SectionHeader("Nothing matches \"\(query)\"")
                 Caption("Help covers the keys, the words this app uses, and what to do when "
                         + "something looks wrong. The FAQ covers the MCP server and the "
@@ -274,13 +276,13 @@ struct ManualSearchResults: View {
             }
         } else {
             SectionHeader(hits.count == 1 ? "1 result" : "\(hits.count) results")
-            VStack(alignment: .leading, spacing: Tokens.Space.group) {
+            VStack(alignment: .leading, spacing: Tokens.Space.medium) {
                 ForEach(hits) { hit in
                     Button { open(hit.topic.page) } label: {
                         VStack(alignment: .leading, spacing: Tokens.Space.row) {
-                            HStack(spacing: Tokens.Space.control - 2) {
+                            HStack(spacing: Tokens.Space.row6) {
                                 Image(systemName: hit.topic.page.symbol)
-                                    .font(.system(size: Tokens.CompactSize.badge))
+                                    .font(Tokens.FontScale.nano)
                                     .foregroundStyle(Tokens.accent)
                                 Text("\(hit.topic.page.title) · \(hit.topic.section)")
                                     .font(Tokens.FontScale.tiny)
