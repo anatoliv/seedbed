@@ -76,6 +76,13 @@ official SDK; OpenAI-compatible endpoints include local servers. You can also
 choose **ChatGPT sign-in** in the app, or run `python3 -m promptlib enhancer
 login`, to build through a Plus or Pro subscription without an API key.
 
+[HELP.md](HELP.md) is the reference: every key, the vocabulary, and what to do
+when something looks wrong. [FAQ.md](FAQ.md) answers the questions people
+arrive with. Both are the same text the app shows under Help and FAQ, generated
+from it by `Scripts/generate-help-docs.py` so the two cannot disagree, which is
+why they carry a banner asking you not to edit them directly. If you have the
+app, press `?` in the panel instead.
+
 ## Let an agent ask for a prompt
 
 The macOS app can run an **MCP server**, so Claude Code, Cursor or Claude Desktop

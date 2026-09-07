@@ -44,6 +44,12 @@ EXEMPT_FILES = {
     # only do by spelling them. Sweeping it would disarm the check that stops
     # them reaching a public repository at all.
     "Scripts/publish-repo.sh",
+    # Same class, and it earned its place on 2026-09-07: the history purge finds
+    # these names in old revisions and replaces them, so its manifest is a list
+    # of the names it removes. A tool that erases a name has to spell it. Both
+    # files are private ops tooling the public snapshot excludes, so neither
+    # exemption puts a name in front of a public reader.
+    "Scripts/purge-public-history.sh",
 }
 
 
