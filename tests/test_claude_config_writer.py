@@ -28,6 +28,8 @@ two invariants that can be read off the source are checked here.
 from __future__ import annotations
 
 import json
+import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -69,6 +71,50 @@ do {
     response = ["ok": false, "failure": failure == .malformed ? "malformed" : "unexpectedShape"]
 } catch {
     response = ["ok": false, "failure": "unknown"]
+}
+FileHandle.standardOutput.write(try! JSONSerialization.data(withJSONObject: response))
+"""
+
+#: The same idea one level out, for the half of the installer that does touch a
+#: filesystem. `update` takes a `path:` and a `now:` precisely so a harness can
+#: point it at a temp directory and hand it a fixed clock, which is the only way
+#: to make two presses land in the same wall-clock second on purpose. Every path
+#: this harness is ever given is inside a temp directory; see `run_installer`.
+INSTALLER_HARNESS = r"""
+import Foundation
+
+let input = FileHandle.standardInput.readDataToEndOfFile()
+guard let request = try? JSONSerialization.jsonObject(with: input) as? [String: Any],
+      let mode = request["mode"] as? String,
+      let path = request["path"] as? String,
+      let epoch = request["now"] as? Double
+else {
+    FileHandle.standardError.write(Data("harness could not read its request".utf8))
+    exit(2)
+}
+let now = Date(timeIntervalSince1970: epoch)
+
+var response: [String: Any] = [:]
+switch mode {
+case "update":
+    guard let url = request["url"] as? String, let token = request["token"] as? String else {
+        FileHandle.standardError.write(Data("update needs a url and a token".utf8))
+        exit(2)
+    }
+    let report = ClaudeConfigInstaller.update(url: url, token: token, at: path, now: now)
+    response = ["succeeded": report.succeeded, "title": report.title, "detail": report.detail]
+case "name":
+    // The name picker on its own, with a made-up filesystem, so the walk up
+    // through -1, -2 and the refusal at the end are all observable.
+    let taken = Set(request["taken"] as? [String] ?? [])
+    let everythingTaken = request["everythingTaken"] as? Bool ?? false
+    let chosen = ClaudeConfigInstaller.backupPath(for: path, now: now) {
+        everythingTaken || taken.contains(($0 as NSString).lastPathComponent)
+    }
+    response = ["name": chosen.map { ($0 as NSString).lastPathComponent } ?? NSNull()]
+default:
+    FileHandle.standardError.write(Data("unknown mode".utf8))
+    exit(2)
 }
 FileHandle.standardOutput.write(try! JSONSerialization.data(withJSONObject: response))
 """
@@ -389,6 +435,252 @@ class TheButtonHandsOverTheReadOnlyToken(unittest.TestCase):
         for banned in ("print(", "NSLog(", "os_log("):
             self.assertNotIn(banned, installer,
                              f"{banned} in the installer, which can put a token in a log")
+
+
+#: A `.bak-` name with nothing after the second-granular stamp. The stamp is
+#: rendered in the machine's own time zone, so the shape is what can be pinned,
+#: and the shape is the part a person sorts a directory listing by.
+PLAIN_BACKUP = re.compile(r"\.claude\.json\.bak-\d{8}-\d{6}$")
+
+#: The backup name as it appears inside a report sentence, suffix and all. The
+#: suffix has to be part of the match, because the plain stamp is a prefix of
+#: every suffixed name and a substring test would find both.
+NAMED_BACKUP = re.compile(r"\.claude\.json\.bak-\d{8}-\d{6}(?:-\d+)?")
+
+
+class TheBackupIsNeverSilentlyOverwritten(unittest.TestCase):
+    """A backup that replaces an earlier backup is worse than no backup at all.
+
+    The name was the timestamp alone, formatted to the second, so two presses
+    inside one wall-clock second produced one name and the second write replaced
+    the first backup. Found by pressing three times in quick succession and
+    getting two backups.
+
+    Usually it costs nothing, because the installer is idempotent and
+    consecutive writes are byte-identical. The case that loses data: the first
+    press takes the file from A to B and its backup holds A, then a second press
+    inside the same second takes it from B to C and overwrites the file holding
+    A with one holding B. A is then gone, and A is the state somebody who
+    pressed by mistake is reaching for.
+
+    **Every path below is inside a temp directory, asserted before each run.**
+    The real `~/.claude.json` is this machine's live Claude Code configuration
+    and nothing here may go near it or leave a `.bak-` file beside it.
+    """
+
+    binary: Path
+    workdir: str
+
+    # A fixed clock, so both presses land in the same second by construction
+    # rather than by racing a real one.
+    NOW = 1_757_200_000.0
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        if shutil.which("swiftc") is None:            # pragma: no cover
+            raise unittest.SkipTest("swiftc is not on this machine")
+        cls.workdir = tempfile.mkdtemp(prefix="seedbed-config-installer-")
+        main = Path(cls.workdir) / "main.swift"
+        main.write_text(INSTALLER_HARNESS, encoding="utf-8")
+        cls.binary = Path(cls.workdir) / "harness"
+        build = subprocess.run(
+            ["swiftc", "-o", str(cls.binary), str(main), str(WRITER)],
+            capture_output=True, text=True,
+        )
+        if build.returncode != 0:                     # pragma: no cover
+            raise AssertionError("the installer did not compile:\n" + build.stderr)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        shutil.rmtree(cls.workdir, ignore_errors=True)
+
+    def setUp(self) -> None:
+        self.home = Path(tempfile.mkdtemp(prefix="seedbed-fake-home-", dir=self.workdir))
+        self.config = self.home / ".claude.json"
+
+    def config_holding(self, url: str) -> None:
+        """Write the fixture config, pointing the seedbed entry at `url`."""
+        self.config.write_text(
+            "{\n"
+            '  "numStartups": 41,\n'
+            '  "mcpServers": {\n'
+            '    "seedbed": {\n'
+            '      "type": "http",\n'
+            f'      "url": "{url}",\n'
+            '      "headers": {\n'
+            '        "Authorization": "Bearer whatever-was-current"\n'
+            "      }\n"
+            "    }\n"
+            "  }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+
+    def run_harness(self, request: dict) -> dict:
+        # The guard that keeps this suite off the real file. A path outside the
+        # temp tree is a bug in the test, and must never reach the installer.
+        path = request["path"]
+        self.assertTrue(
+            os.path.realpath(path).startswith(os.path.realpath(self.workdir) + os.sep),
+            f"the harness was pointed outside its temp directory: {path}",
+        )
+        done = subprocess.run(
+            [str(self.binary)], input=json.dumps(request), capture_output=True, text=True,
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return json.loads(done.stdout)
+
+    def press(self, url: str, at: float | None = None) -> dict:
+        return self.run_harness({
+            "mode": "update", "path": str(self.config), "url": url,
+            "token": TOKEN, "now": self.NOW if at is None else at,
+        })
+
+    def backups(self) -> list[Path]:
+        return sorted(p for p in self.home.iterdir() if ".bak-" in p.name)
+
+    def test_a_second_press_in_the_same_second_keeps_the_first_backup(self) -> None:
+        """The state before the first press stays recoverable.
+
+        This is the defect. Two presses, one fixed clock, and each has to leave
+        behind the file as it was when that press began. Before the fix the
+        second backup landed on the first one's name and the original url was
+        unrecoverable from anywhere on disk.
+        """
+        self.config_holding("http://127.0.0.1:1111")            # state A
+        self.assertTrue(self.press("http://127.0.0.1:2222")["succeeded"])   # A -> B
+        self.assertTrue(self.press("http://127.0.0.1:3333")["succeeded"])   # B -> C
+
+        names = self.backups()
+        self.assertEqual(len(names), 2, f"a backup was overwritten: {[p.name for p in names]}")
+        held = [p.read_text(encoding="utf-8") for p in names]
+        self.assertTrue(any("127.0.0.1:1111" in text for text in held),
+                        "the state before the first press is not recoverable from any backup")
+        self.assertTrue(any("127.0.0.1:2222" in text for text in held),
+                        "the state before the second press is not recoverable from any backup")
+        self.assertIn("127.0.0.1:3333", self.config.read_text(encoding="utf-8"))
+
+    def test_each_report_names_the_backup_that_press_actually_wrote(self) -> None:
+        """The report is how somebody finds the file, so it has to be the one.
+
+        A fix that picks a free name and then writes to the colliding one, or
+        the other way round, still leaves two backups on disk and still tells
+        the reader to look in the wrong place.
+        """
+        self.config_holding("http://127.0.0.1:1111")
+        first = self.press("http://127.0.0.1:2222")
+        second = self.press("http://127.0.0.1:3333")
+
+        on_disk = {p.name: p for p in self.backups()}
+        for report, expected_url in ((first, "127.0.0.1:1111"), (second, "127.0.0.1:2222")):
+            named = set(NAMED_BACKUP.findall(report["detail"]))
+            self.assertEqual(len(named), 1,
+                             f"the report names no one backup: {report['detail']!r}")
+            name = named.pop()
+            self.assertIn(name, on_disk, "the report names a backup that was never written")
+            self.assertIn(expected_url, on_disk[name].read_text(encoding="utf-8"),
+                          "the report names a backup other than the one it wrote")
+        self.assertNotEqual(first["detail"], second["detail"],
+                            "both presses reported the same backup file")
+
+    def test_the_first_backup_of_a_second_is_named_by_the_stamp_alone(self) -> None:
+        """The readable name is the common case and must not grow a suffix.
+
+        Sub-second precision was the other candidate fix, and this is what it
+        would have cost: a name nobody can order by eye, on every press, to
+        make rarer a collision that is now impossible.
+        """
+        self.config_holding("http://127.0.0.1:1111")
+        self.assertTrue(self.press("http://127.0.0.1:2222")["succeeded"])
+
+        names = self.backups()
+        self.assertEqual(len(names), 1)
+        self.assertRegex(names[0].name, PLAIN_BACKUP)
+
+    def test_a_backup_left_by_something_else_is_stepped_over_not_replaced(self) -> None:
+        """Nothing already sitting under that name is ours to destroy.
+
+        A file from a run a day earlier that happens to share the stamp, or one
+        a person copied there by hand, is still somebody's fallback.
+        """
+        self.config_holding("http://127.0.0.1:1111")
+        looked_at_a_name = self.run_harness({
+            "mode": "name", "path": str(self.config), "now": self.NOW, "taken": [],
+        })["name"]
+        squatter = self.home / looked_at_a_name
+        squatter.write_text("not a config, and not ours to lose\n", encoding="utf-8")
+
+        report = self.press("http://127.0.0.1:2222")
+        self.assertTrue(report["succeeded"], report)
+        self.assertEqual(squatter.read_text(encoding="utf-8"),
+                         "not a config, and not ours to lose\n",
+                         "a file that was already there was overwritten")
+        self.assertIn("127.0.0.1:1111",
+                      (self.home / f"{looked_at_a_name}-1").read_text(encoding="utf-8"))
+
+    def test_the_search_walks_up_to_the_first_free_name(self) -> None:
+        """`-1`, then `-2`, in the order a person reads them."""
+        base = self.run_harness({
+            "mode": "name", "path": str(self.config), "now": self.NOW, "taken": [],
+        })["name"]
+        for taken, expected in (
+            ([base], f"{base}-1"),
+            ([base, f"{base}-1"], f"{base}-2"),
+            ([base, f"{base}-1", f"{base}-2"], f"{base}-3"),
+            ([f"{base}-1"], base),          # the stamp itself is still free
+        ):
+            with self.subTest(taken=len(taken)):
+                chosen = self.run_harness({
+                    "mode": "name", "path": str(self.config),
+                    "now": self.NOW, "taken": taken,
+                })["name"]
+                self.assertEqual(chosen, expected)
+
+    def test_a_search_that_finds_no_free_name_refuses_rather_than_reusing_one(self) -> None:
+        """Running out of names is a reason to change nothing, not to pick one.
+
+        Falling back to any taken name here would put the whole defect back for
+        the one case the fix exists to cover.
+        """
+        chosen = self.run_harness({
+            "mode": "name", "path": str(self.config),
+            "now": self.NOW, "everythingTaken": True,
+        })["name"]
+        self.assertIsNone(chosen, f"a name already in use was handed back: {chosen!r}")
+
+    def test_a_press_with_no_free_backup_name_leaves_the_file_alone(self) -> None:
+        """No backup, no write. The backup is what makes the button safe."""
+        self.config_holding("http://127.0.0.1:1111")
+        before = self.config.read_text(encoding="utf-8")
+        base = self.run_harness({
+            "mode": "name", "path": str(self.config), "now": self.NOW, "taken": [],
+        })["name"]
+        (self.home / base).write_text("taken\n", encoding="utf-8")
+        for suffix in range(1, 1000):
+            (self.home / f"{base}-{suffix}").write_text("taken\n", encoding="utf-8")
+
+        report = self.press("http://127.0.0.1:2222")
+        self.assertFalse(report["succeeded"], report)
+        self.assertEqual(self.config.read_text(encoding="utf-8"), before,
+                         "the configuration was rewritten without a backup")
+        self.assertTrue(
+            all(p.read_text(encoding="utf-8") == "taken\n" for p in self.backups()),
+            "an existing backup was overwritten when there was no free name",
+        )
+
+    def test_the_backup_write_itself_refuses_to_overwrite(self) -> None:
+        """The second half of the guarantee, which only the source can show.
+
+        Choosing a free name is a check, and a check has a gap between it and
+        the write. `.withoutOverwriting` closes the gap in the kernel, and it
+        cannot be paired with `.atomic` because Foundation traps on the
+        combination. There is no way to open that gap from a single-process
+        test, so the line is pinned where it is written.
+        """
+        text = WRITER.read_text(encoding="utf-8")
+        installer = text[text.index("enum ClaudeConfigInstaller"):]
+        self.assertIn("options: [.withoutOverwriting])", installer,
+                      "the backup write no longer refuses to overwrite")
 
 
 if __name__ == "__main__":                            # pragma: no cover

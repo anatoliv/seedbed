@@ -396,12 +396,55 @@ enum ClaudeConfigInstaller {
         (NSHomeDirectory() as NSString).appendingPathComponent(".claude.json")
     }
 
+    /// The second-granular stamp a backup is named after.
+    ///
+    /// Deliberately second-granular and deliberately not unique: this is a name
+    /// a person reads in a directory listing when they are trying to find the
+    /// version of their file from before they pressed the button, and sorting
+    /// it by eye is most of its job. Uniqueness is `backupPath`'s problem, not
+    /// this function's.
     static func timestamp(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone.current
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         return formatter.string(from: date)
+    }
+
+    /// How many names one second's worth of backups may claim before the write
+    /// is refused. A person cannot press a button a thousand times inside one
+    /// second, so reaching this means something else is writing these files and
+    /// guessing further is worse than stopping.
+    static let backupNameLimit = 999
+
+    /// The name to back `path` up under: the timestamp, then the first free
+    /// `-1`, `-2` … if something already sits there. `nil` when the whole run
+    /// is taken, which is the caller's cue to change nothing.
+    ///
+    /// The timestamp alone used to be the whole name, and two presses inside
+    /// the same wall-clock second therefore produced the same one, so the
+    /// second backup silently replaced the first. Usually harmless, because
+    /// consecutive writes are identical — the installer is idempotent. The path
+    /// that loses data: the first press takes the file from A to B and its
+    /// backup holds A, then a second press inside the same second takes it from
+    /// B to C and overwrites the file holding A with one holding B. A is then
+    /// unrecoverable, and A is exactly the state somebody who pressed by
+    /// mistake is reaching for.
+    ///
+    /// Sub-second precision in the stamp would have made the collision rarer
+    /// rather than impossible, and would have cost the readable ordering above.
+    /// A name that is checked for free-ness needs no argument about how likely
+    /// a collision is.
+    static func backupPath(for path: String, now: Date,
+                           exists: (String) -> Bool = {
+                               FileManager.default.fileExists(atPath: $0)
+                           }) -> String? {
+        let base = "\(path).bak-\(timestamp(now))"
+        if !exists(base) { return base }
+        for suffix in 1...backupNameLimit where !exists("\(base)-\(suffix)") {
+            return "\(base)-\(suffix)"
+        }
+        return nil
     }
 
     /// Point the client's `seedbed` entry at this url and token.
@@ -458,10 +501,25 @@ enum ClaudeConfigInstaller {
         }
 
         // Back up before writing, never after. The backup is the whole reason
-        // this is safe to press, so a failure here stops the write.
-        let backup = "\(path).bak-\(timestamp(now))"
+        // this is safe to press, so a failure here stops the write — and so
+        // does having nowhere free to put it, because a backup that replaces
+        // an earlier backup is worse than no backup at all: it looks like one.
+        guard let backup = backupPath(for: path, now: now) else {
+            return Report(
+                succeeded: false,
+                title: "Seedbed could not save a backup, so it changed nothing.",
+                detail: "There are already too many backups of "
+                    + "\(displayPath(path)) from this same second, so there was no free "
+                    + "name left to write another one under. Move some of them somewhere "
+                    + "else and try again."
+            )
+        }
         do {
-            try data.write(to: URL(fileURLWithPath: backup), options: [.atomic])
+            // `.withoutOverwriting` rather than `.atomic`, and not both, because
+            // Foundation traps on the combination. Refusing to replace a backup
+            // that appeared between the name being chosen and the write is worth
+            // more here than atomicity on a name that was free a moment ago.
+            try data.write(to: URL(fileURLWithPath: backup), options: [.withoutOverwriting])
         } catch {
             return Report(
                 succeeded: false,

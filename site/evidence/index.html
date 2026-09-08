@@ -95,12 +95,17 @@
         </p>
         <p>
           <strong>Declared deviations.</strong> Four tasks rather than the five first planned. Scored against
-          checkable criteria by one reader rather than judged blind. One run per condition at temperature 0.
+          checkable criteria by one reader rather than judged blind. One run per condition. The local run was
+          served at temperature 0; the Opus run used a command line runner that exposes no temperature setting,
+          so temperature was not controlled there.
           Both fix tasks in the Opus run had <code>swift build</code> and <code>swift test</code> refused by the
           permission system, so nothing was compiled or run in either condition. That hit the two arms unevenly:
           the render asks the model to reproduce the failure and run the tests, the seed asks it to verify nothing,
-          and those are the two tasks the render lost. The scoring stands as recorded, and neither task has been
-          re-run with the toolchain available.
+          and those are the two tasks the render lost. The scoring stands as recorded. Both fix tasks were later
+          re-run with the toolchain permitted: on t3 the two arms tied at 3 of 3, which is a tie and not a gain,
+          and t4 was not scored, because the root cause it is scored against has never been measured and the two
+          re-runs disagree about what the code does. So the confound is closed on one of the two tasks and open
+          on the other.
         </p>
 
         <h3>Inputs</h3>
