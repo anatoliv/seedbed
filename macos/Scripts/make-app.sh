@@ -27,6 +27,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The notarization wall clock and its retry loop, shared with release.sh. This
+# script is separately runnable and is also invoked by release.sh as a child
+# process, so it sources the helper for itself either way.
+# shellcheck source=Scripts/support/notarize.sh
+. Scripts/support/notarize.sh
+
 # Keep the Mac awake through `notarytool submit`, which uploads to Apple and then
 # blocks on a verdict. An idle Mac sleeping through it suspends the upload, and
 # the step then looks exactly like a hang with no error to read.
@@ -270,25 +276,24 @@ if [[ -n "${NOTARY_PROFILE:-}" ]]; then
         echo "       or unset NOTARY_PROFILE." >&2
         exit 1
     fi
-    # GNU timeout is not part of macOS. Where it is absent, run the command bare
-    # rather than failing on a missing binary: the retry loop still works, it just
-    # loses the outer wall clock that the comment below explains.
-    command -v timeout >/dev/null 2>&1 || timeout() { shift; "$@"; }
+    # The wall clock has to exist before anything is uploaded. This refuses when
+    # GNU timeout is missing rather than running the submission unguarded, and
+    # it refuses here — inside the NOTARY_PROFILE branch — so an ordinary local
+    # build still needs nothing installed. Scripts/support/notarize.sh says why
+    # at length.
+    require_wall_clock || exit 1
     echo "==> Notarizing the bundle (profile: $NOTARY_PROFILE)"
     ZIP="build/notarize-upload.zip"
     ditto -c -k --keepParent "$APP" "$ZIP"
-    # `--timeout` covers the wait for Apple's verdict and NOT the upload, and the
-    # upload is the half that hangs: `notarytool submit` sits at "initiating
-    # connection to the Apple notary service" while nothing ever reaches
-    # `notarytool history`, so the flag never fires. An outer wall clock turns an
-    # hour of silence into a hiccup and fails loudly instead of appearing to work.
-    if ! timeout 900 xcrun notarytool submit "$ZIP" \
-            --keychain-profile "$NOTARY_PROFILE" --wait --timeout 12m; then
+    # Bounded retries around a wall clock, the same treatment the DMG gets in
+    # release.sh. The .app and the DMG go to the same service and hang the same
+    # way; until 2026-09-08 this one had a single attempt, so a hang here failed
+    # a release that the next attempt would have completed.
+    if ! notarize_with_retry "$ZIP" "$NOTARY_PROFILE"; then
         rm -f "$ZIP"
-        echo "error: notarization of the bundle did not complete within 15 minutes." >&2
-        echo "       Check whether the upload ever landed:" >&2
-        echo "         xcrun notarytool history --keychain-profile $NOTARY_PROFILE | head" >&2
-        echo "       Absent from that list means nothing uploaded, and waiting cannot help." >&2
+        echo "error: notarization of the bundle did not complete." >&2
+        notarize_failure_advice "$NOTARY_PROFILE"
+        echo "       Nothing was published: this is a local bundle." >&2
         exit 1
     fi
     rm -f "$ZIP"

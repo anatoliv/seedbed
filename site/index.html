@@ -520,12 +520,14 @@ E   assert 0 == 10.0 …</code></pre>
         <div class="verdict">
           <div class="who"><span class="model">claude-opus-5</span><span class="tag flat">No advantage</span></div>
           <div class="big">0 of 4<small>tasks where the render beat the seed on correctness</small></div>
+          <div class="t-small t-mute">t4 withdrawn as evidence. <a href="/evidence/">Why</a></div>
           <p>Both conditions found the true mechanism wherever it was findable. The render explained more thoroughly and refused more; the seed delivered more working code. On a strong model, tailoring changed risk posture, not correctness.</p>
           <blockquote class="bad">If you already pay for a frontier model, the honest advice is: type the short prompt. Seedbed is not going to make it answer better.</blockquote>
         </div>
         <div class="verdict">
           <div class="who"><span class="model">qwen3-vl-30b</span><span class="tag won">Render won</span></div>
-          <div class="big">3 of 4<small>tasks won by the render · 9 of 12 criteria against 5 of 12</small></div>
+          <div class="big">3 of 4<small>tasks won by the render · 10 of 12 criteria against 6 of 12</small></div>
+          <div class="t-small t-mute">t4 withdrawn as evidence. <a href="/evidence/">Why</a></div>
           <p>The raw seed produced five confident fabrications on one task and skipped the requested test on both fix tasks. The render invented nothing, named nine things it could not see, wrote real tests both times, and did it in 44% fewer words.</p>
           <div class="quotecmp">
             <div><div class="lbl">Raw seed</div><blockquote class="bad">"likely using SHA-256 … the file format is likely YAML-like … the <code>save</code> method would likely…"</blockquote></div>
@@ -724,7 +726,7 @@ git clone https://github.com/anatoliv/seedbed \
           <div class="box">
             <h3>What it asks for, and what it never sends</h3>
             <p>Pasting into the app you came from needs the Accessibility permission, which macOS asks for the first time you use it. Without it Seedbed copies to the clipboard and tells you why it did not paste.</p>
-            <p style="margin-top:8px">Crash reports are off. If you turn them on, they carry the stack trace and the versions, and never a prompt, a render, a value you filled in, or a token. There is no other telemetry, and no account.</p>
+            <p style="margin-top:8px">Crash reports are off. If you turn them on, they carry the stack trace and the versions, and never a prompt, a render, a value you filled in, or a token. Your home folder path is rewritten to a tilde before anything leaves this Mac. There is no other telemetry, and no account.</p>
           </div>
         </div>
         <ul class="specs" aria-label="At a glance">

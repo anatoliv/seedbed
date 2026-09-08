@@ -37,4 +37,5 @@ clipboard and tells you why it did not paste.
 
 Crash reports are off. If you turn them on in Settings, General, Diagnostics,
 they carry the stack trace and the versions, and never a prompt, a render, a
-value you filled in, or an access token.
+value you filled in, or an access token. Your home folder path is rewritten
+to a tilde before anything leaves this Mac.

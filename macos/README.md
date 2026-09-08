@@ -294,9 +294,17 @@ Reference after they earned their place there:
   if you mean it). That file may already be installed somewhere, and replacing
   its bytes under the same name makes "which build is that Mac running?"
   unanswerable.
-- **Notarization runs under an outer 15-minute wall clock, three attempts.**
-  `notarytool --timeout` covers the wait for Apple's verdict and not the upload,
-  and the upload is the half that hangs, so that flag never fires.
+- **Notarization runs under an outer 15-minute wall clock, three attempts —
+  both submissions, the `.app` and the DMG.** `notarytool --timeout` covers the
+  wait for Apple's verdict and not the upload, and the upload is the half that
+  hangs, so that flag never fires. The clock and the loop live in
+  `Scripts/support/notarize.sh`, sourced by `make-app.sh` and `release.sh`
+  alike, because until 2026-09-08 only the DMG retried.
+- **Notarizing needs GNU timeout, and refuses without it** (`brew install
+  coreutils`). It used to fall back to running the submission bare, which left
+  the source showing a guard and the release able to hang for an hour. Only
+  notarization asks for it: an ordinary `Scripts/make-app.sh` with no
+  `NOTARY_PROFILE` never reaches the check.
 - **A hosted-Sentry build refuses to package without a symbol upload**
   (`ALLOW_NO_SYMBOLS=1` to override). Crash reports with no function names or
   line numbers are most of the way to no crash reports at all, and you find out

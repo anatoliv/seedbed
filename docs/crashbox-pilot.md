@@ -13,9 +13,10 @@ application never initializes two clients and packaging refuses both inputs.
   `sha256:dad0a78961ed17ff0fdc778db48d5290cecc2eccd82f45d4b18fc264b02e4302`
 - Credential source: the estate's root-owned mode-`0600` project record; never
   copy its value into this repository, logs, a task comment, or shell history.
-- Hosted rollback: the existing Seedbed hosted-Sentry DSN, retained separately
-  as a protected mode-`0600` record. Its value must not coexist with the
-  Crashbox input during any build.
+- Hosted rollback: a retained release artifact, not a credential. See "Cutover
+  and rollback gate" for what it is and how to execute it. A hosted-Sentry DSN
+  must still never coexist with the Crashbox input during a build, and that
+  half is mechanical: `Scripts/configure-crash-reporting.sh` refuses both.
 
 ## Build and artifact proof
 
@@ -72,7 +73,15 @@ the event id and timestamps, never a DSN or payload.
 
 ## Cutover and rollback gate
 
-Do not install or publish the Crashbox build until all of these are true:
+**Seedbed 0.1.9 shipped as a Crashbox build on 2026-09-08 with item 3 below
+unmet, and this document was not amended for a day.** For that day the only
+written instruction in the repository on the subject said not to publish, and
+a build had been published. The decision to go ahead was right on the merits
+and is defended below. Taking it without amending this file in the same commit
+was not, because a runbook that contradicts the artifact teaches its next
+reader to disbelieve the whole file rather than the one stale line.
+
+The gate was written on 2026-09-07 as a pre-cutover checklist. It read:
 
 1. the exact dSYM is privately stored and its two UUIDs match the bundle;
 2. the one-event Crashbox test is durably queryable and its alert arrived;
@@ -81,9 +90,80 @@ Do not install or publish the Crashbox build until all of these are true:
 4. the prior signed/notarized Seedbed release and hosted DSN remain available
    as the smallest rollback unit.
 
-The estate's hosted-Sentry quota currently rejects new events, so item 3 is a
-hard blocker. A local Crashbox canary can prove ingestion without changing the
-installed application, but it is not a production cutover and cannot open the
-one-hour observation window. After the fallback gate clears, release one
-Crashbox build, observe it for one hour, and immediately restore the retained
-hosted build on any ingest, alert, symbolication, privacy, or stability failure.
+Three of those were the right conditions. One was not, and the reason is worth
+stating rather than editing away.
+
+**Item 1 held, and can no longer fail quietly.** `Scripts/release.sh` refuses a
+Crashbox build that does not declare `CRASHBOX_DSYM_ARTIFACT` and
+`CRASHBOX_DSYM_UUIDS`, and after the build compares the declared set against
+`dwarfdump --uuid` of the executable that is actually shipping. A dSYM from a
+near-identical build stops the release rather than producing healthy-looking
+reports with empty stacks.
+
+**Item 2 held, and was then exceeded.** The bounded test event was durable and
+its alert arrived before the release. Afterwards the installed build produced a
+real crash that was accepted, stored, grouped into an issue and alerted on the
+first attempt.
+
+**Item 3 did not hold, cannot be made to hold, and is withdrawn as of
+2026-09-08.** It was already unmeetable on the day it was written, and the
+gate said so in the paragraph beneath it: the estate's hosted-Sentry quota
+rejects new events, and it still does. So nothing lapsed between the writing
+and the cutover. What changed is its purpose. Item 3 existed only to
+prove that the rollback named in item 4 was worth taking, and item 4 turned out
+to be satisfiable without it, because the rollback is an artifact rather than a
+credential. Worse, the build that rollback restores points at the same
+exhausted quota, so executing it today would move Seedbed from a provider that
+accepts, stores, groups and alerts to one that accepts nothing. Item 3 asked
+for a certificate of health for a fallback that is worse than the thing it
+insures. Earning it would have meant buying hosted quota to validate a path
+this pilot exists to leave. It is withdrawn outright rather than restated in a
+weaker form, because a weaker form would still be a condition about a service
+Seedbed no longer sends anything to.
+
+**Item 4 held, and it is the one that still binds.** Stated so someone could
+execute it: the rollback unit is the previous release's retained artifacts. On
+2026-09-08 that is `dist/Seedbed_0.1.8_universal.dmg`, which is retained,
+Developer ID signed, notarized, stapled with a ticket that still validates,
+accepted by Gatekeeper, and still carried as an entry in `dist/appcast.xml`.
+Rolling back means re-pinning the three version-pinned surfaces at that release
+(the appcast, `Casks/seedbed.rb`, `site/index.html`) and re-uploading. It does
+not require `Packaging/sentry-dsn.local`, which is absent from the release
+machine: the retained bundle was built with its reporting configuration already
+baked in, so restoring the artifact restores that too. The local file is needed
+only to build a *new* hosted build, which is a slower and different thing than
+a rollback.
+
+### What still binds, and where it is checked
+
+Between 2026-09-07 and 2026-09-08 nothing on the release path checked any of
+the four items. The gate was prose, and prose is enforced by whoever happens to
+re-read it. That is how a release went past item 3 without anyone noticing at
+the time, and it is the part of this episode worth fixing rather than
+apologizing for.
+
+- **The dSYM must belong to the binary.** Refused in `Scripts/release.sh`
+  before the build, and verified against the shipped executable after it.
+  Pinned by `tests/test_crashbox_symbol_gate.py`.
+- **A rollback target must already exist.** Refused in `Scripts/release.sh`
+  before the build: a Crashbox release will not start unless the previous
+  tagged release's DMG is still in `dist/` and still carries a valid stapled
+  notarization ticket. Pinned by `tests/test_crashbox_rollback_gate.py`. A
+  retained artifact is a rollback; an intention to retain one is not.
+
+### The observation window
+
+Release one Crashbox build, observe it for one hour, and restore the retained
+build on any ingest, alert, privacy or stability failure.
+
+Symbolication is no longer on that list, and its removal is the same argument
+as item 3 rather than an exception carved for what happened. The first real
+crash from the installed 0.1.9 build was accepted, stored, grouped and alerted,
+and none of its frames resolved: the receiver symbolicates a stack all or
+nothing, so one Apple system image whose dSYM is not distributable leaves every
+frame raw. That is a defect in the receiving service, it is tracked there, and
+it is exactly the kind of finding a pilot exists to produce. Rolling back over
+it would trade a service that records the crash for one that records nothing,
+and would retire the only build that can demonstrate the defect. A local
+Crashbox canary can prove ingestion without changing the installed
+application, but it is not a production cutover and cannot open this window.

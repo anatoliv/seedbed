@@ -41,6 +41,13 @@ fi
 
 cd "$(dirname "$0")/.."
 
+# The notarization wall clock and its retry loop, shared with make-app.sh. Both
+# submissions in a release — the .app there, the DMG here — hit the same service
+# and hang the same way, so they get one implementation rather than two that
+# drift.
+# shellcheck source=Scripts/support/notarize.sh
+. Scripts/support/notarize.sh
+
 APP_NAME="Seedbed"
 APP="build/${APP_NAME}.app"
 DIST="dist"
@@ -104,6 +111,16 @@ if [[ -z "$NOTARY_PROFILE" ]]; then
         exit 1
     fi
 fi
+
+# 0b2. A release notarizes twice, and neither submission may run without a wall
+#      clock around it. make-app.sh refuses at its own point of use, which is
+#      what makes a direct `NOTARY_PROFILE=... Scripts/make-app.sh` safe too;
+#      this is the same refusal moved to the front, so a missing coreutils costs
+#      a second here instead of a full build and a preflight gate first. The
+#      check is at this point in the file, after the profile is resolved,
+#      because it is a notarization requirement: a build that is not notarizing
+#      never asks for it.
+require_wall_clock || exit 1
 
 # 0c. Refuse to package while a Seedbed built from this repo is running. A
 #     running copy holds files open under build/, which produces a CORRUPT DMG
@@ -328,6 +345,79 @@ MSG
     printf '    %s\n' $DECLARED_UUIDS
 fi
 
+# 0f2. A Crashbox build must have somewhere to fall back to, and that somewhere
+#      has to be an artifact rather than an intention.
+#
+#      This is the surviving half of the cutover gate in docs/crashbox-pilot.md.
+#      That gate listed four conditions and nothing on the release path checked
+#      any of them, so 0.1.9 shipped past one of the four and the only thing
+#      that noticed was a person re-reading the file a day later. Two of the
+#      four still bind: the dSYM must belong to the binary (above), and the
+#      release this one would be rolled back to must still exist. The other two
+#      are settled or withdrawn; the document says which and why.
+#
+#      Crashbox is the unproven provider here, which is why this is scoped to a
+#      Crashbox build rather than to every release. Its failure modes are still
+#      being found — the first real crash from 0.1.9 was accepted, stored and
+#      alerted, and symbolicated no frames at all — and the honest answer to
+#      "what do we do if the next one is worse" has to be an artifact on disk.
+#
+#      Stapling is checked, not merely presence. An unstapled DMG has to reach
+#      Apple to be verified and fails on a Mac that is offline or filtered, so a
+#      rollback target that is present but unstapled is one that does not open
+#      on some of the machines that would need it.
+if [[ "$REPORTING_PROVIDER" == "crashbox" ]]; then
+    # Same idiom as check-release.sh's build-number check, and for the same
+    # reason: excluding this version's own tag keeps FORCE_REBUILD honest,
+    # where the newest tag IS the release being rebuilt.
+    ROLLBACK_TAG="$(git tag --list 'v*' --sort=-v:refname 2>/dev/null \
+                    | grep -v "^v${VERSION}\$" | head -1 || true)"
+    if [[ -z "$ROLLBACK_TAG" ]]; then
+        # Nothing has shipped yet, so there is nothing to retain. Refusing here
+        # would make a first release impossible, which is a gate that cannot be
+        # satisfied rather than one that is hard to satisfy.
+        echo "==> No previous release exists yet; no rollback target to check"
+    else
+        ROLLBACK_DMGS=( "${DIST}/${APP_NAME}_${ROLLBACK_TAG#v}_"*.dmg )
+        ROLLBACK_DMG="${ROLLBACK_DMGS[0]}"
+        if [[ ! -f "$ROLLBACK_DMG" ]]; then
+            cat >&2 <<MSG
+error: this build reports to Crashbox and there is no retained release to roll
+       back to. ${ROLLBACK_TAG} shipped, but no DMG for it is left in ${DIST}/.
+
+  Crashbox is still the provider being proved here, and the documented response
+  to an ingest, alert, privacy or stability failure is to restore the previous
+  release. That is only a plan if the artifact still exists: re-pinning the
+  appcast, the cask and the site at a version nobody can download is not a
+  rollback.
+
+  Restore ${DIST}/${APP_NAME}_${ROLLBACK_TAG#v}_*.dmg from wherever this machine's
+  releases are kept, or rebuild that tag and notarize it again, before you
+  release this one. (Phrased the long way on purpose: the public-snapshot
+  guard in Scripts/publish-repo.sh refuses "<word>-notarize", which is the
+  shape an internal host name takes here.)
+  See docs/crashbox-pilot.md, "Cutover and rollback gate".
+MSG
+            exit 1
+        fi
+        if ! xcrun stapler validate "$ROLLBACK_DMG" >/dev/null 2>&1; then
+            cat >&2 <<MSG
+error: the rollback target ${ROLLBACK_DMG} carries no valid stapled
+       notarization ticket, so it is not a release anyone could install.
+
+  Without a stapled ticket the copy dragged out of the image has to reach Apple
+  to be verified, and fails on a Mac that is offline or behind a filter. A
+  rollback that only works for machines with clear internet access is not the
+  one you want during an incident.
+
+  See docs/crashbox-pilot.md, "Cutover and rollback gate".
+MSG
+            exit 1
+        fi
+        echo "==> Rollback target retained: $ROLLBACK_DMG (stapled)"
+    fi
+fi
+
 # 0g. Run the artifact-independent half of the gate NOW, before the build. A red
 #     test suite or a missing release note is knowable in seconds; discovering it
 #     after a build and two notarizations costs ten minutes, and a gate that
@@ -421,33 +511,16 @@ fi
 echo "==> Signing the DMG"
 codesign --force --timestamp --sign "$IDENTITY" "$DMG"
 
-# GNU timeout is not part of macOS. Where it is absent, run the command bare
-# rather than failing on a missing binary: the retry loop still works, it just
-# loses the outer wall clock that the comment below explains.
-command -v timeout >/dev/null 2>&1 || timeout() { shift; "$@"; }
 echo "==> Notarizing the DMG"
-# `--timeout` covers the wait for Apple's verdict and NOT the upload, and the
-# upload is the half that hangs: notarytool sits at "initiating connection to
-# the Apple notary service" with nothing ever reaching `notarytool history`, so
-# the flag never fires and the release appears to be working. Observed twice in
-# one afternoon on another project, at 69 and 18 minutes, both killed by hand.
-# An outer wall clock plus retries turns an hour of silence into a hiccup.
-notarize_with_retry() {
-    for attempt in 1 2 3; do
-        if timeout 900 xcrun notarytool submit "$DMG" \
-                --keychain-profile "$NOTARY_PROFILE" --wait --timeout 12m; then
-            return 0
-        fi
-        echo "    WARNING: attempt $attempt did not finish within 15 minutes — retrying" >&2
-        pkill -f "notarytool submit" 2>/dev/null || true
-    done
-    return 1
-}
-if ! notarize_with_retry; then
-    echo "error: notarization failed after 3 attempts (15 minutes wall clock each)." >&2
-    echo "       Check whether the upload ever landed:" >&2
-    echo "         xcrun notarytool history --keychain-profile $NOTARY_PROFILE | head -20" >&2
-    echo "       Absent from that list means nothing uploaded, and waiting cannot help." >&2
+# The wall clock and the retry loop both live in Scripts/support/notarize.sh,
+# which explains at length why `--timeout` cannot cover this: it governs the
+# wait for Apple's verdict, and the upload is the half that hangs. Checked again
+# at the point of use, so this cannot run unguarded even if step 0b2 above is
+# ever moved or removed.
+require_wall_clock || exit 1
+if ! notarize_with_retry "$DMG" "$NOTARY_PROFILE"; then
+    echo "error: notarization of the DMG did not complete." >&2
+    notarize_failure_advice "$NOTARY_PROFILE"
     echo "       Nothing was published: the DMG is local and no tag was written." >&2
     exit 1
 fi

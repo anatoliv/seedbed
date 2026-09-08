@@ -71,8 +71,8 @@
         </p>
 
         <div class="verdictline">
-          <div><div class="m">claude-opus-5</div><div class="r flat">No advantage</div><div class="t-small t-mute">0 of 4 tasks gained on correctness</div></div>
-          <div><div class="m">qwen3-vl-30b, local</div><div class="r won">Render won 3 of 4</div><div class="t-small t-mute">9 of 12 criteria against 5 of 12</div></div>
+          <div><div class="m">claude-opus-5</div><div class="r flat">No advantage</div><div class="t-small t-mute">0 of 4 tasks gained on correctness</div><div class="t-small t-mute">t4 withdrawn as evidence</div></div>
+          <div><div class="m">qwen3-vl-30b, local</div><div class="r won">Render won 3 of 4</div><div class="t-small t-mute">10 of 12 criteria against 6 of 12</div><div class="t-small t-mute">t4 withdrawn as evidence</div></div>
         </div>
 
         <h2>Method</h2>
@@ -112,7 +112,9 @@
           task supplies it, the fault it describes does not happen at all. Both branches behave as written. So
           there was never a true cause in it to find, and every mark against t4, in either arm and in either
           direction, was scored against something that is not there. That is a fault in the task, not in either
-          answer.
+          answer. The headline above is left as it was scored, on the same footing as the qwen run
+          below: without t4 the render gained on none of the three remaining tasks, which is the
+          result it already reports.
         </p>
 
         <h3>Inputs</h3>
@@ -190,12 +192,31 @@
               <tr><td>working fix</td><td class="y">yes</td><td class="y">yes</td></tr>
               <tr><td>real test</td><td class="n">no: a manual click-through headed "Test the Fix"</td><td class="y">yes, XCTest</td></tr>
               <tr><td rowspan="3">t4 fix: menu never opens</td><td>root cause</td><td class="p">partial: says <code>performClick</code> is the wrong mechanism, never names the re-entrancy</td><td class="n">wrong: blames <code>statusItem.menu = nil</code></td></tr>
-              <tr><td>working fix</td><td class="y">yes</td><td class="n">no: keeps <code>performClick</code>, which is the bug</td></tr>
+              <tr><td>working fix</td><td class="y">yes</td><td class="n">no: keeps <code>performClick</code>, which the key called the bug</td></tr>
               <tr><td>real test</td><td class="n">none</td><td class="y">yes, XCTest, for a fix that does not work</td></tr>
-              <tr><th>Total</th><th></th><th>5 of 12</th><th>9 of 12</th></tr>
+              <tr><th>Total</th><th></th><th>6 of 12</th><th>10 of 12</th></tr>
             </tbody>
           </table>
         </div>
+        <p style="margin-top:14px">
+          <strong>Corrected on 2026-09-08: the totals here first read 5 of 12 and 9 of 12.</strong>
+          Both were one short of the marks in the table above. That was an error in the addition
+          and not a rescoring: no mark changed, and the per-task result is the one first published.
+          Both arms gain the same point, so the four-point gap between them is what it was.
+        </p>
+        <p>
+          <strong>t4 is withdrawn from this run too, and the figures above are left as they were scored.</strong>
+          The reason for withdrawing it is a property of the task rather than of the model: for the code exactly
+          as the task supplies it, the fault it describes does not happen, so there was no true cause in it for
+          either model to find. That applies here as much as it does to the Opus run above.
+        </p>
+        <p>
+          Without t4 the render won 3 of the 3 remaining tasks, on 9 of 9 criteria against 5 of 9. Those are the
+          better numbers, and that is exactly why the verdict at the top of this page has not been changed to
+          them. The published scores are a record of what was scored on the day, this correction happens to run
+          in Seedbed's favour, and a page that revises its own headline upward on a later finding is worth less than one
+          that leaves the record standing and shows the arithmetic instead.
+        </p>
         <h3>What the difference consists of</h3>
         <p>
           <strong>The render stops the model inventing.</strong> Condition A produced five confident fabrications on
@@ -240,11 +261,13 @@
         <blockquote><strong>agent:</strong> "Reproduce the failure first. Find the relevant code and tests, then run whatever command demonstrates the bug. Do not change code until you have seen the failure yourself."</blockquote>
         <blockquote><strong>chat:</strong> "The snippet below is the only material available to you: there is no repository, no test runner, no ability to execute anything. Verify by reasoning, since you cannot run anything. If nothing in the snippet is actually broken, say so instead of manufacturing a fix."</blockquote>
         <p>
-          Given t4 as a bare snippet with the chat-context render, Opus 5 found the real cause: <code>performClick</code>
-          sends the button's action to its target, so it re-enters the click handler instead of opening the menu. It
-          also caught the teardown as a secondary issue rather than mistaking it for the cause, and stated its
-          assumptions explicitly. One task, one model, one run: it shows the context field addresses the measured
-          failure, not that chat context is better in general.
+          Given t4 as a bare snippet with the chat-context render, Opus 5 worked from the snippet instead of hunting
+          for a repository, and stated its assumptions explicitly. It named <code>performClick</code> as the cause,
+          which agreed with the answer key, and that agreement was recorded here as evidence that the field fixed the
+          task the render had failed. The key has since been measured false, and the task turned out to contain no
+          defect, so the agreement says nothing about whether the answer was right. What survives is the behaviour the
+          field was built for: with the context declared, the render stopped sending the model after code that was not
+          there. One task, one model, one run, and a narrower claim than the one first made here.
         </p>
         <ul class="files">
           <li><a href="/evidence/context/render-agent.md">render-agent.md</a> <span>agent context</span></li>

@@ -163,15 +163,7 @@ enum CrashReporting {
                     // Budget first: an event dropped here costs nothing, and
                     // scrubbing is wasted work on something nobody will read.
                     guard withinBudget() else { return nil }
-                    event.user = nil
-                    event.serverName = nil
-                    event.request = nil
-                    event.extra = nil
-                    if let formatted = event.message?.formatted {
-                        event.message = SentryMessage(formatted: redact(formatted))
-                    }
-                    event.breadcrumbs = event.breadcrumbs?.map(redact)
-                    return event
+                    return scrub(event)
                 }
                 options.beforeBreadcrumb = { redact($0) }
             }
@@ -183,7 +175,32 @@ enum CrashReporting {
         }
     }
 
-    private static func redact(_ crumb: Breadcrumb) -> Breadcrumb {
+    /// Everything the promise on the download page says a report does not
+    /// carry, applied to one event.
+    ///
+    /// It is a named function rather than the body of the `beforeSend` closure
+    /// because a closure handed to `SentrySDK.start` can only be run by
+    /// starting the SDK, and a test that starts the SDK is a test that can send
+    /// something. Asked as a function it is an ordinary value question, which
+    /// is the same reason `TestCrash.decision` and `configuration(from:)` are
+    /// shaped the way they are. `CrashReportingScrubbingTests` runs it;
+    /// `tests/test_crash_reporting.py` pins that `beforeSend` still calls it,
+    /// because a scrubber nothing is wired to passes its own tests forever.
+    static func scrub(_ event: Event) -> Event {
+        event.user = nil
+        event.serverName = nil
+        event.request = nil
+        event.extra = nil
+        if let formatted = event.message?.formatted {
+            event.message = SentryMessage(formatted: redact(formatted))
+        }
+        event.breadcrumbs = event.breadcrumbs?.map(redact)
+        return event
+    }
+
+    /// Internal rather than private so a test can run the `beforeBreadcrumb`
+    /// path, which is otherwise reachable only through a started SDK.
+    static func redact(_ crumb: Breadcrumb) -> Breadcrumb {
         if let message = crumb.message { crumb.message = redact(message) }
         crumb.data = nil                            // arbitrary payloads, none of them needed
         return crumb
