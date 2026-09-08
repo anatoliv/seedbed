@@ -127,6 +127,31 @@ struct MCPSettings: View {
     /// knows about turns into a test that no longer presses anything.
     static let updateConfigButtonIdentifier = "mcp.updateClientConfig"
 
+    /// The environment variable a test harness points somewhere harmless with.
+    ///
+    /// Pressing "Update my client config" writes a real file: the MCP client
+    /// configuration in the home folder of whoever is running the app. So a UI
+    /// test that presses the button rewrites the tester's own configuration,
+    /// and that is the whole reason the button went unpressed for as long as it
+    /// did. Set this, and the press lands in a temp file instead; leave it
+    /// unset, which the app always does, and the write goes exactly where it
+    /// always went.
+    static let clientConfigPathVariable = "SEEDBED_CLIENT_CONFIG_PATH"
+
+    /// Where the button writes.
+    ///
+    /// This redirects the path and nothing else. The read-only token, the
+    /// backup, the refusal to touch a file it cannot parse: all of that is
+    /// `ClaudeConfigInstaller`'s and none of it is reachable from here. An
+    /// empty value counts as unset, so an exported-but-blank variable cannot
+    /// aim a write at the filesystem root.
+    static func clientConfigPath(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String {
+        let override = environment[clientConfigPathVariable] ?? ""
+        return override.isEmpty ? ClaudeConfigInstaller.defaultPath : override
+    }
+
     private var url: String { "http://127.0.0.1:\(port)" }
 
     var body: some View {
@@ -341,7 +366,10 @@ struct MCPSettings: View {
                 // configures has not been trusted with anything: it was never
                 // asked about, so it gets the token that cannot spend money.
                 Button("Update my client config") {
-                    configReport = ClaudeConfigInstaller.update(url: url, token: readOnlyToken)
+                    configReport = ClaudeConfigInstaller.update(
+                        url: url, token: readOnlyToken,
+                        at: MCPSettings.clientConfigPath()
+                    )
                 }
                 .disabled(readOnlyToken.isEmpty)
                 // Named so a UI test can press this one by identity. Nothing in

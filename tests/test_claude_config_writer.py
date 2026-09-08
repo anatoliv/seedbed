@@ -416,9 +416,14 @@ class TheButtonHandsOverTheReadOnlyToken(unittest.TestCase):
 
         It gets the token that can search and read but cannot rebuild a prompt,
         so it can never spend an LLM call.
+
+        Matched against the source with its whitespace collapsed, because the
+        call gained an `at:` argument and wrapped onto three lines. What is being
+        held is which token goes across, not how the line is broken.
         """
         text = SETTINGS.read_text(encoding="utf-8")
-        self.assertIn("ClaudeConfigInstaller.update(url: url, token: readOnlyToken)", text,
+        flat = " ".join(text.split())
+        self.assertIn("ClaudeConfigInstaller.update( url: url, token: readOnlyToken,", flat,
                       "the update button no longer hands over the read-only token")
 
     def test_no_message_in_the_installer_can_carry_a_token(self) -> None:
