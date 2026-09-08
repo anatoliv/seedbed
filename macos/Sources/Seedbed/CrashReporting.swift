@@ -201,6 +201,40 @@ enum CrashReporting {
                                         options: .regularExpression)
     }
 
+    /// Brings the SDK up so that a deliberate crash is caught, and answers
+    /// whether it actually came up.
+    ///
+    /// The crash handler is installed by `SentrySDK.start`, so a crash fired
+    /// before that returns is an ordinary crash that nobody hears about. The
+    /// wait is the same bounded one `captureTestEvent` uses, and for the same
+    /// reason: initialization is deliberately off the main thread, so the caller
+    /// has to wait for it rather than assume it.
+    ///
+    /// Consent works the way it already does for `captureTestEvent`. Typing
+    /// `--crash-test`, or holding Option and confirming a dialog that says what
+    /// is about to happen, is the explicit request that the Settings toggle
+    /// exists to obtain for the automatic case. The DSN gate is not waived: with
+    /// no configuration this returns false and sends nothing.
+    ///
+    /// Blocks the calling thread for up to `initializationWait`. Never call it
+    /// from the main thread.
+    static func prepareForTestCrash() -> Bool {
+        guard let configuration else { return false }
+        startSDKOnce(configuration)
+        let deadline = Date().addingTimeInterval(initializationWait)
+        while !SentrySDK.isEnabled && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        return attemptGate.current() == .started && SentrySDK.isEnabled
+    }
+
+    /// Runs `work` on the private reporting queue. The test-crash trigger needs
+    /// `prepareForTestCrash` off the main thread, and this is the only queue the
+    /// SDK is ever started from.
+    static func onReportingQueue(_ work: @escaping () -> Void) {
+        queue.async(execute: work)
+    }
+
     /// Sends one event so the wiring can be checked end to end against the real
     /// project, rather than assumed from the absence of a compiler error.
     /// Driven by `SEEDBED_TEST_CRASH_REPORTING=1`, the same way the menu dump is.

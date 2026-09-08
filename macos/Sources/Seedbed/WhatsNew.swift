@@ -48,6 +48,31 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.9",
+            date: "8 September 2026",
+            highlight: "Seedbed can write your MCP client's config itself, and it explains a refused client instead of leaving you a 401.",
+            changes: [
+                WhatsNewChange(kind: .added, text:
+                    "The MCP pane has an \"Update my client config\" button. It writes Seedbed's "
+                    + "own entry into your client's config file and nothing else, saves the "
+                    + "previous file beside it first, and tells you which file it wrote and "
+                    + "where the backup went."),
+                WhatsNewChange(kind: .improved, text:
+                    "A client Seedbed refuses now says which check failed. A rotated token and "
+                    + "a moved port both arrive as an authentication error, and only one of "
+                    + "them is about the token."),
+                WhatsNewChange(kind: .added, text:
+                    "About now carries the support and sponsor links, directly under the licence."),
+                WhatsNewChange(kind: .fixed, text:
+                    "Two config backups made inside the same second no longer collapse into "
+                    + "one. The second press used to overwrite the first backup, which is "
+                    + "exactly the state somebody who pressed by mistake is reaching for."),
+                WhatsNewChange(kind: .improved, text:
+                    "Crash reports, if you switch them on in Settings, now reach Seedbed's own "
+                    + "reporting service. What they carry is unchanged: the stack trace and the "
+                    + "versions, never a prompt, a render, a value you filled in, or a token."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.8",
             date: "7 September 2026",
             highlight: "Sharper reading pages, a cleaner fill window, and conflict-free local services.",

@@ -379,6 +379,78 @@ one event, prints its event id, selected provider, immutable release and flush
 completion, then exits. The operator must query that exact id in the durable
 store; flush completion proves only that the SDK drained its queue, not acceptance.
 
+### Releasing a build that reports to Crashbox
+
+Crashbox symbolicates from a dSYM held in its own private, project-scoped
+artifact catalog. Uploading to it is OS-authenticated on the Crashbox host, so
+`release.sh` cannot do it and no credential for it belongs in this repository.
+The script therefore refuses a Crashbox build until the operator names what was
+uploaded, and then checks the name against what it built:
+
+    CRASHBOX_DSYM_ARTIFACT=<artifact id from the upload> \
+    CRASHBOX_DSYM_UUIDS="<arm64 uuid> <x86_64 uuid>" \
+    Scripts/release.sh
+
+The order is forced by the fact that a dSYM does not exist until something is
+built. Build the release binary first, without notarizing, which produces the
+dSYM under the release build directory:
+
+    swift build -c release --build-system native -Xswiftc -g --arch arm64 --arch x86_64
+
+Signing does not change `LC_UUID`, so that dSYM pairs with the signed binary
+the release produces from the same sources. Upload it, note the artifact id and
+the UUIDs the catalog recorded, then run the release with both values set.
+
+After the build, `release.sh` runs `dwarfdump --uuid` on the executable inside
+the bundle and compares it with the declared set, refusing on any difference.
+That is the part worth having. Apple pairs a binary to a dSYM by build UUID and
+by nothing else, so a dSYM from a near-identical build symbolicates nothing
+while every other signal looks correct: the upload succeeded, the artifact is
+ready, both architectures are present. Without the comparison the declaration
+would be a rubber stamp, and the mismatch would surface months later on the
+crash that mattered.
+
+Between 2026-09-05 and 2026-09-08 this gate was an unconditional refusal, which
+is why no Crashbox build had ever been released.
+
+### Firing a crash on purpose
+
+That canary proves the transport. It does not prove the crash path, which is the
+half that has never run in production: a fault caught by the handler, a report
+written while the process is dying, and that report sent on the next launch and
+symbolicated back to a Seedbed function. There are two ways to fire one, and
+both live in `Sources/Seedbed/TestCrash.swift`.
+
+**A launch argument**, for an installed release:
+
+    /Applications/Seedbed.app/Contents/MacOS/Seedbed --crash-test
+
+**A hidden menu item.** Hold Option and open the menu-bar menu. One extra row
+appears under Check for Updates…, called *Send a Test Crash Report…*. It asks
+for confirmation, and Cancel is the button Return presses. Let go of Option and
+the row is gone again, because the menu is rebuilt every time it opens.
+
+Both refuse instead of crashing when the crash would produce nothing, and each
+refusal says which case it was:
+
+| Refusal | Why |
+|---|---|
+| no reporting configuration | the build carries no DSN, so a copy built out of this checkout cannot be made to crash by anyone who reads the source |
+| Diagnostics switched off | the report is sent by the *next* launch, and that launch starts the SDK only if the toggle is on |
+| a debugger is attached | a traced process hands its exception to the debugger, so no report is written |
+
+The crash is a write to address `0x1`, which the kernel never maps. That is
+`EXC_BAD_ACCESS` with `KERN_INVALID_ADDRESS`, one of the four things
+sentry-cocoa installs a monitor for, and it puts the faulting frame on top. The
+frame to look for in the symbolicated issue is `seedbedTestCrash()` in
+`TestCrash.swift`. `@_cdecl` fixes that name, so it does not move with the
+compiler, and the test suite looks it up by that spelling rather than calling
+it. An `abort()` follows the write as a backstop, so a store that somehow did
+not fault becomes `SIGABRT` instead of an app that stayed up.
+
+Nothing is sent by the process that crashes. Open Seedbed again and the report
+goes out on that launch.
+
 The public release script continues to own hosted-Sentry dSYM upload. A Crashbox
 pilot uses the estate's private, project-scoped artifact procedure before the
 signed build is distributed; the public script fails closed rather than embed

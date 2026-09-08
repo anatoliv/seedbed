@@ -7,7 +7,7 @@
 #   Scripts/check-release.sh                     everything, after the DMG exists
 #
 # Overrides, each of which prints loudly rather than passing quietly:
-#   SKIP_TESTS=1        do not run the Python suite
+#   SKIP_TESTS=1        do not run either suite — the Python one or the Swift one
 #
 # The two-moment structure is the point: a stale release note or a failing test is
 # knowable in seconds, and finding out after a build plus two notarizations has
@@ -44,7 +44,7 @@ source_digest() {
 # the SwiftUI layer where no test reaches. A green run here is a floor, not a
 # guarantee, and it is still the cheapest thing in this file.
 if [[ "${SKIP_TESTS:-}" == "1" ]]; then
-    echo "WARNING: SKIP_TESTS=1 — packaging without running the suite" >&2
+    echo "WARNING: SKIP_TESTS=1 — packaging without running either suite" >&2
 else
     echo "==> Test suite"
     # Captured rather than piped. `cmd | tail` returns TAIL's status, so
@@ -58,6 +58,44 @@ else
         exit 1
     }
     printf '%s\n' "$TEST_OUT" | tail -3 | sed 's/^/    /'
+
+    # --- The Swift suite ------------------------------------------------------
+    # The Python suite above cannot see a line of Swift. What lives only here is
+    # the code that decides whether a shipped build can report a crash at all:
+    # the DSN configuration parser, the reporting attempt fuse, the MCP
+    # client-config path override, and the gates in front of the deliberate
+    # test crash. A regression in any of them leaves the Python suite green, the
+    # gate green, and the crash-reporting loop silently unprovable — which is
+    # exactly the failure this release is trying to rule out.
+    #
+    # The Python suite mitigates part of it by reading the Swift source and
+    # pinning call sites, so this was a gap rather than an absence. Reading a
+    # call site is not running the code.
+    #
+    # Same capture-don't-pipe shape as above, and for the same reason: `cmd |
+    # tail` returns tail's status, so a red suite would print its failures and
+    # pass. Same SKIP_TESTS escape too — one deliberate override, not two, since
+    # a release that skips one suite is already off the paved road.
+    #
+    # Cost: a cold run compiles the package plus sentry-cocoa and Sparkle in
+    # debug, which is minutes. It still belongs in the preflight half rather
+    # than only the post-build one — the whole argument for the two-moment
+    # structure is that learning about a red suite after a build and two
+    # notarizations is how a gate stops being run. The second invocation, after
+    # the artifacts exist, finds the build cached and costs seconds.
+    echo "==> Swift suite"
+    SWIFT_TEST_OUT="$(swift test 2>&1)" || {
+        printf '%s\n' "$SWIFT_TEST_OUT" | tail -25 >&2
+        echo "error: the Swift test suite failed — nothing built." >&2
+        echo "       Run it yourself: (cd macos && swift test)" >&2
+        echo "       To package anyway, deliberately: SKIP_TESTS=1 Scripts/release.sh" >&2
+        exit 1
+    }
+    # `|| true` on the grep, not on the run: pipefail plus a grep that matches
+    # nothing would abort the script here, turning a cosmetic summary into a
+    # failed gate. The exit status that matters was already taken above.
+    printf '%s\n' "$SWIFT_TEST_OUT" | grep -E '^[[:space:]]*Executed [0-9]+ test' \
+        | tail -1 | sed 's/^[[:space:]]*/    /' || true
 fi
 
 # --- Design drift -------------------------------------------------------------
@@ -122,7 +160,7 @@ if [[ -n "$PREV_TAG" ]]; then
 fi
 
 if [[ "${PREFLIGHT_ONLY:-}" == "1" ]]; then
-    echo "preflight ok: $VERSION ($BUILD_NUM) — tests, design tokens, release notes, build number"
+    echo "preflight ok: $VERSION ($BUILD_NUM) — Python and Swift suites, design tokens, release notes, build number"
     exit 0
 fi
 

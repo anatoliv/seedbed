@@ -99,6 +99,40 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
 
+        // Crashes on purpose, so an installed release can be made to produce a
+        // real crash report on demand instead of waiting for a genuine fault.
+        // Inert on every build that carries no reporting configuration, which is
+        // every build made out of this checkout. See TestCrash.
+        switch TestCrash.decision(arguments: ProcessInfo.processInfo.arguments,
+                                  isConfigured: CrashReporting.isConfigured,
+                                  isReportingEnabled: CrashReporting.isEnabled,
+                                  isBeingDebugged: TestCrash.isBeingDebugged()) {
+        case .notRequested:
+            break
+        case .refusedNoProvider:
+            print("\(TestCrash.launchArgument): this build carries no crash-reporting "
+                  + "configuration, so nothing would be recorded. Nothing fired.")
+            NSApp.terminate(nil)
+            return
+        case .refusedNotEnabled:
+            print("\(TestCrash.launchArgument): Settings, General, Diagnostics, Send crash "
+                  + "reports is off, so the report would be written and never sent. "
+                  + "Turn it on first. Nothing fired.")
+            NSApp.terminate(nil)
+            return
+        case .refusedDebugger:
+            print("\(TestCrash.launchArgument): a debugger is attached and takes the "
+                  + "exception, so no report would be written. Nothing fired.")
+            NSApp.terminate(nil)
+            return
+        case .crash:
+            fireTestCrash { reason in
+                print("\(TestCrash.launchArgument): \(reason) Nothing fired.")
+                NSApp.terminate(nil)
+            }
+            return
+        }
+
         // Prints what "Check for Updates…" would say and exits. The text now
         // branches on whether this copy was built from the checkout or
         // installed from a release, and an alert is not a thing this project
@@ -604,6 +638,15 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let updates = menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates),
                                    keyEquivalent: "")
         updates.target = self
+        // Present only while Option is held as the menu opens, and only in a
+        // build that can actually report. The menu is rebuilt on every open, so
+        // the modifiers read here are the ones held right now. See TestCrash.
+        if TestCrash.menuItemIsVisible(modifiers: NSEvent.modifierFlags,
+                                       isConfigured: CrashReporting.isConfigured) {
+            let crash = menu.addItem(withTitle: TestCrash.menuItemTitle,
+                                     action: #selector(sendTestCrash), keyEquivalent: "")
+            crash.target = self
+        }
 
         menu.addItem(.separator())
         // Routed through our own method rather than `terminate:`. macOS
@@ -886,6 +929,69 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         show()
         model.rebuild(scope: .everything)
+    }
+
+    /// Crashes Seedbed on purpose, after saying so plainly and being told yes.
+    ///
+    /// The dialog is the whole safety of this item. It sits one row below
+    /// "Check for Updates…" in a menu people use every day, and the cost of a
+    /// mis-click is whatever the app was in the middle of. Cancel is the first
+    /// button, so it is the one Return presses.
+    @objc private func sendTestCrash() {
+        guard CrashReporting.isConfigured else { return }
+        guard CrashReporting.isEnabled else {
+            report(testCrashProblem: "Sending crash reports is switched off, so the report "
+                   + "would be written and never sent. Turn on Settings, General, "
+                   + "Diagnostics, Send crash reports, then try again.")
+            return
+        }
+        if TestCrash.isBeingDebugged() {
+            report(testCrashProblem: "A debugger is attached to Seedbed and takes the "
+                   + "exception, so no crash report would be written. Detach it first.")
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = "Crash Seedbed on purpose?"
+        alert.informativeText = "Seedbed quits immediately by crashing, and anything it "
+            + "was doing is lost. The report is sent the next time you open it. This is "
+            + "here to check that crash reporting works."
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Crash Now")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertSecondButtonReturn else { return }
+        fireTestCrash { [weak self] reason in
+            self?.report(testCrashProblem: reason)
+        }
+    }
+
+    private func report(testCrashProblem: String) {
+        let alert = NSAlert()
+        alert.messageText = "No test crash was sent"
+        alert.informativeText = testCrashProblem
+        alert.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+    }
+
+    /// Waits for the crash handler off the main thread, then crashes on the main
+    /// thread, which is where a person pressing the menu item already was.
+    ///
+    /// The wait matters: `SentrySDK.start` is what installs the handler, and it
+    /// is deliberately asynchronous, so a crash fired the instant the argument
+    /// is seen is an ordinary crash nobody hears about. `unavailable` runs
+    /// instead when the SDK did not come up, and the app stays alive.
+    private func fireTestCrash(unavailable: @escaping (String) -> Void) {
+        CrashReporting.onReportingQueue {
+            let ready = CrashReporting.prepareForTestCrash()
+            DispatchQueue.main.async {
+                guard ready else {
+                    unavailable("Crash reporting did not start, so the crash would not "
+                                + "have been recorded.")
+                    return
+                }
+                seedbedTestCrash()
+            }
+        }
     }
 }
 

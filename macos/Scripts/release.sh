@@ -12,7 +12,13 @@
 #   NOTARY_PROFILE=<a notarytool keychain profile>
 #   FORCE_REBUILD=1     rebuild a DMG for a version already packaged
 #   ALLOW_DIRTY=1       skip the "which commit is this?" warning
-#   SKIP_TESTS=1        package without running the suite (prints loudly)
+#   SKIP_TESTS=1        package without running either suite (prints loudly)
+#
+# A build that reports to Crashbox needs two more, because its symbols are
+# uploaded out of band and this script has to refuse to ship until they are:
+#
+#   CRASHBOX_DSYM_ARTIFACT=<artifact uuid returned by the private upload>
+#   CRASHBOX_DSYM_UUIDS="<arm64 uuid> <x86_64 uuid>"  as the catalog recorded them
 #
 # This builds, generates the Sparkle appcast, syncs the Homebrew cask and tags.
 # What it deliberately does NOT do is put anything where a stranger can reach it:
@@ -249,14 +255,77 @@ MSG
     fi
     echo "WARNING: ALLOW_NO_SYMBOLS=1 — shipping without symbolicated crash reports" >&2
 fi
+# A Crashbox build cannot upload its own symbols. The upload runs on the
+# Crashbox host as an OS-authenticated service account, and no credential for it
+# is going to live in a script that gets published. So the dSYM is uploaded out
+# of band, and this script's job is to refuse to ship until the operator can
+# name the artifact it went into and the UUIDs the catalog recorded for it.
+#
+# The two variables are an assertion, and an assertion on its own is a rubber
+# stamp. What makes it a check is that the UUIDs are compared, after the build,
+# against `dwarfdump --uuid` of the binary that is actually shipping (step 2b).
+# That catches the failure this gate exists for and the one that actually
+# happens: a dSYM uploaded from a different build, so every report arrives
+# unsymbolicated with the catalog looking perfectly healthy.
+#
+# What it still cannot see is whether the artifact is `ready` in the catalog, or
+# whether it exists at all — that needs the private host. The operator verifies
+# it there and pastes the result here. Naming both values is the point: an
+# operator who has them has been to the catalog.
+#
+# The procedure, in order, because the ordering is not obvious: the dSYM does
+# not exist until something is built, so the upload cannot come first.
+#
+#   1. Build the release binary to produce the dSYM, without notarizing:
+#        swift build -c release --build-system native -Xswiftc -g \
+#            --arch arm64 --arch x86_64
+#      Code signing does not change LC_UUID, so the dSYM from this build matches
+#      the signed binary the release produces from the same sources.
+#   2. Zip the dSYM and upload it through the private, project-scoped artifact
+#      path, as that host's own service account. Read the artifact id out of
+#      the upload's result, and confirm the catalog holds it as ready with one
+#      row per architecture. That path is deliberately not described here; it
+#      is the operator's, and this file is published.
+#   3. Re-run this script with both values set.
 if [[ "$REPORTING_PROVIDER" == "crashbox" ]]; then
-    cat >&2 <<'MSG'
-error: the public release script cannot publish a Crashbox build by itself.
-       Its dSYM must first be uploaded through the private, project-scoped
-       Crashbox artifact path and verified by UUID. Use the estate release
-       procedure; never bypass this gate or put an upload credential here.
+    if [[ -z "${CRASHBOX_DSYM_ARTIFACT:-}" || -z "${CRASHBOX_DSYM_UUIDS:-}" ]]; then
+        cat >&2 <<'MSG'
+error: this build reports to Crashbox, and Crashbox symbolicates only from a
+       dSYM that was uploaded to its private, project-scoped artifact catalog.
+       Nothing here can perform that upload: it is OS-authenticated on the
+       Crashbox host, and no upload credential belongs in this file.
+
+  Upload it out of band, then name what you uploaded:
+      CRASHBOX_DSYM_ARTIFACT=<artifact uuid from the upload's JSON> \
+      CRASHBOX_DSYM_UUIDS="<arm64 uuid> <x86_64 uuid>" \
+      Scripts/release.sh
+
+  The UUIDs are re-checked against the shipped binary after the build, so a
+  dSYM from a different build stops the release instead of quietly producing
+  unsymbolicated reports.
 MSG
-    exit 1
+        exit 1
+    fi
+    if [[ ! "$CRASHBOX_DSYM_ARTIFACT" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+        echo "error: CRASHBOX_DSYM_ARTIFACT is not an artifact uuid." >&2
+        exit 1
+    fi
+    # Upper-cased and sorted here so the comparison in 2b is between two sets in
+    # the same shape. dwarfdump prints upper case; a catalog row pasted in lower
+    # case would otherwise fail a check it should pass, and a gate that cries
+    # wolf is a gate someone turns off.
+    DECLARED_UUIDS="$(printf '%s\n' $CRASHBOX_DSYM_UUIDS | tr 'a-f' 'A-F' | LC_ALL=C sort -u)"
+    if [[ "$(printf '%s\n' "$DECLARED_UUIDS" | wc -l | tr -d ' ')" -lt 2 ]]; then
+        echo "error: CRASHBOX_DSYM_UUIDS names fewer than two UUIDs; a universal" >&2
+        echo "       build has one per architecture and both must be in the catalog." >&2
+        exit 1
+    fi
+    if printf '%s\n' "$DECLARED_UUIDS" | grep -qvE '^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$'; then
+        echo "error: CRASHBOX_DSYM_UUIDS holds something that is not a UUID." >&2
+        exit 1
+    fi
+    echo "==> Crashbox build: symbols declared as artifact $CRASHBOX_DSYM_ARTIFACT"
+    printf '    %s\n' $DECLARED_UUIDS
 fi
 
 # 0g. Run the artifact-independent half of the gate NOW, before the build. A red
@@ -273,6 +342,35 @@ PREFLIGHT_ONLY=1 Scripts/check-release.sh || {
 #    the DMG) is what lets the installed copy launch on a Mac that is offline.
 echo "==> Building and notarizing ${APP}"
 IDENTITY="$IDENTITY" NOTARY_PROFILE="$NOTARY_PROFILE" ./Scripts/make-app.sh
+
+# 2b. The declared dSYM must belong to THIS binary. Apple pairs a binary with a
+#     dSYM by build UUID and by nothing else, so a dSYM from a near-identical
+#     build symbolicates nothing while every other signal — the upload
+#     succeeded, the artifact is `ready`, the catalog has both architectures —
+#     looks correct. The mismatch is invisible until a real crash arrives with
+#     no function names in it, which is months later and on the one that
+#     mattered.
+#
+#     Asked of the shipped executable, not of the dSYM on this disk: the dSYM
+#     could be regenerated, and the executable inside the bundle is the thing
+#     that will actually fault on someone else's Mac.
+if [[ "$REPORTING_PROVIDER" == "crashbox" ]]; then
+    echo "==> Checking the declared dSYM against the shipped binary"
+    BUILT_UUIDS="$(dwarfdump --uuid "$APP/Contents/MacOS/Seedbed" \
+        | awk '{print $2}' | tr 'a-f' 'A-F' | LC_ALL=C sort -u)"
+    if [[ "$BUILT_UUIDS" != "$DECLARED_UUIDS" ]]; then
+        echo "error: the uploaded dSYM is not this binary's." >&2
+        echo "       binary:   $(printf '%s ' $BUILT_UUIDS)" >&2
+        echo "       declared: $(printf '%s ' $DECLARED_UUIDS)" >&2
+        echo "       Crashbox pairs a dSYM to a binary by build UUID alone, so this" >&2
+        echo "       release would report crashes nothing could symbolicate." >&2
+        echo "       Upload the dSYM for this build and re-run. Nothing was" >&2
+        echo "       published: the DMG does not exist yet and no tag was written." >&2
+        exit 1
+    fi
+    printf '    %s\n' $BUILT_UUIDS
+    echo "    match artifact $CRASHBOX_DSYM_ARTIFACT"
+fi
 
 # 2. Upload debug symbols for the build that is actually shipping.
 #    Deliberately the .app plus the release dSYM, and NOT all of .build, which
