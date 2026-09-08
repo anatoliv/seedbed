@@ -30,6 +30,51 @@ enum MCPClientSnippet {
     }
 }
 
+/// How the outcome of a client-config write is shown: which symbol sits at the
+/// head of the row, which tint it takes, and what colour the row is bordered in.
+///
+/// Lifted out of the view because it is the one part of the pane whose
+/// correctness a person's eyes depend on, and a value can be checked without a
+/// window. `ClaudeConfigInstaller.Report` exists because a write that reports
+/// nothing is indistinguishable from one that failed; that only holds while the
+/// two outcomes reach the screen looking different, and nothing used to check
+/// that they did.
+///
+/// **The symbol, not the tint, is what carries the outcome.** A check in a
+/// circle against a warning triangle is two different shapes, so the row still
+/// says which happened to somebody who cannot tell the green from the amber, or
+/// who is reading it in a greyscale capture. The tint is the fast signal on top
+/// of that, never the only one — which is why the two must differ in both.
+struct MCPReportRowStyle: Equatable {
+    /// An SF Symbol name. Functional iconography, not brand art.
+    let symbol: String
+    let tint: Color
+    let border: Color
+
+    static let success = MCPReportRowStyle(
+        symbol: "checkmark.circle.fill",
+        tint: Tokens.positive,
+        border: Tokens.Surface.hairline
+    )
+
+    /// Also the style of the pane's standing diagnostic rows, which are
+    /// failures of the same kind: something is not as the person left it.
+    static let failure = MCPReportRowStyle(
+        symbol: "exclamationmark.triangle.fill",
+        tint: Tokens.warning,
+        border: Tokens.warning.opacity(0.4)
+    )
+
+    /// The row a report of this outcome is shown in.
+    ///
+    /// The pane hands this the report's own `succeeded` and keeps no branch of
+    /// its own, so a failure cannot come to be dressed as a success by an edit
+    /// to a view body that nothing can run.
+    static func forOutcome(succeeded: Bool) -> MCPReportRowStyle {
+        succeeded ? .success : .failure
+    }
+}
+
 /// Turn the MCP server on, see its tokens, and copy a ready-to-paste client
 /// configuration. The pane is also where the security model gets explained to
 /// the person who has to decide about it, which is most of why it exists.
@@ -75,6 +120,12 @@ struct MCPSettings: View {
     /// it. A write that reports nothing is indistinguishable from one that
     /// failed, which is the failure this whole button exists to end.
     @State private var configReport: ClaudeConfigInstaller.Report?
+
+    /// How a UI test names the "Update my client config" button. A constant
+    /// rather than a literal at the call site so a test and the pane cannot
+    /// drift apart quietly: a renamed identifier that only a string comparison
+    /// knows about turns into a test that no longer presses anything.
+    static let updateConfigButtonIdentifier = "mcp.updateClientConfig"
 
     private var url: String { "http://127.0.0.1:\(port)" }
 
@@ -293,14 +344,20 @@ struct MCPSettings: View {
                     configReport = ClaudeConfigInstaller.update(url: url, token: readOnlyToken)
                 }
                 .disabled(readOnlyToken.isEmpty)
+                // Named so a UI test can press this one by identity. Nothing in
+                // the app reads it; it is here because the alternative is
+                // pressing by position, and the two "Regenerate" buttons a few
+                // points above rotate a bearer token and break every client
+                // already configured. A miss there causes the exact failure
+                // this button exists to end. SwiftUI publishes no usable label
+                // for any button in this pane, so a script has nothing else to
+                // aim at.
+                .accessibilityIdentifier(MCPSettings.updateConfigButtonIdentifier)
                 Spacer()
             }
             if let configReport {
-                if configReport.succeeded {
-                    resultRow(configReport.title, configReport.detail)
-                } else {
-                    warningRow(configReport.title, configReport.detail)
-                }
+                reportRow(MCPReportRowStyle.forOutcome(succeeded: configReport.succeeded),
+                          configReport.title, configReport.detail)
             }
             note("\"Update my client config\" writes the read-only configuration straight into "
                  + "the Claude Code settings file in your home folder, replacing only the "
@@ -347,33 +404,23 @@ struct MCPSettings: View {
     }
 
     private func warningRow(_ title: String, _ detail: String) -> some View {
-        HStack(alignment: .top, spacing: Tokens.Space.tight) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: Tokens.IconSize.compact))
-                .foregroundStyle(Tokens.warning)
-            VStack(alignment: .leading, spacing: Tokens.Space.row) {
-                Text(title).font(Tokens.FontScale.small.weight(.medium))
-                Text(detail).font(Tokens.FontScale.small).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer()
-        }
-        .padding(Tokens.Space.row6)
-        .background(RoundedRectangle(cornerRadius: Tokens.Radius.control)
-            .fill(Tokens.Surface.sunken))
-        .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.control)
-            .stroke(Tokens.warning.opacity(0.4), lineWidth: 0.5))
+        reportRow(.failure, title, detail)
     }
 
-    /// The same shape as `warningRow`, for the case where the write worked.
-    /// Deliberately as prominent as the failure: the person needs to see which
-    /// file was written and where the backup went, and a success reported in
-    /// passing is one they will not read.
-    private func resultRow(_ title: String, _ detail: String) -> some View {
+    /// One row for both outcomes, told apart only by its style.
+    ///
+    /// A success is deliberately as prominent as a failure: the person needs to
+    /// see which file was written and where the backup went, and a success
+    /// reported in passing is one they will not read. What separates the two is
+    /// `MCPReportRowStyle`, and nothing else in here reads the outcome, so the
+    /// difference a person relies on cannot be changed from this function.
+    private func reportRow(
+        _ style: MCPReportRowStyle, _ title: String, _ detail: String
+    ) -> some View {
         HStack(alignment: .top, spacing: Tokens.Space.tight) {
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: style.symbol)
                 .font(.system(size: Tokens.IconSize.compact))
-                .foregroundStyle(Tokens.positive)
+                .foregroundStyle(style.tint)
             VStack(alignment: .leading, spacing: Tokens.Space.row) {
                 Text(title).font(Tokens.FontScale.small.weight(.medium))
                 Text(detail).font(Tokens.FontScale.small).foregroundStyle(.secondary)
@@ -385,7 +432,7 @@ struct MCPSettings: View {
         .background(RoundedRectangle(cornerRadius: Tokens.Radius.control)
             .fill(Tokens.Surface.sunken))
         .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.control)
-            .stroke(Tokens.Surface.hairline, lineWidth: 0.5))
+            .stroke(style.border, lineWidth: 0.5))
     }
 
     private func note(_ text: String) -> some View {

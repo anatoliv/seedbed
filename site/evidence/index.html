@@ -103,9 +103,11 @@
           the render asks the model to reproduce the failure and run the tests, the seed asks it to verify nothing,
           and those are the two tasks the render lost. The scoring stands as recorded. Both fix tasks were later
           re-run with the toolchain permitted: on t3 the two arms tied at 3 of 3, which is a tie and not a gain,
-          and t4 was not scored, because the root cause it is scored against has never been measured and the two
-          re-runs disagree about what the code does. So the confound is closed on one of the two tasks and open
-          on the other.
+          and t4 was not scored. The root cause t4 is scored against was later measured directly, by running the
+          task's own code and clicking it, and it is wrong: the menu opens rather than re-entering. For the code
+          as the task supplies it the described fault does not occur at all, so there was no true cause in it to
+          find. That is a fault in the task rather than in either answer, and t4 is withdrawn as evidence in both
+          directions.
         </p>
 
         <h3>Inputs</h3>

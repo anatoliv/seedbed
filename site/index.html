@@ -540,7 +540,8 @@ E   assert 0 == 10.0 …</code></pre>
         against pre-registered criteria, on four tasks. The two Opus fix tasks ran with <code>swift build</code> and
         <code>swift test</code> refused by the permission system. That falls harder on the render
         than on the seed, because only the render asks for a test run. Those two tasks have since been re-run with
-        the toolchain permitted: on one the render and the seed tied, and the other could not be settled.
+        the toolchain permitted: on one the render and the seed tied, and the other turned out to have no
+        defect in the code it supplied, so it is withdrawn as evidence either way.
         Both runs failed the same task in the
         same way, which led to a design change: a seed now declares whether it will be pasted into an agent with a checkout or a chat
         window with a snippet, and the render is built for that context. The raw outputs, inputs and scoring are on
