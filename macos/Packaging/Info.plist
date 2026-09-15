@@ -8,20 +8,28 @@
 	<string>Seedbed</string>
 	<key>CFBundleExecutable</key>
 	<string>Seedbed</string>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
 	<key>CFBundleIconFile</key>
 	<string>Seedbed</string>
 	<key>CFBundleIdentifier</key>
 	<string>net.amnesia.seedbed</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>Seedbed</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.9</string>
+	<string>0.1.10</string>
 	<key>CFBundleVersion</key>
-	<string>10</string>
+	<string>11</string>
+	<key>CrashReportingDSN</key>
+	<string></string>
+	<key>CrashReportingEnvironment</key>
+	<string></string>
+	<key>CrashReportingProvider</key>
+	<string></string>
+	<key>CrashReportingRelease</key>
+	<string></string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key>
@@ -34,25 +42,17 @@
 	<string>Seedbed reads and writes your prompt library from the folder you choose.</string>
 	<key>NSDownloadsFolderUsageDescription</key>
 	<string>Seedbed reads and writes your prompt library from the folder you choose.</string>
-	<key>NSRemovableVolumesUsageDescription</key>
-	<string>Seedbed reads and writes your prompt library from the folder you choose, including one on an external disk.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Anatoli Vishnyakov. MIT licence.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Seedbed reads and writes your prompt library from the folder you choose, including one on an external disk.</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
 	<string>https://seedbed.dev/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>pDgN5Ibe6Q9QY5cxRpXmXLm/S2lBGbVLy/eBVEW1nTo=</string>
-	<key>CrashReportingDSN</key>
-	<string></string>
-	<key>CrashReportingProvider</key>
-	<string></string>
-	<key>CrashReportingRelease</key>
-	<string></string>
-	<key>CrashReportingEnvironment</key>
-	<string></string>
 </dict>
 </plist>

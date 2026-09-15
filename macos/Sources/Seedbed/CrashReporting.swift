@@ -33,8 +33,7 @@ enum CrashReporting {
     ///
     /// A server quota is not a client-side safety boundary: it can be shared,
     /// delayed, changed, or exhausted by another project. The app therefore owns
-    /// a fixed local ceiling regardless of whether the selected endpoint is
-    /// Crashbox or the hosted-Sentry rollback.
+    /// a fixed local ceiling regardless of collector health.
     ///
     /// Twenty is chosen to be useless for a crash loop and sufficient for a
     /// crash: the first fault of a session is what gets diagnosed, and the
@@ -73,8 +72,8 @@ enum CrashReporting {
     }
 
     /// Reporting fails closed unless packaging supplied the endpoint and all
-    /// immutable identity fields together. Crashbox and hosted Sentry are
-    /// mutually exclusive values of `provider`; the SDK has only one client.
+    /// immutable identity fields together. Crashbox is the only provider; the
+    /// Sentry SDK is retained solely as its envelope client.
     private static var configuration: Configuration? {
         configuration(from: Bundle.main.infoDictionary ?? [:])
     }
@@ -88,14 +87,16 @@ enum CrashReporting {
         guard let dsn = value("CrashReportingDSN"),
               let url = URLComponents(string: dsn),
               url.scheme == "https",
-              url.host?.isEmpty == false,
+              url.host == "ingest.crashbox.dev",
               url.user?.isEmpty == false,
               url.password == nil,
+              url.port == nil,
               url.query == nil,
               url.fragment == nil,
-              !url.path.isEmpty, url.path != "/",
+              url.path.range(of: #"^/[0-9]+$"#,
+                             options: .regularExpression) != nil,
               let provider = value("CrashReportingProvider"),
-              provider == "crashbox" || provider == "hosted-sentry",
+              provider == "crashbox",
               let release = value("CrashReportingRelease"),
               release.range(of: #"^net\.amnesia\.seedbed@[0-9a-f]{40}$"#,
                             options: .regularExpression) != nil,

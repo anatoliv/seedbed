@@ -193,17 +193,16 @@ class IdentityIsRecordedWithOrWithoutAProvider(SourceCheck):
             "the configurator accepts a revision that is not a full "
             "lowercase-hex SHA")
 
-    def test_it_still_refuses_two_providers(self) -> None:
-        """Rollback has to be a rebuild and swap that cannot become dual-send.
+    def test_it_refuses_any_legacy_hosted_input(self) -> None:
+        """Rollback cannot revive the provider this cohort has left.
 
         Not this file's change, but it is the invariant everything else here
         sits on top of, and a refactor of provider selection could drop it
         without any other test noticing.
         """
         self.assertInSource(
-            "refusing dual-send",
-            "the configurator no longer refuses a build carrying both Crashbox "
-            "and hosted-Sentry inputs")
+            "legacy hosted-Sentry build route has been removed",
+            "the configurator no longer refuses a legacy hosted-Sentry input")
 
     def test_it_does_not_inspect_the_working_tree(self) -> None:
         """Cleanliness is make-app.sh's question, not this script's.

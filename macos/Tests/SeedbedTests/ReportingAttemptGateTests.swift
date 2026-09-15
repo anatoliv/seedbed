@@ -34,7 +34,7 @@ final class ReportingAttemptGateTests: XCTestCase {
         XCTAssertNil(CrashReporting.configuration(from: [:]))
 
         let base: [String: Any] = [
-            "CrashReportingDSN": "https://public@example.invalid/project",
+            "CrashReportingDSN": "https://public@ingest.crashbox.dev/12345",
             "CrashReportingProvider": "crashbox",
             "CrashReportingRelease": "net.amnesia.seedbed@" + String(repeating: "a", count: 40),
             "CrashReportingEnvironment": "production",
@@ -47,6 +47,9 @@ final class ReportingAttemptGateTests: XCTestCase {
             "https://public:secret@example.invalid/project",
             "https://public@example.invalid/",
             "https://public@example.invalid/project?secret=value",
+            "https://public@o1.ingest.sentry.io/12345",
+            "https://public@ingest.crashbox.dev:443/12345",
+            "https://public@ingest.crashbox.dev/not-numeric",
         ] {
             var candidate = base
             candidate["CrashReportingDSN"] = malformed
@@ -60,6 +63,10 @@ final class ReportingAttemptGateTests: XCTestCase {
         var unknownProvider = base
         unknownProvider["CrashReportingProvider"] = "automatic"
         XCTAssertNil(CrashReporting.configuration(from: unknownProvider))
+
+        var hostedProvider = base
+        hostedProvider["CrashReportingProvider"] = "hosted-sentry"
+        XCTAssertNil(CrashReporting.configuration(from: hostedProvider))
     }
 
     func testSlowInitializationCanRunWithoutBlockingTheCaller() {

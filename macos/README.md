@@ -305,10 +305,10 @@ Reference after they earned their place there:
   the source showing a guard and the release able to hang for an hour. Only
   notarization asks for it: an ordinary `Scripts/make-app.sh` with no
   `NOTARY_PROFILE` never reaches the check.
-- **A hosted-Sentry build refuses to package without a symbol upload**
-  (`ALLOW_NO_SYMBOLS=1` to override). Crash reports with no function names or
-  line numbers are most of the way to no crash reports at all, and you find out
-  months later on the one that mattered.
+- **A Crashbox build refuses to release without a verified private artifact
+  receipt.** Crash reports with no function names or line numbers are most of
+  the way to no crash reports at all, and you find out months later on the one
+  that mattered. The public release script never reads an upload credential.
 
 ## Publishing a release
 
@@ -365,10 +365,13 @@ same is true of a key rotation, for the same reason.
 Off. Two gates have to be open before anything leaves the Mac: the user turns
 **Settings → General → Diagnostics → Send crash reports** on, *and* the build
 carries one complete reporting configuration. The tracked `Packaging/Info.plist`
-keeps its reporting fields empty. `make-app.sh` chooses either Crashbox from
-`Packaging/crashbox-dsn.local` / `$SEEDBED_CRASHBOX_DSN`, or the hosted-Sentry
-rollback from `Packaging/sentry-dsn.local` / `$SEEDBED_SENTRY_DSN`. It refuses
-both together. A reporting build also refuses uncommitted source and records
+keeps its reporting fields empty. `make-app.sh` chooses Crashbox from
+`Packaging/crashbox-dsn.local` / `$SEEDBED_CRASHBOX_DSN`, or leaves reporting
+disabled. Any stale `Packaging/sentry-dsn.local` / `$SEEDBED_SENTRY_DSN` input
+is refused, and the Crashbox input must name the canonical
+`ingest.crashbox.dev` collector with its numeric project id. Hosted-provider
+artifacts are historical evidence only, not build or rollback targets. A
+reporting build also refuses uncommitted source and records
 `net.amnesia.seedbed@<full-40-character-commit>` plus an explicit environment.
 Every ordinary local build is therefore incapable of reporting regardless of
 the toggle, and Settings says so.
@@ -459,9 +462,12 @@ not fault becomes `SIGABRT` instead of an app that stayed up.
 Nothing is sent by the process that crashes. Open Seedbed again and the report
 goes out on that launch.
 
-The public release script continues to own hosted-Sentry dSYM upload. A Crashbox
-pilot uses the estate's private, project-scoped artifact procedure before the
-signed build is distributed; the public script fails closed rather than embed
-an upload credential or ship an unsymbolicated Crashbox build. Rollback removes
-the Crashbox input, restores the protected hosted-Sentry input, and rebuilds the
-exact retained source. Test that fallback before cutover; never dual-send.
+The legacy hosted-Sentry dSYM upload path has been removed. A Crashbox pilot
+uses the estate's private, project-scoped artifact procedure before the signed
+build is distributed; the public script fails closed rather than embed an
+upload credential or ship an unsymbolicated Crashbox build.
+Rollback restores a retained source-identified, signed/notarized/stapled
+artifact whose embedded provider is Crashbox or disabled. An explicit target
+is named by its DMG, version and exact repository-known commit together. The
+release gate verifies the outer DMG and inner Seedbed app, rejects missing tag
+history and hosted-Sentry artifacts, and still refuses dual-send.

@@ -140,9 +140,10 @@ you update with `git pull`.
 
 Crash reporting exists for builds that leave this machine, and is off twice
 over: the user has to opt in, *and* the build has to carry exactly one reporting
-DSN, which no locally built copy does. A release can target the private Crashbox
-service or the retained hosted-Sentry fallback, never both. Prompts, renders and
-filled-in values are never captured. `macos/README.md` has the details.
+DSN, which no locally built copy does. A release may target the private Crashbox
+service; an allowed rollback artifact reports either to Crashbox or nowhere,
+never to hosted Sentry. Prompts, renders and filled-in values are never
+captured. `macos/README.md` has the details.
 
 ## The web UI
 

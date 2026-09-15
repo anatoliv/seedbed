@@ -2,8 +2,10 @@
 
 Seedbed is the first low-risk application cohort for replacing hosted Sentry.
 The application keeps Sentry Cocoa `8.58.4` only as the Sentry-envelope client;
-the packaged DSN selects either Crashbox or the hosted-Sentry rollback. The
-application never initializes two clients and packaging refuses both inputs.
+the distributed build reports either to Crashbox or nowhere. The application
+never initializes two clients, and packaging refuses any legacy hosted input.
+Hosted-Sentry artifacts remain historical evidence only; the source path that
+could build or upload a new one has been removed.
 
 ## Protected identities
 
@@ -13,23 +15,23 @@ application never initializes two clients and packaging refuses both inputs.
   `sha256:dad0a78961ed17ff0fdc778db48d5290cecc2eccd82f45d4b18fc264b02e4302`
 - Credential source: the estate's root-owned mode-`0600` project record; never
   copy its value into this repository, logs, a task comment, or shell history.
-- Hosted rollback: a retained release artifact, not a credential. See "Cutover
-  and rollback gate" for what it is and how to execute it. A hosted-Sentry DSN
-  must still never coexist with the Crashbox input during a build, and that
-  half is mechanical: `Scripts/configure-crash-reporting.sh` refuses both.
+- Rollback: a retained, source-identified, signed/notarized/stapled artifact
+  whose embedded reporting provider is Crashbox or disabled. See "Cutover and
+  rollback gate" for the executable check. A hosted-Sentry artifact is
+  historical evidence only. It is not an allowed rollback target.
 
 ## Build and artifact proof
 
-Start from a clean, committed checkout. Place exactly one provider DSN in the
-corresponding gitignored `Packaging/*.local` file, mode `0600`, without printing
+Start from a clean, committed checkout. Place the Crashbox DSN in the
+gitignored `Packaging/crashbox-dsn.local` file, mode `0600`, without printing
 it. `Scripts/make-app.sh` derives the full 40-character commit and injects:
 
-- `CrashReportingProvider` (`crashbox` or `hosted-sentry`);
+- `CrashReportingProvider` (`crashbox`);
 - `CrashReportingRelease` (`net.amnesia.seedbed@<full commit>`); and
 - `CrashReportingEnvironment` (`production` unless explicitly set).
 
 It fails if the tree is dirty, identity is not exact, the DSN is malformed, or
-both providers are present. Build the universal bundle, then verify it without
+any legacy hosted-Sentry input is present. Build the universal bundle, then verify it without
 printing or sending the DSN:
 
 ```console
@@ -121,18 +123,16 @@ this pilot exists to leave. It is withdrawn outright rather than restated in a
 weaker form, because a weaker form would still be a condition about a service
 Seedbed no longer sends anything to.
 
-**Item 4 held, and it is the one that still binds.** Stated so someone could
-execute it: the rollback unit is the previous release's retained artifacts. On
-2026-09-08 that is `dist/Seedbed_0.1.8_universal.dmg`, which is retained,
-Developer ID signed, notarized, stapled with a ticket that still validates,
-accepted by Gatekeeper, and still carried as an entry in `dist/appcast.xml`.
-Rolling back means re-pinning the three version-pinned surfaces at that release
-(the appcast, `Casks/seedbed.rb`, `site/index.html`) and re-uploading. It does
-not require `Packaging/sentry-dsn.local`, which is absent from the release
-machine: the retained bundle was built with its reporting configuration already
-baked in, so restoring the artifact restores that too. The local file is needed
-only to build a *new* hosted build, which is a slower and different thing than
-a rollback.
+**Item 4 was incomplete and no longer binds in that form.** The retained 0.1.8
+artifact is signed, notarized and stapled, but its baked reporting provider is
+hosted Sentry. Restoring it would route Seedbed back to the service this pilot
+left, so it is historical evidence rather than an allowed rollback target.
+
+As of 2026-09-13, an allowed target is either a retained source-identified
+Crashbox release or a retained source-identified reporting-disabled release.
+It must also remain signed, notarized and stapled. The dated 2026-09-14 record
+below closes that artifact prerequisite and the rollback-drill step for the
+0.1.9 cohort. It does not supply either observation window.
 
 ### What still binds, and where it is checked
 
@@ -145,16 +145,58 @@ apologizing for.
 - **The dSYM must belong to the binary.** Refused in `Scripts/release.sh`
   before the build, and verified against the shipped executable after it.
   Pinned by `tests/test_crashbox_symbol_gate.py`.
-- **A rollback target must already exist.** Refused in `Scripts/release.sh`
-  before the build: a Crashbox release will not start unless the previous
-  tagged release's DMG is still in `dist/` and still carries a valid stapled
-  notarization ticket. Pinned by `tests/test_crashbox_rollback_gate.py`. A
-  retained artifact is a rollback; an intention to retain one is not.
+- **An allowed rollback target must already exist.** Refused in
+  `Scripts/release.sh` before the build: a Crashbox release will not start
+  unless the selected retained DMG has an exact source identity, embeds either
+  Crashbox or no reporting provider, and carries a valid stapled notarization
+  ticket. The gate also requires the exact Seedbed bundle identifier, release
+  namespace, exact commit-derived source digest, expected version and build,
+  runtime-discovered Seedbed signing team, universal executable, inner-app
+  signature, Gatekeeper acceptance and app ticket. Crashbox targets must name
+  the canonical collector; disabled targets must retain no DSN or environment.
+  `SEEDBED_ROLLBACK_DMG`, `SEEDBED_ROLLBACK_VERSION`,
+  `SEEDBED_ROLLBACK_BUILD` and `SEEDBED_ROLLBACK_COMMIT` name one explicit
+  reporting-disabled target when the previous tagged release is not allowed.
+  Missing tag history fails closed; the first-release exception is explicit and
+  accepted only when the repository has no tag, cask version or site DMG pin.
+  Pinned by
+  `tests/test_crashbox_rollback_gate.py`. A hosted-Sentry artifact is refused.
+
+### 2026-09-14 retained artifact and rollback drill
+
+The reporting-disabled rollback artifact was built from exact 0.1.9 source
+`5eb48beb14b9f1cff1d67eccd4e8be4f60e98e80`, not from the later verifier
+source. It records version 0.1.9, build 10, the exact source release and source
+digest, and empty provider, DSN and environment fields. Apple accepted the app
+and DMG notarization submissions; both the inner app and outer DMG were stapled.
+The current fail-closed verifier accepted the copy retained in the operator's
+artifact archive as
+`Seedbed_0.1.9_10_5eb48_reporting-disabled_universal.dmg`, with SHA-256
+`4df8d742a95d63ee52fbd161a9ec8245e8084285c03faf4199fa80f668eabf39`.
+
+Immediately before the drill, one authorized real crash from the installed
+Crashbox build produced event `c385a561-8560-4008-8da2-923a5f0fc2e4`. The
+occurrence was durable at 2026-09-14 07:57:00Z, its Apple symbolication job
+completed on attempt one, and `seedbedTestCrash()` resolved to
+`TestCrash.swift:136`. The alert outbox delivered a 202 on attempt one and the
+gateway recorded email, Telegram and Discord acceptance without suppression.
+
+Rollback to the verified reporting-disabled artifact completed at
+2026-09-14 08:00:39Z. Its bounded diagnostic printed that no complete reporting
+configuration existed and sent nothing; the app launched successfully.
+Roll-forward to the separately verified Crashbox 0.1.9 artifact completed at
+2026-09-14 08:01:54Z. The exact Crashbox release identity was read back from the
+installed bundle, its signature, ticket and universal executable were rechecked,
+the app launched, and the public health endpoint was ready with alert delivery.
+The durable occurrence count for the drill window remained one, so the disabled
+probe did not create an event.
 
 ### The observation window
 
 Release one Crashbox build, observe it for one hour, and restore the retained
-build on any ingest, alert, privacy or stability failure.
+allowed build on any ingest, alert, privacy or stability failure. Record a
+clean bounded 24-hour window after the rollback/roll-forward drill as separate
+evidence; the historical three-run exercise did not create either window.
 
 Symbolication is no longer on that list, and its removal is the same argument
 as item 3 rather than an exception carved for what happened. The first real

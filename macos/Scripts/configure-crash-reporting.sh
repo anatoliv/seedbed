@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Select exactly one Sentry-compatible crash-reporting provider and, when given
-# an app bundle, inject only that provider into its copied Info.plist.
+# Select Crashbox or reporting-disabled and, when given an app bundle, inject
+# that state into its copied Info.plist. The legacy hosted provider is refused.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -35,10 +35,10 @@ read_value() {
 }
 
 crashbox_dsn="$(read_value SEEDBED_CRASHBOX_DSN "$PACKAGING_DIR/crashbox-dsn.local")"
-sentry_dsn="$(read_value SEEDBED_SENTRY_DSN "$PACKAGING_DIR/sentry-dsn.local")"
+legacy_sentry_dsn="$(read_value SEEDBED_SENTRY_DSN "$PACKAGING_DIR/sentry-dsn.local")"
 
-if [[ -n "$crashbox_dsn" && -n "$sentry_dsn" ]]; then
-    echo "error: both Crashbox and hosted-Sentry DSNs are configured; refusing dual-send" >&2
+if [[ -n "$legacy_sentry_dsn" ]]; then
+    echo "error: the legacy hosted-Sentry build route has been removed; remove the stale input" >&2
     exit 1
 fi
 
@@ -47,9 +47,13 @@ dsn=""
 if [[ -n "$crashbox_dsn" ]]; then
     provider=crashbox
     dsn="$crashbox_dsn"
-elif [[ -n "$sentry_dsn" ]]; then
-    provider=hosted-sentry
-    dsn="$sentry_dsn"
+fi
+
+if [[ "$provider" == "crashbox" ]]; then
+    if [[ ! "$dsn" =~ ^https://[A-Za-z0-9._~-]+@ingest\.crashbox\.dev/[0-9]+$ ]]; then
+        echo "error: the selected Crashbox DSN does not name the canonical collector and project" >&2
+        exit 1
+    fi
 fi
 
 if [[ "${1:-}" == "--provider-only" ]]; then
@@ -88,11 +92,6 @@ if [[ "$provider" == "none" ]]; then
     fi
     exit 0
 fi
-
-case "$dsn" in
-    https://?*@?*/?*) ;;
-    *) echo "error: the selected reporting DSN is not a valid HTTPS Sentry-compatible DSN" >&2; exit 1 ;;
-esac
 
 build_ref="${SEEDBED_BUILD_REF:-}"
 if [[ ! "$build_ref" =~ ^[0-9a-f]{40}$ ]]; then

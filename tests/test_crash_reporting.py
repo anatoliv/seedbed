@@ -41,8 +41,8 @@ class CrashReportingTests(unittest.TestCase):
         its own location — so no amount of environment hygiene on this side can
         stop a configured machine from being seen. That is exactly how these
         tests came to be green everywhere except the machine that builds
-        releases, where `sentry-dsn.local` exists and five cases asserting "no
-        provider" saw "hosted-sentry" instead.
+        releases, where a stale `sentry-dsn.local` may still exist. The release
+        path must see and refuse that file rather than silently ignore it.
 
         An empty directory is the neutral state these cases mean by "default",
         stated rather than assumed from the checkout.
@@ -79,12 +79,12 @@ class CrashReportingTests(unittest.TestCase):
         """
         self.assertEqual("none\n", self.run_config("--provider-only").stdout)
 
-        (self.packaging / "sentry-dsn.local").write_text(
-            "https://public@example.invalid/project\n")
+        (self.packaging / "crashbox-dsn.local").write_text(
+            "https://public@ingest.crashbox.dev/12345\n")
         result = self.run_config("--provider-only")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
-            "hosted-sentry\n", result.stdout,
+            "crashbox\n", result.stdout,
             "a DSN in the packaging directory was not seen, so these tests "
             "would report 'none' whatever the machine is configured with")
 
@@ -149,7 +149,7 @@ class CrashReportingTests(unittest.TestCase):
             commit = "a" * 40
             result = self.run_config(
                 str(app),
-                SEEDBED_CRASHBOX_DSN="https://public@example.invalid/project",
+                SEEDBED_CRASHBOX_DSN="https://public-key@ingest.crashbox.dev/12345",
                 SEEDBED_BUILD_REF=commit,
                 SEEDBED_ERROR_ENVIRONMENT="production",
             )
@@ -158,25 +158,41 @@ class CrashReportingTests(unittest.TestCase):
             self.assertEqual(values["CrashReportingProvider"], "crashbox")
             self.assertEqual(values["CrashReportingRelease"], f"net.amnesia.seedbed@{commit}")
             self.assertEqual(values["CrashReportingEnvironment"], "production")
-            self.assertEqual(values["CrashReportingDSN"], "https://public@example.invalid/project")
+            self.assertEqual(values["CrashReportingDSN"], "https://public-key@ingest.crashbox.dev/12345")
 
-    def test_dual_provider_configuration_fails_without_echoing_dsns(self) -> None:
+    def test_legacy_hosted_input_fails_without_echoing_dsns(self) -> None:
         first = "https://first@example.invalid/project"
         second = "https://second@example.invalid/project"
         result = self.run_config(
             "--provider-only", SEEDBED_CRASHBOX_DSN=first, SEEDBED_SENTRY_DSN=second
         )
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("refusing dual-send", result.stderr)
+        self.assertIn("legacy hosted-Sentry build route has been removed", result.stderr)
         self.assertNotIn(first, result.stdout + result.stderr)
         self.assertNotIn(second, result.stdout + result.stderr)
+
+    def test_release_pipeline_has_no_hosted_provider_or_upload_route(self) -> None:
+        release = (ROOT / "macos" / "Scripts" / "release.sh").read_text()
+        for retired in (
+            "sentry-cli",
+            "SENTRY_AUTH_TOKEN",
+            "SENTRY_ORG",
+            'REPORTING_PROVIDER" == "hosted-sentry',
+        ):
+            with self.subTest(retired=retired):
+                self.assertNotIn(retired, release)
+
+        self.assertFalse(
+            (ROOT / "macos" / "Packaging" / "sentry-dsn.local.example").exists(),
+            "the tracked legacy input still instructs a future operator to rebuild a hosted artifact",
+        )
 
     def test_nonimmutable_release_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             app = self.temporary_app(tmp)
             result = self.run_config(
                 str(app),
-                SEEDBED_CRASHBOX_DSN="https://public@example.invalid/project",
+                SEEDBED_CRASHBOX_DSN="https://public-key@ingest.crashbox.dev/12345",
                 SEEDBED_BUILD_REF="main",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -190,7 +206,7 @@ class CrashReportingTests(unittest.TestCase):
                 str(app), SEEDBED_CRASHBOX_DSN=dsn, SEEDBED_BUILD_REF="a" * 40
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("not a valid HTTPS", result.stderr)
+            self.assertIn("does not name the canonical collector", result.stderr)
             self.assertNotIn(dsn, result.stdout + result.stderr)
 
     def test_sdk_is_event_only_and_bounded(self) -> None:
@@ -413,7 +429,8 @@ class CrashReportingTests(unittest.TestCase):
 
     def test_artifact_verifier_never_prints_the_dsn(self) -> None:
         verifier = VERIFY.read_text()
-        self.assertIn('[[ -n "$dsn" ]]', verifier)
+        self.assertIn('[[ "$dsn" =~ ^https://', verifier)
+        self.assertIn('@ingest\\.crashbox\\.dev/[0-9]+$ ]]', verifier)
         for line in verifier.splitlines():
             if line.lstrip().startswith("echo "):
                 self.assertNotIn("$dsn", line)

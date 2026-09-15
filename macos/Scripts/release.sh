@@ -20,6 +20,19 @@
 #   CRASHBOX_DSYM_ARTIFACT=<artifact uuid returned by the private upload>
 #   CRASHBOX_DSYM_UUIDS="<arm64 uuid> <x86_64 uuid>"  as the catalog recorded them
 #
+# It may also name an allowed retained rollback explicitly. This is required
+# when the previous tagged release reports to hosted Sentry rather than to
+# Crashbox or nowhere:
+#
+#   SEEDBED_ROLLBACK_DMG=/path/to/retained-reporting-disabled.dmg
+#   SEEDBED_ROLLBACK_VERSION=0.1.9
+#   SEEDBED_ROLLBACK_BUILD=10
+#   SEEDBED_ROLLBACK_COMMIT=<exact 40-character Seedbed commit>
+#
+# The four values are one assertion and must be supplied together. A repository
+# with no release history may set SEEDBED_FIRST_RELEASE=1 only while it has no
+# release tag, cask version or published site DMG pin.
+#
 # This builds, generates the Sparkle appcast, syncs the Homebrew cask and tags.
 # What it deliberately does NOT do is put anything where a stranger can reach it:
 # Scripts/publish.sh uploads the DMG and the feed, and ../Scripts/publish-repo.sh
@@ -212,6 +225,12 @@ fi
 #     tree it came from, so a dirty tree means the answer is "we cannot say".
 #     A warning rather than a refusal, because there is no publish step here
 #     that a wrong answer would corrupt.
+#
+#     DIRTY describes the tree AT THIS POINT and nothing later may reuse it.
+#     Steps 5b and 5c rewrite tracked files further down, so this value goes
+#     stale the moment they run; step 7 read it and tagged two releases whose
+#     cask still pinned the previous version. Anything downstream that needs to
+#     know whether the tree is clean reads it again where it stands.
 COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 DIRTY=0
 [[ -n "$(git status --porcelain 2>/dev/null)" ]] && DIRTY=1
@@ -237,41 +256,6 @@ fi
 #     function names or line numbers, which is most of the way to no reports at
 #     all — and the discovery happens months later, on the crash you needed.
 REPORTING_PROVIDER="$(Scripts/configure-crash-reporting.sh --provider-only)"
-HAS_DSN=0
-[[ "$REPORTING_PROVIDER" != "none" ]] && HAS_DSN=1
-if [[ "$REPORTING_PROVIDER" == "hosted-sentry" && -z "${SENTRY_AUTH_TOKEN:-}" ]]; then
-    SENTRY_AUTH_TOKEN="$(security find-generic-password -s sentry-release-token -w 2>/dev/null || true)"
-    export SENTRY_AUTH_TOKEN
-fi
-# The org slug is an identifier, so it is not written into this tracked file —
-# it comes from the environment or, failing that, a gitignored local file, which
-# is exactly how the DSN beside it works. Absent, the gate below fails loudly
-# rather than shipping a reporting build with no symbolication.
-SENTRY_ORG="${SENTRY_ORG:-}"
-if [[ -z "$SENTRY_ORG" && -f Packaging/sentry-org.local ]]; then
-    SENTRY_ORG="$(tr -d ' \t\r\n' < Packaging/sentry-org.local)"
-fi
-if [[ "$REPORTING_PROVIDER" == "hosted-sentry" && ( -z "${SENTRY_AUTH_TOKEN:-}" || -z "$(command -v sentry-cli)" || -z "$SENTRY_ORG" ) ]]; then
-    if [[ "${ALLOW_NO_SYMBOLS:-}" != "1" ]]; then
-        cat >&2 <<'MSG'
-error: this build carries a Sentry DSN but cannot upload debug symbols, so its
-       crash reports would arrive with no function names or line numbers.
-
-  Needs all three:
-    - sentry-cli            brew install getsentry/tools/sentry-cli
-    - an auth token         security add-generic-password -U -s sentry-release-token -a sentry -w
-                            (bare -w prompts hidden, keeping the token out of shell history)
-    - SENTRY_ORG            your Sentry organization slug. Deliberately not
-                            defaulted in this file: an org name is an identifier,
-                            and this script is meant to be publishable.
-
-  Or ship without symbols deliberately:
-      ALLOW_NO_SYMBOLS=1 Scripts/release.sh
-MSG
-        exit 1
-    fi
-    echo "WARNING: ALLOW_NO_SYMBOLS=1 — shipping without symbolicated crash reports" >&2
-fi
 # A Crashbox build cannot upload its own symbols. The upload runs on the
 # Crashbox host as an OS-authenticated service account, and no credential for it
 # is going to live in a script that gets published. So the dSYM is uploaded out
@@ -370,20 +354,67 @@ if [[ "$REPORTING_PROVIDER" == "crashbox" ]]; then
     # Same idiom as check-release.sh's build-number check, and for the same
     # reason: excluding this version's own tag keeps FORCE_REBUILD honest,
     # where the newest tag IS the release being rebuilt.
-    ROLLBACK_TAG="$(git tag --list 'v*' --sort=-v:refname 2>/dev/null \
-                    | grep -v "^v${VERSION}\$" | head -1 || true)"
-    if [[ -z "$ROLLBACK_TAG" ]]; then
-        # Nothing has shipped yet, so there is nothing to retain. Refusing here
-        # would make a first release impossible, which is a gate that cannot be
-        # satisfied rather than one that is hard to satisfy.
-        echo "==> No previous release exists yet; no rollback target to check"
-    else
+    ROLLBACK_DMG="${SEEDBED_ROLLBACK_DMG:-}"
+    ROLLBACK_VERSION="${SEEDBED_ROLLBACK_VERSION:-}"
+    ROLLBACK_BUILD="${SEEDBED_ROLLBACK_BUILD:-}"
+    ROLLBACK_COMMIT="${SEEDBED_ROLLBACK_COMMIT:-}"
+    ROLLBACK_TAG=""
+    if [[ -n "$ROLLBACK_DMG" \
+        && ( -z "$ROLLBACK_VERSION" || -z "$ROLLBACK_BUILD" || -z "$ROLLBACK_COMMIT" ) ]]; then
+        echo "error: SEEDBED_ROLLBACK_DMG, SEEDBED_ROLLBACK_VERSION," >&2
+        echo "       SEEDBED_ROLLBACK_BUILD and SEEDBED_ROLLBACK_COMMIT must be supplied together." >&2
+        exit 1
+    fi
+    if [[ -z "$ROLLBACK_DMG" \
+        && ( -n "$ROLLBACK_VERSION" || -n "$ROLLBACK_BUILD" || -n "$ROLLBACK_COMMIT" ) ]]; then
+        echo "error: rollback version/build/commit were supplied without SEEDBED_ROLLBACK_DMG." >&2
+        exit 1
+    fi
+    if [[ -z "$ROLLBACK_DMG" ]]; then
+        if [[ "${SEEDBED_FIRST_RELEASE:-0}" != "0" \
+            && "${SEEDBED_FIRST_RELEASE:-0}" != "1" ]]; then
+            echo "error: SEEDBED_FIRST_RELEASE must be exactly 0 or 1." >&2
+            exit 1
+        fi
+        SELECT_ARGS=(.. "$VERSION" ../Casks/seedbed.rb ../site/index.html)
+        if [[ "${SEEDBED_FIRST_RELEASE:-0}" == "1" ]]; then
+            SELECT_ARGS+=(--first-release)
+        fi
+        if ! ROLLBACK_TAG="$(python3 Scripts/support/select_rollback.py "${SELECT_ARGS[@]}")"; then
+            exit 1
+        fi
+    fi
+    if [[ -z "$ROLLBACK_DMG" && -z "$ROLLBACK_TAG" ]]; then
+        echo "==> Verified first release: no tag, cask version or site DMG pin exists"
+    elif [[ -z "$ROLLBACK_DMG" ]]; then
+        shopt -s nullglob
         ROLLBACK_DMGS=( "${DIST}/${APP_NAME}_${ROLLBACK_TAG#v}_"*.dmg )
+        shopt -u nullglob
+        if [[ "${#ROLLBACK_DMGS[@]}" -ne 1 ]]; then
+            echo "error: expected exactly one retained DMG for ${ROLLBACK_TAG}; found ${#ROLLBACK_DMGS[@]}." >&2
+            exit 1
+        fi
         ROLLBACK_DMG="${ROLLBACK_DMGS[0]}"
+        ROLLBACK_VERSION="${ROLLBACK_TAG#v}"
+        ROLLBACK_COMMIT="$(git rev-parse "${ROLLBACK_TAG}^{commit}")"
+        TAG_PLIST="$(mktemp -t seedbed-rollback-plist)"
+        if ! git show "${ROLLBACK_COMMIT}:macos/Packaging/Info.plist" >"$TAG_PLIST"; then
+            rm -f "$TAG_PLIST"
+            echo "error: the rollback tag's packaging identity could not be read." >&2
+            exit 1
+        fi
+        ROLLBACK_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$TAG_PLIST" 2>/dev/null || true)"
+        rm -f "$TAG_PLIST"
+        if [[ -z "$ROLLBACK_BUILD" ]]; then
+            echo "error: the rollback tag has no build identity." >&2
+            exit 1
+        fi
+    fi
+    if [[ -n "$ROLLBACK_DMG" ]]; then
         if [[ ! -f "$ROLLBACK_DMG" ]]; then
             cat >&2 <<MSG
 error: this build reports to Crashbox and there is no retained release to roll
-       back to. ${ROLLBACK_TAG} shipped, but no DMG for it is left in ${DIST}/.
+       back to. The selected DMG is not present: ${ROLLBACK_DMG}.
 
   Crashbox is still the provider being proved here, and the documented response
   to an ingest, alert, privacy or stability failure is to restore the previous
@@ -391,30 +422,30 @@ error: this build reports to Crashbox and there is no retained release to roll
   appcast, the cask and the site at a version nobody can download is not a
   rollback.
 
-  Restore ${DIST}/${APP_NAME}_${ROLLBACK_TAG#v}_*.dmg from wherever this machine's
-  releases are kept, or rebuild that tag and notarize it again, before you
-  release this one. (Phrased the long way on purpose: the public-snapshot
+  Restore an allowed Crashbox or reporting-disabled DMG from wherever this
+  machine's releases are kept, or build and notarize one before you release
+  this one. (Phrased the long way on purpose: the public-snapshot
   guard in Scripts/publish-repo.sh refuses "<word>-notarize", which is the
   shape an internal host name takes here.)
   See docs/crashbox-pilot.md, "Cutover and rollback gate".
 MSG
             exit 1
         fi
-        if ! xcrun stapler validate "$ROLLBACK_DMG" >/dev/null 2>&1; then
+        if ! Scripts/check-rollback-target.sh \
+            "$ROLLBACK_DMG" "$ROLLBACK_VERSION" "$ROLLBACK_BUILD" \
+            "$ROLLBACK_COMMIT" "$IDENTITY"; then
             cat >&2 <<MSG
-error: the rollback target ${ROLLBACK_DMG} carries no valid stapled
-       notarization ticket, so it is not a release anyone could install.
+error: the retained artifact is not an allowed Crashbox rollback target.
 
-  Without a stapled ticket the copy dragged out of the image has to reach Apple
-  to be verified, and fails on a Mac that is offline or behind a filter. A
-  rollback that only works for machines with clear internet access is not the
-  one you want during an incident.
+  A rollback may restore a source-identified Crashbox release or a
+  source-identified reporting-disabled release. Hosted Sentry is never a
+  rollback target. Set SEEDBED_ROLLBACK_DMG to an allowed retained artifact.
 
   See docs/crashbox-pilot.md, "Cutover and rollback gate".
 MSG
             exit 1
         fi
-        echo "==> Rollback target retained: $ROLLBACK_DMG (stapled)"
+        echo "==> Rollback target retained: $ROLLBACK_DMG (stapled, allowed provider)"
     fi
 fi
 
@@ -462,24 +493,7 @@ if [[ "$REPORTING_PROVIDER" == "crashbox" ]]; then
     echo "    match artifact $CRASHBOX_DSYM_ARTIFACT"
 fi
 
-# 2. Upload debug symbols for the build that is actually shipping.
-#    Deliberately the .app plus the release dSYM, and NOT all of .build, which
-#    also holds sentry-cocoa's iOS, watchOS, tvOS and simulator slices. Those
-#    cannot be crashed in by a macOS app; they only burn upload time and quota.
-if [[ "$REPORTING_PROVIDER" == "hosted-sentry" && -n "${SENTRY_AUTH_TOKEN:-}" ]] && command -v sentry-cli >/dev/null 2>&1; then
-    echo "==> Uploading debug symbols to Sentry"
-    UPLOAD_PATHS=("$APP")
-    # Same flags make-app.sh used, or this resolves a different build directory
-    # and silently uploads nothing.
-    RELEASE_DSYM="$(swift build -c release --build-system native --arch arm64 --arch x86_64 --show-bin-path 2>/dev/null)/Seedbed.dSYM"
-    [[ -d "$RELEASE_DSYM" ]] && UPLOAD_PATHS+=("$RELEASE_DSYM")
-    sentry-cli debug-files upload \
-        --org "$SENTRY_ORG" \
-        --project "${SENTRY_PROJECT:-seedbed}" "${UPLOAD_PATHS[@]}" 2>&1 | tail -3 \
-        || { echo "error: hosted-Sentry symbol upload failed" >&2; exit 1; }
-fi
-
-# 3. Stage and build the DMG: the app, a drop target, and the two things the
+# 2. Stage and build the DMG: the app, a drop target, and the two things the
 #    app needs on the other Mac that the bundle cannot carry.
 echo "==> Building ${DMG}"
 mkdir -p "$DIST"
@@ -602,10 +616,41 @@ Scripts/check-release.sh || {
 #    A dirty tree gets no tag. A tag on uncommitted work points at a commit that
 #    does not contain what shipped, which is worse than no tag at all: it looks
 #    like an answer.
-if [[ "$DIRTY" == "1" ]]; then
-    echo "==> Not tagging: the tree is dirty, so v${VERSION} would point at $COMMIT,"
-    echo "    which is not what this DMG was built from. Commit, then tag by hand:"
-    echo "      git tag -a v${VERSION} -m 'Seedbed ${VERSION} (${BUILD_NUM})' && git push origin v${VERSION}"
+#
+#    The reading is taken HERE rather than reused from step 0e. That one is read
+#    before steps 5b and 5c rewrite Casks/seedbed.rb and site/index.html, so on a
+#    tree that started clean it still said "clean" while the two version-pinned
+#    files the tag is supposed to describe sat uncommitted — and the tag went on
+#    anyway. Both shipped releases carry the PREVIOUS version's cask because of
+#    it: `git show v0.1.9:Casks/seedbed.rb` pins 0.1.8,9, and the commit that
+#    pins 0.1.9 lands after the tag.
+#
+#    That matters because check-release.sh states the attribution chain for
+#    everything shipped before the bundle carried its own source record as "the
+#    tag names a commit and the cask commit records the sha256 of the bytes that
+#    were served". A tag written before the cask commit breaks that chain: the
+#    sha256 is one commit further on, and nothing anywhere says to look there.
+#
+#    So the tag becomes a deliberate second step: the pin is committed first,
+#    and only then does anything tag it. The alternative — having this script
+#    write the commit itself — is a release script that commits on the operator's
+#    behalf, which is a much larger change than it looks and one nobody reviews
+#    at the moment it fires. Refusing and saying exactly what to run is honest
+#    and costs one paste.
+TAG_TREE="$(git status --porcelain 2>/dev/null)"
+if [[ -n "$TAG_TREE" ]]; then
+    echo "==> Not tagging: the tree is dirty, so v${VERSION} would name a commit"
+    echo "    that does not contain the release it claims to describe."
+    echo
+    echo "    Steps 5b and 5c just repinned the cask and the site to ${VERSION}."
+    echo "    Commit those, then tag, so the tag contains its own pin:"
+    echo "      git add Casks/seedbed.rb site/index.html"
+    echo "      git commit -m 'Point the cask and the site at Seedbed ${VERSION}'"
+    echo "      git tag -a v${VERSION} -m 'Seedbed ${VERSION} (${BUILD_NUM})'"
+    echo "      git push origin v${VERSION}"
+    echo
+    echo "    Uncommitted right now:"
+    sed 's/^/      /' <<<"$TAG_TREE"
 elif git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null 2>&1; then
     echo "==> Tag v${VERSION} already exists (rebuild) — left alone."
 else
@@ -634,7 +679,9 @@ needs a checkout of this repository and Python 3.11+ to do anything.
 Verify it arrived intact, on that Mac, before installing:
   shasum -a 256 ~/Downloads/$(basename "$DMG")
 
-Casks/seedbed.rb now pins $VERSION,$BUILD_NUM — commit it with the version bump.
+Casks/seedbed.rb and site/index.html now pin $VERSION,$BUILD_NUM. Commit them
+before tagging, or the tag will not contain the pin it is supposed to describe
+— see the tagging step above for the exact commands.
 Homebrew keeps offering the PREVIOUS release until the public tap is updated,
 which is a separate step on its own schedule:
   Scripts/publish.sh          put the DMG and the feed on the download host

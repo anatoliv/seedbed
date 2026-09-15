@@ -42,8 +42,8 @@ fi
 
 APP="build/Seedbed.app"
 
-# Crashbox and hosted Sentry both accept Sentry envelopes, so the SDK does not
-# choose the provider. Packaging does, exactly once. A configured reporting
+# Crashbox accepts Sentry envelopes, so the SDK remains a protocol client.
+# Packaging selects Crashbox or reporting-disabled exactly once. A configured reporting
 # build must come from a clean, exact commit; version/build is not enough to
 # identify the source or its dSYM later.
 #
@@ -148,9 +148,8 @@ ARCHS=(--arch arm64 --arch x86_64)
 swift build -c release --build-system native -Xswiftc -g "${ARCHS[@]}"
 BIN="$(swift build -c release --build-system native "${ARCHS[@]}" --show-bin-path)/Seedbed"
 
-# The dSYM is built next to the binary inside .build, which is where release.sh
-# points `sentry-cli debug-files upload`. It is deliberately NOT copied into the
-# .app: it would enlarge the download for no user benefit.
+# The dSYM is built next to the binary inside .build. It is deliberately NOT
+# copied into the .app: it would enlarge the download for no user benefit.
 if command -v dsymutil >/dev/null 2>&1; then
     echo "==> Generating dSYM for crash symbolication"
     dsymutil "$BIN" -o "$BIN.dSYM" 2>/dev/null \
@@ -182,9 +181,8 @@ cp ../assets/brand/Seedbed.icns "$APP/Contents/Resources/Seedbed.icns"
 cp ../assets/brand/seedbed-menu-template.png "$APP/Contents/Resources/SeedbedMenuBar.png"
 cp ../assets/brand/seedbed-menu-template@2x.png "$APP/Contents/Resources/SeedbedMenuBar@2x.png"
 
-# Inject one provider without ever printing its DSN. The helper refuses a build
-# with both Crashbox and hosted-Sentry inputs, so rollback is a rebuild/swap and
-# can never accidentally become dual-send.
+# Inject Crashbox or reporting-disabled without ever printing a DSN. The helper
+# refuses any stale hosted-Sentry input rather than reviving the retired route.
 Scripts/configure-crash-reporting.sh "$APP"
 
 # Re-assert the identity by reading the BUILT bundle back.

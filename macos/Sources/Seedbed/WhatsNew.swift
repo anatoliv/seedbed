@@ -48,6 +48,21 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.10",
+            date: "8 September 2026",
+            highlight: "A maintenance release. Nothing in the app behaves differently; what changed is that one thing a crash report already did is now written down, and covered by tests.",
+            changes: [
+                WhatsNewChange(kind: .improved, text:
+                    "The install notes inside the disk image now say that your home folder path "
+                    + "is rewritten to a tilde before a crash report leaves this Mac. The app "
+                    + "already did that. Only the sentence saying so was missing, and it was "
+                    + "missing from the two places someone reads before deciding to trust it."),
+                WhatsNewChange(kind: .improved, text:
+                    "The scrubbing that keeps your home folder path and any long token out of a "
+                    + "crash report is now held by tests, so a later change cannot quietly drop "
+                    + "part of it while the promise stays on the download page."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.9",
             date: "8 September 2026",
             highlight: "Seedbed can write your MCP client's config itself, and it explains a refused client instead of leaving you a 401.",

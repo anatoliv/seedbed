@@ -16,13 +16,14 @@ release="$(read_plist CrashReportingRelease)"
 environment="$(read_plist CrashReportingEnvironment)"
 dsn="$(read_plist CrashReportingDSN)"
 
-[[ "$provider" == "crashbox" || "$provider" == "hosted-sentry" ]] \
-    || { echo "error: bundle has no valid reporting provider" >&2; exit 1; }
+[[ "$provider" == "crashbox" ]] \
+    || { echo "error: bundle is not configured for Crashbox" >&2; exit 1; }
 [[ "$release" =~ ^net\.amnesia\.seedbed@[0-9a-f]{40}$ ]] \
     || { echo "error: bundle release is not an exact source identity" >&2; exit 1; }
 [[ "$environment" =~ ^[a-z0-9][a-z0-9._-]{0,63}$ ]] \
     || { echo "error: bundle environment is invalid" >&2; exit 1; }
-[[ -n "$dsn" ]] || { echo "error: bundle has no reporting DSN" >&2; exit 1; }
+[[ "$dsn" =~ ^https://[A-Za-z0-9._~-]+@ingest\.crashbox\.dev/[0-9]+$ ]] \
+    || { echo "error: bundle does not name the canonical Crashbox collector" >&2; exit 1; }
 
 codesign --verify --strict --deep "$app"
 architectures="$(lipo -archs "$binary")"
