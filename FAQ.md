@@ -119,7 +119,7 @@ That is why history, sharing and backup come for free, and why you can read a di
 prompts/fix-bug-and-test.md            the seed
 rendered/claude-opus-5/…               its Opus version
 rendered/llama-3.3-70b/…               its Llama version
-models.toml                            the five target profiles
+models.toml                            the target profiles
 ```
 
 ### Do I need an API key?

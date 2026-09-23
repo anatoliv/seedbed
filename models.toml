@@ -8,6 +8,24 @@
 # because vendor guides are HTML that moves, and because some of the best
 # guidance already sits on disk.
 
+[models."claude-fable-5-1"]
+name    = "Claude Fable 5.1"
+family  = "claude"
+guides  = [
+  "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1",
+  "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices",
+]
+notes   = "Use for demanding, long-horizon work. State the desired outcome and scope, request progress updates when useful, and define completion clearly; adaptive thinking is always on."
+
+[models."claude-opus-5-5"]
+name    = "Claude Opus 5.5"
+family  = "claude"
+guides  = [
+  "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5",
+  "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices",
+]
+notes   = "Use as the default for most workloads. Start with medium effort, define the end state and progress expectations, and avoid generic instructions to think carefully; adaptive thinking is always on."
+
 [models."claude-opus-5"]
 name    = "Claude Opus 5"
 family  = "claude"
@@ -24,6 +42,38 @@ guides  = [
   "https://docs.claude.com/en/docs/build-with-claude/prompt-engineering/overview",
 ]
 notes   = "Cheaper worker tier. Benefits from more explicit acceptance criteria than Opus."
+
+[models."claude-haiku-4-5-20251001"]
+name    = "Claude Haiku 4.5"
+family  = "claude"
+guides  = [
+  "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices",
+]
+notes   = "Use for fast, cost-sensitive work. Make constraints and the output format explicit, and include examples when the expected pattern is not obvious."
+
+[models."gpt-6-astra"]
+name    = "GPT-6 Astra"
+family  = "openai"
+guides  = [
+  "https://developers.openai.com/api/docs/guides/latest-model",
+]
+notes   = "Use for the highest-capability multi-step work. State autonomy, scope, style, and the definition of done explicitly; this model does not support a reasoning effort of none."
+
+[models."gpt-6-sol"]
+name    = "GPT-6 Sol"
+family  = "openai"
+guides  = [
+  "https://developers.openai.com/api/docs/guides/latest-model",
+]
+notes   = "Use for demanding reasoning with a strong capability-cost balance. Specify a clear end state and tune reasoning effort to the task; a reasoning effort of none is supported."
+
+[models."gpt-6-luna"]
+name    = "GPT-6 Luna"
+family  = "openai"
+guides  = [
+  "https://developers.openai.com/api/docs/guides/latest-model",
+]
+notes   = "Use for efficient, repeatable work at scale. Give explicit constraints, output format, and acceptance criteria; a reasoning effort of none is supported."
 
 [models."gpt-5.4-mini"]
 name    = "GPT-5.4 mini (ChatGPT / Codex)"

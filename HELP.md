@@ -151,10 +151,10 @@ fix this bug and test
 
 A prompting profile: a name, and the documentation that says how to prompt that model well. Targeting a model does not call that vendor and does not need an account with them.
 
-Seedbed ships with five. A prompt lists the ones it is built for, and most do not list all five.
+Seedbed ships with eleven. A prompt lists the ones it is built for, and most do not list all eleven.
 
 ```
-claude-opus-5 · claude-sonnet-5 · gpt-5.4-mini · llama-3.3-70b · qwen3-vl-30b
+claude-fable-5-1 · claude-opus-5-5 · claude-opus-5 · claude-sonnet-5 · claude-haiku-4-5-20251001 · gpt-6-astra · gpt-6-sol · gpt-6-luna · gpt-5.4-mini · llama-3.3-70b · qwen3-vl-30b
 ```
 
 ### Enhancer

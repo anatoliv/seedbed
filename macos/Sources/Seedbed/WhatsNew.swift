@@ -48,6 +48,16 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.13",
+            date: "23 September 2026",
+            highlight: "Seedbed knows the latest Anthropic and OpenAI model families.",
+            changes: [
+                WhatsNewChange(kind: .added, text:
+                    "The target registry now includes Claude Fable 5.1, Claude Opus 5.5, "
+                    + "Claude Haiku 4.5, and the GPT-6 Astra, Sol, and Luna tiers. Existing "
+                    + "targets remain available, so saved prompts and renders keep working."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.12",
             date: "23 September 2026",
             highlight: "The Library stops showing an error after its retry succeeds.",
