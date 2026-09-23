@@ -48,6 +48,16 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.12",
+            date: "23 September 2026",
+            highlight: "The Library stops showing an error after its retry succeeds.",
+            changes: [
+                WhatsNewChange(kind: .fixed, text:
+                    "When a Library reload succeeds after an earlier failure, the old red "
+                    + "error now clears instead of remaining in the footer after the library "
+                    + "is healthy again."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.11",
             date: "23 September 2026",
             highlight: "Library errors stay readable at the window's opening size.",

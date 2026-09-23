@@ -109,6 +109,7 @@ final class LibraryModel: ObservableObject {
                     } else if !keepingDraft {
                         self.loadDraft()
                     }
+                    if self.statusIsError { self.report("") }
                 }
             } catch {
                 await MainActor.run { self.report(error.localizedDescription, isError: true) }
