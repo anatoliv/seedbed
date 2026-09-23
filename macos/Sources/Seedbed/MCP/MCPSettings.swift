@@ -254,9 +254,11 @@ struct MCPSettings: View {
                  "starts a small HTTP server on this Mac that an agent can call. It only runs "
                  + "while Seedbed is running."),
                 ("Port",
-                 "the number that server listens on. Change it only if something else on this "
-                 + "Mac already uses it, and note the status line above reports the port "
-                 + "actually bound, which is the one your client must dial."),
+                 "the number that server listens on. If something else on this Mac already "
+                 + "holds it when the server starts, Seedbed moves up to the next free port, "
+                 + "writes that number into this field and says so above and in a "
+                 + "notification. The status line reports the port actually bound, which is "
+                 + "the one your client must dial."),
                 ("After changing the port or a token",
                  "every client you already configured is now pointing at the old one and will "
                  + "fail to connect. Copy the configuration below again and replace the entry "
@@ -278,7 +280,10 @@ struct MCPSettings: View {
                 .fill(server.isRunning ? Tokens.positive : Color.secondary.opacity(0.5))
                 .frame(width: 7, height: 7)
             if server.isRunning {
-                Text("Running at \(url)").font(Tokens.FontScale.small)
+                // The port the listener actually holds, not the field above:
+                // the two differ for the moment between a move and the field
+                // catching up, and the one a client must dial is this one.
+                Text("Running at http://127.0.0.1:\(server.boundPort)").font(Tokens.FontScale.small)
             } else if let error = server.lastError {
                 Text(error).font(Tokens.FontScale.small).foregroundStyle(Tokens.danger)
             } else {
@@ -299,6 +304,13 @@ struct MCPSettings: View {
     @ViewBuilder private var diagnosticRows: some View {
         if let alert = server.authAlert {
             warningRow(alert.title, alert.detail)
+        }
+        // The stale-config warning for a moved port. The server cannot see a
+        // client still dialling the old number, because that client reaches
+        // whatever took the port and never arrives here, so the move itself is
+        // the warning and it names the button that fixes it.
+        if let move = server.portMove {
+            warningRow(move.title, move.detail)
         }
         if server.legacyPortHeldByAnother {
             warningRow(

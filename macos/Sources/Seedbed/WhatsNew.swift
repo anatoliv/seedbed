@@ -48,6 +48,21 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.16",
+            date: "23 September 2026",
+            highlight: "The MCP server moves to the next free port when its port is taken.",
+            changes: [
+                WhatsNewChange(kind: .added, text:
+                    "When the configured MCP port is already in use, the server starts on "
+                    + "the next free port, saves that port in Settings, and posts a "
+                    + "notification so you know to update your client configuration."),
+                WhatsNewChange(kind: .improved, text:
+                    "Settings shows a warning row while the server runs on a moved port, "
+                    + "next to the button that rewrites the client config."),
+                WhatsNewChange(kind: .added, text:
+                    "The target registry now includes Grok 4.7, Grok 4.6 and Composer 2.5."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.15",
             date: "23 September 2026",
             highlight: "Seedbed prepares a library on first launch.",

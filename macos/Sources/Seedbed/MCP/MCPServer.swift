@@ -30,15 +30,15 @@ enum MCPConstants {
 /// Resumes a continuation at most once, from whichever of several callbacks
 /// arrives first. A state handler and a deadline can both fire, and resuming a
 /// checked continuation twice is a crash rather than a warning.
-private final class ResumeOnce: @unchecked Sendable {
+private final class ResumeOnce<Value: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
-    private var continuation: CheckedContinuation<Bool, Never>?
+    private var continuation: CheckedContinuation<Value, Never>?
 
-    init(_ continuation: CheckedContinuation<Bool, Never>) {
+    init(_ continuation: CheckedContinuation<Value, Never>) {
         self.continuation = continuation
     }
 
-    func resume(_ value: Bool) {
+    func resume(_ value: Value) {
         lock.lock()
         let pending = continuation
         continuation = nil
@@ -194,9 +194,26 @@ final class MCPServer: ObservableObject {
     /// all, and the error it reports is an authentication error, so the address
     /// is the last thing anyone suspects.
     @Published private(set) var legacyPortHeldByAnother = false
+    /// The server is not on the port Settings asked for, because something
+    /// else was, and it walked to a free one. Nil after any start that bound
+    /// the requested port, so the row in Settings outlives only the run it
+    /// describes.
+    @Published private(set) var portMove: MCPPortMove?
 
-    init(client: LibraryClient) {
+    /// Where the bound port is written when it differs from the requested
+    /// one, so the Settings field shows the live port and the next launch
+    /// asks for it directly. Injected so a test can hand in a scratch suite.
+    private let defaults: UserDefaults
+    /// How a port move reaches somebody whose Settings window is closed.
+    /// Injected because the real one needs a bundled app to deliver anything.
+    private let notifyPortMove: @MainActor (MCPPortMove) -> Void
+
+    init(client: LibraryClient,
+         defaults: UserDefaults = .standard,
+         notifyPortMove: @escaping @MainActor (MCPPortMove) -> Void = MCPPortMoveNotifier.post) {
         handler = MCPRequestHandler(client: client)
+        self.defaults = defaults
+        self.notifyPortMove = notifyPortMove
         observeAuthFailures()
     }
 
@@ -234,6 +251,13 @@ final class MCPServer: ObservableObject {
         chain { [weak self] in await self?.tearDownCurrentListener() }
     }
 
+    /// Waits for every queued start and stop to finish. For a test, which
+    /// otherwise has to poll `isRunning` and can miss the moment a restart
+    /// passes through "not running" on its way back up.
+    func awaitPendingRestart() async {
+        _ = await restartTask?.value
+    }
+
     private func chain(_ work: @escaping @MainActor () async -> Void) {
         let previous = restartTask
         restartTask = Task { @MainActor in
@@ -246,6 +270,9 @@ final class MCPServer: ObservableObject {
         guard let old = listener else { return }
         listener = nil
         isRunning = false
+        // The notice describes a listener that no longer exists. The moved
+        // port itself has already been written to Settings and stays there.
+        portMove = nil
         await Self.awaitTerminal(old)
     }
 
@@ -270,7 +297,7 @@ final class MCPServer: ObservableObject {
             log.error("MCP server start refused: empty token")
             return
         }
-        guard let nwPort = NWEndpoint.Port(rawValue: port) else {
+        guard NWEndpoint.Port(rawValue: port) != nil else {
             lastError = "Invalid port \(port)."
             return
         }
@@ -282,44 +309,126 @@ final class MCPServer: ObservableObject {
             return
         }
         await handler.setTokens(full: token, readOnly: readOnlyToken)
-        boundPort = port
+        portMove = nil
 
+        // Ask before binding. With address reuse off a bind beside another
+        // listener fails rather than silently sharing the port, but a failed
+        // bind is a worse probe than a connect: it is the same syscall a
+        // client would make, and it cannot take the port from whoever has it.
+        // A port the probe called free can still be taken by the time the
+        // bind lands, so a bind refused as in use is fed back to the walk as
+        // one more taken port rather than reported as the end of the story.
+        var refused = Set<UInt16>()
+        while true {
+            guard let candidate = await MCPPortScan.firstFree(requested: port, isFree: { probe in
+                if refused.contains(probe) { return false }
+                return await !Self.isSomethingListening(on: probe)
+            }) else {
+                let last = MCPPortScan.candidates(for: port).last ?? port
+                lastError = "Every port from \(port) to \(last) is taken."
+                log.error("MCP server found no free port from \(port, privacy: .public) to \(last, privacy: .public)")
+                return
+            }
+            switch await bind(candidate) {
+            case .ready:
+                boundPort = candidate
+                isRunning = true
+                lastError = nil
+                if candidate != port {
+                    let move = MCPPortMove(requested: port, bound: candidate)
+                    portMove = move
+                    defaults.set(Int(candidate), forKey: AppController.mcpPortKey)
+                    log.info("MCP port \(port, privacy: .public) taken; listening on \(candidate, privacy: .public)")
+                    notifyPortMove(move)
+                }
+                await refreshLegacyPortCheck(currentPort: candidate)
+                return
+            case .addressInUse:
+                refused.insert(candidate)
+            case let .failed(description):
+                lastError = description
+                log.error("MCP server failed to start: \(description, privacy: .public)")
+                return
+            }
+        }
+    }
+
+    /// The parameters every listener is built with, in one place so a test can
+    /// prove the bind.
+    ///
+    /// Address reuse is off on purpose. With it on, a loopback bind can
+    /// succeed beside another program's wildcard listener on the same port
+    /// and take some of its traffic, so a collision never surfaces as an
+    /// error at all. A restart on the same port does not need it: `start`
+    /// waits for the old listener to reach a terminal state, which is what
+    /// releases the socket, before the new bind is attempted.
+    nonisolated static func listenerParameters() -> NWParameters {
         let params = NWParameters.tcp
         params.requiredInterfaceType = .loopback
-        params.allowLocalEndpointReuse = true
+        params.allowLocalEndpointReuse = false
+        return params
+    }
 
+    private enum BindOutcome: Sendable {
+        case ready
+        case addressInUse
+        case failed(String)
+    }
+
+    /// Binds one port and waits for the listener to say whether it worked.
+    /// Only a ready listener is kept; a failed one is dropped so a later
+    /// teardown has nothing half-built to wait on.
+    private func bind(_ port: UInt16) async -> BindOutcome {
+        guard let nwPort = NWEndpoint.Port(rawValue: port) else {
+            return .failed("Invalid port \(port).")
+        }
+        let listener: NWListener
         do {
-            let listener = try NWListener(using: params, on: nwPort)
-            listener.newConnectionHandler = { [weak self] connection in
-                guard let self else { connection.cancel(); return }
-                connection.start(queue: self.ioQueue)
-                Task { await self.serve(connection) }
-            }
+            listener = try NWListener(using: Self.listenerParameters(), on: nwPort)
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+        listener.newConnectionHandler = { [weak self] connection in
+            guard let self else { connection.cancel(); return }
+            connection.start(queue: self.ioQueue)
+            Task { await self.serve(connection) }
+        }
+        let outcome = await withCheckedContinuation { (continuation: CheckedContinuation<BindOutcome, Never>) in
+            let once = ResumeOnce(continuation)
             listener.stateUpdateHandler = { [weak self] state in
-                Task { @MainActor in
-                    guard let self else { return }
-                    switch state {
-                    case .ready:
-                        self.isRunning = true
-                        self.lastError = nil
-                    case let .failed(error):
+                switch state {
+                case .ready:
+                    once.resume(.ready)
+                case let .failed(error):
+                    if case let .posix(code) = error, code == .EADDRINUSE {
+                        once.resume(.addressInUse)
+                    } else {
+                        once.resume(.failed(error.localizedDescription))
+                    }
+                    Task { @MainActor in
+                        guard let self, self.listener === listener else { return }
                         self.isRunning = false
                         self.lastError = error.localizedDescription
                         log.error("MCP listener failed: \(error.localizedDescription, privacy: .public)")
-                    case .cancelled:
-                        self.isRunning = false
-                    default:
-                        break
                     }
+                case .cancelled:
+                    once.resume(.failed("The listener was cancelled before it was ready."))
+                    Task { @MainActor in
+                        guard let self, self.listener === listener else { return }
+                        self.isRunning = false
+                    }
+                default:
+                    break
                 }
             }
             listener.start(queue: ioQueue)
-            self.listener = listener
-            await refreshLegacyPortCheck(currentPort: port)
-        } catch {
-            lastError = error.localizedDescription
-            log.error("MCP server failed to start: \(error.localizedDescription, privacy: .public)")
         }
+        if case .ready = outcome {
+            self.listener = listener
+        } else {
+            listener.cancel()
+        }
+        return outcome
     }
 
     /// Asks whether the port Seedbed no longer uses is answered by something

@@ -72,6 +72,16 @@ The snippet is the only thing the client is handed, so its shape matters as much
 }
 ```
 
+### If the port is already taken
+
+Seedbed checks before it binds. If another program is already listening on the port in Settings, the server moves up to the next free port, skipping the ones other local agent servers are known to use, and writes the new number into the port field so it is kept for next time. A notification says where it went, and the MCP pane shows the same notice beside the status line.
+
+The move makes every client you already configured stale: each one is still dialling the old port, where the other program answers, and reports an authentication failure. Press Update my client config, or copy the configuration again. The walk stops 32 ports up. If every one of those is taken too, the server does not start and the status line says so.
+
+```
+Port 8789 was taken, so Seedbed is listening on 8803.
+```
+
 ### What an agent can do
 
 Five tools. find_prompt searches by description, get_prompt reads one by id, list_prompts and list_models browse, and build_prompt renders a prompt for a model. Clients that speak MCP prompts can also pull one straight through prompts/get without calling a tool at all.
@@ -255,7 +265,7 @@ python3 -c 'import tomllib; print("ok")'
 
 Check the menu bar first. It says whether the server is running, or warns you that it is switched on and did not start.
 
-If it is running, the client is nearly always holding a regenerated token or a URL with an unsupported path. The root and `/mcp` both work. Copy the configuration again from Settings, then MCP. The server lives inside this app, so quitting Seedbed takes it down and the client sees a connection failure rather than a message.
+If it is running, the client is nearly always holding a regenerated token, a port the server has since moved off, or a URL with an unsupported path. The root and `/mcp` both work. Copy the configuration again from Settings, then MCP, or press Update my client config. The server lives inside this app, so quitting Seedbed takes it down and the client sees a connection failure rather than a message.
 
 ```
 The bearer token this client sent isn't the one Seedbed is using.

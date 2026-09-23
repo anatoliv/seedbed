@@ -428,7 +428,7 @@ extension Guide {
 
         The menu bar menu shows whether the server is actually listening, not merely whether the switch is on. A failed bind is otherwise silent, and a switch that says on over a server that never started is the worst of both.
 
-        The port is yours to change. The default is 8789 and it binds to the loopback interface only.
+        The port is yours to change. The default is 8789 and it binds to the loopback interface only. If something else already holds the port when the server starts, Seedbed moves up to the next free one, updates the port field to match, and tells you with a notification. Your clients keep the old number until you press **Update my client config** or copy the configuration again.
 
         The configuration it copies is the whole block your client expects, including the token, so there is nothing to assemble by hand.
         """),

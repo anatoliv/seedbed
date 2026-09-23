@@ -626,7 +626,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // most needs telling: a failed bind is otherwise silent.
         if UserDefaults.standard.bool(forKey: Self.mcpEnabledKey) {
             lines.append(mcp?.isRunning == true
-                         ? "MCP: serving agents on 127.0.0.1:\(Self.mcpPort)"
+                         ? "MCP: serving agents on 127.0.0.1:\(mcp.boundPort)"
                          : "⚠︎ MCP: switched on but not running")
         }
         return lines

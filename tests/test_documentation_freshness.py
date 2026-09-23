@@ -63,6 +63,14 @@ class DocumentationFreshnessTests(unittest.TestCase):
         self.assertIn("require the conventional `/mcp` path", MACOS_README)
         self.assertNotIn("URL with a path on the end", MANUAL)
 
+    def test_a_moved_port_is_documented_where_the_server_behaves_that_way(self) -> None:
+        self.assertIn("MCPPortScan.firstFree(requested: port", SERVER)
+        self.assertIn("Port 8789 was taken, so Seedbed is listening on 8803.", MANUAL)
+        self.assertIn("Update my client config", MANUAL)
+        self.assertIn("walks up to the next free port", MACOS_README)
+        self.assertIn("Address reuse is off", MACOS_README)
+        self.assertIn("moves up to the next free one", GUIDE)
+
     def test_current_docs_use_the_modal_term(self) -> None:
         # The other half of this check — that no document names another project
         # — moved to tests/test_no_sibling_projects.py, which sweeps every

@@ -169,6 +169,26 @@ enum Manual {
             key: nil),
         ManualTopic(
             page: .help, section: "Letting an agent ask for a prompt",
+            term: "If the port is already taken",
+            detail: """
+                Seedbed checks before it binds. If another program is already listening on \
+                the port in Settings, the server moves up to the next free port, skipping the \
+                ones other local agent servers are known to use, and writes the new number \
+                into the port field so it is kept for next time. A notification says where \
+                it went, and the MCP pane shows the same notice beside the status line.
+
+                The move makes every client you already configured stale: each one is still \
+                dialling the old port, where the other program answers, and reports an \
+                authentication failure. Press Update my client config, or copy the \
+                configuration again. The walk stops 32 ports up. If every one of those is \
+                taken too, the server does not start and the status line says so.
+                """,
+            example: """
+                Port 8789 was taken, so Seedbed is listening on 8803.
+                """,
+            key: nil),
+        ManualTopic(
+            page: .help, section: "Letting an agent ask for a prompt",
             term: "What an agent can do",
             detail: """
                 Five tools. find_prompt searches by description, get_prompt reads one by \
@@ -480,11 +500,12 @@ enum Manual {
                 Check the menu bar first. It says whether the server is running, or warns \
                 you that it is switched on and did not start.
 
-                If it is running, the client is nearly always holding a regenerated token \
-                or a URL with an unsupported path. The root and `/mcp` both work. Copy the \
-                configuration again from Settings, then MCP. The server lives inside this app, so \
-                quitting Seedbed takes it down and the client sees a connection failure \
-                rather than a message.
+                If it is running, the client is nearly always holding a regenerated token, \
+                a port the server has since moved off, or a URL with an unsupported path. \
+                The root and `/mcp` both work. Copy the configuration again from Settings, \
+                then MCP, or press Update my client config. The server lives inside this \
+                app, so quitting Seedbed takes it down and the client sees a connection \
+                failure rather than a message.
                 """,
             example: """
                 The bearer token this client sent isn't the one Seedbed is using.
@@ -547,6 +568,21 @@ enum Manual {
                 }
                 """,
             key: nil),
+        ManualTopic(
+            page: .faq, section: "Letting an agent use the library",
+            term: "What happens if something else is already using the port?",
+            detail: """
+                Seedbed moves. It checks the port before binding, and if another program \
+                answers there it takes the next free port above it, updates the port field \
+                in Settings to match, and tells you with a notification and a notice in the \
+                MCP pane.
+
+                Your clients do not move with it. Each one is still configured with the old \
+                port, so press Update my client config or copy the configuration again. \
+                The number it lands on is kept, so the next launch asks for it directly \
+                and nothing moves again.
+                """,
+            example: nil, key: nil),
         ManualTopic(
             page: .faq, section: "Letting an agent use the library",
             term: "What tools does an agent get?",
@@ -679,10 +715,11 @@ enum Manual {
                 Open the menu bar menu first. It says whether the server is running, or \
                 warns you that it is switched on and did not start.
 
-                If it is running, the client is almost certainly using an old token or a \
-                URL with an unsupported path other than `/mcp`. Copy the configuration again from Settings, \
-                then MCP. If the menu says nothing at all, Seedbed is not running: the \
-                server lives inside the app and goes down with it.
+                If it is running, the client is almost certainly using an old token, a \
+                port the server has moved off, or a URL with an unsupported path other than \
+                `/mcp`. Copy the configuration again from Settings, then MCP, or press \
+                Update my client config. If the menu says nothing at all, Seedbed is not \
+                running: the server lives inside the app and goes down with it.
                 """,
             example: nil, key: nil),
     ]

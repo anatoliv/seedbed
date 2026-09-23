@@ -34,6 +34,12 @@ What you get is a standard mcpServers block with the URL and the bearer token al
 }
 ```
 
+### What happens if something else is already using the port?
+
+Seedbed moves. It checks the port before binding, and if another program answers there it takes the next free port above it, updates the port field in Settings to match, and tells you with a notification and a notice in the MCP pane.
+
+Your clients do not move with it. Each one is still configured with the old port, so press Update my client config or copy the configuration again. The number it lands on is kept, so the next launch asks for it directly and nothing moves again.
+
 ### What tools does an agent get?
 
 Five. find_prompt searches by description, get_prompt reads one by id, list_prompts and list_models browse, build_prompt generates or regenerates a tailored version.
@@ -105,7 +111,7 @@ Connect to the address shown in Seedbed → MCP Server.
 
 Open the menu bar menu first. It says whether the server is running, or warns you that it is switched on and did not start.
 
-If it is running, the client is almost certainly using an old token or a URL with an unsupported path other than `/mcp`. Copy the configuration again from Settings, then MCP. If the menu says nothing at all, Seedbed is not running: the server lives inside the app and goes down with it.
+If it is running, the client is almost certainly using an old token, a port the server has moved off, or a URL with an unsupported path other than `/mcp`. Copy the configuration again from Settings, then MCP, or press Update my client config. If the menu says nothing at all, Seedbed is not running: the server lives inside the app and goes down with it.
 
 ## The library itself
 

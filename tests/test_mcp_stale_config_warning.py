@@ -34,6 +34,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "macos" / "Sources" / "Seedbed"
 SERVER = SOURCES / "MCP" / "MCPServer.swift"
 SETTINGS = SOURCES / "MCP" / "MCPSettings.swift"
+PORT_MOVE = SOURCES / "MCP" / "MCPPortMove.swift"
 
 
 def block(text: str, opener: str) -> str:
@@ -147,6 +148,26 @@ class RefusalIsDiagnosed(unittest.TestCase):
         self.assertNotIn("8787", rows)
         self.assertIn("await server.refreshLegacyPortCheck(", self.settings,
                       "nothing re-probes the old port when the pane opens")
+
+    def test_a_moved_port_is_reported_as_the_stale_config_it_causes(self) -> None:
+        """The server cannot see a client still dialling the port it moved off.
+
+        That client reaches whatever took the port and never arrives here, so
+        no refusal is recorded and the auth alert cannot fire. The move itself
+        is therefore the warning, it sits beside the other two, and it names
+        the button that repairs the configuration it made stale.
+        """
+        rows = block(self.settings, "@ViewBuilder private var diagnosticRows")
+        self.assertIn("server.portMove", rows, "the pane no longer shows a port move")
+        self.assertIn("warningRow(move.title, move.detail)", rows,
+                      "the port move is not drawn in the warning row style")
+        move = block(PORT_MOVE.read_text(encoding="utf-8"), "struct MCPPortMove")
+        self.assertIn("Update my client config", move,
+                      "the notice no longer names the button that fixes the stale config")
+        self.assertIn("authentication", move,
+                      "the notice no longer says what the stale client will report")
+        for dash in ("\u2014", "\u2013"):
+            self.assertNotIn(dash, move, "customer-facing copy carries a dash")
 
 
 if __name__ == "__main__":

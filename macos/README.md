@@ -132,6 +132,15 @@ Settings live in `MCPEnabled` and `MCPPort` under `net.amnesia.seedbed`; the
 default port is 8789. Upgrades migrate the former 8787 default once, while a
 different port chosen in Settings is preserved.
 
+The port is probed before it is bound. If another program already listens
+there, the server walks up to the next free port (bounded to 32 above, and
+stepping over the ports other local agent servers use), writes the bound port
+back to `MCPPort` so the Settings field and the next launch follow it, and says
+so in the MCP pane and in a user notification. Address reuse is off on the
+listener, so a loopback bind cannot silently succeed beside another program's
+wildcard listener on the same port. A moved port leaves every configured client
+stale; the pane's notice names the button that repairs it.
+
 ## The library window
 
 ⌘L from the panel, or menu-bar icon → **Prompt Library…**. A proper window for
