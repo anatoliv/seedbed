@@ -48,6 +48,16 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.11",
+            date: "23 September 2026",
+            highlight: "Library errors stay readable at the window's opening size.",
+            changes: [
+                WhatsNewChange(kind: .fixed, text:
+                    "The Library footer now gives an error two lines when it needs them, so "
+                    + "the explanation and the rejected folder name are no longer cut off. "
+                    + "The full remedy stays visible without resizing the window."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.10",
             date: "8 September 2026",
             highlight: "A maintenance release. Nothing in the app behaves differently; what changed is that one thing a crash report already did is now written down, and covered by tests.",

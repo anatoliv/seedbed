@@ -303,7 +303,8 @@ class ARollbackTargetCannotRestoreHostedSentry(RollbackFixture):
     def test_the_outer_helper_binds_signer_and_universal_executable(self) -> None:
         source = CHECK_TARGET.read_text()
         self.assertIn('"$team" != "$EXPECTED_TEAM"', source)
-        self.assertIn('/usr/bin/lipo "$EXECUTABLE" -verify_arch arm64 x86_64', source)
+        self.assertIn('/usr/bin/lipo "$EXECUTABLE" -verify_arch arm64', source)
+        self.assertIn('/usr/bin/lipo "$EXECUTABLE" -verify_arch x86_64', source)
         self.assertIn('$SCRIPT_DIR/support/select_rollback_app.py', source)
         self.assertIn('/usr/bin/codesign --verify --strict "$TARGET"', source)
         self.assertIn('/usr/bin/codesign --verify --deep --strict "$APP"', source)

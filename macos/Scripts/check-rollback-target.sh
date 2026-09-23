@@ -94,7 +94,8 @@ fi
 PLIST="$APP/Contents/Info.plist"
 EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$PLIST")"
 EXECUTABLE="$APP/Contents/MacOS/$EXECUTABLE_NAME"
-if ! /usr/bin/lipo "$EXECUTABLE" -verify_arch arm64 x86_64 >/dev/null 2>&1; then
+if ! /usr/bin/lipo "$EXECUTABLE" -verify_arch arm64 >/dev/null 2>&1 \
+    || ! /usr/bin/lipo "$EXECUTABLE" -verify_arch x86_64 >/dev/null 2>&1; then
     echo "error: the rollback Seedbed executable is not universal arm64 and x86_64." >&2
     exit 1
 fi

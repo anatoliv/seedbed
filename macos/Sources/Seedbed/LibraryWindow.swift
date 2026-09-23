@@ -632,7 +632,8 @@ struct LibraryView: View {
             Text(model.status.isEmpty ? " " : model.status)
                 .font(Tokens.FontScale.small)
                 .foregroundStyle(model.statusIsError ? Tokens.danger : .secondary)
-                .lineLimit(1)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer()
             if model.dirty {
                 Text("unsaved changes").font(Tokens.FontScale.small).foregroundStyle(Tokens.warning)
