@@ -186,9 +186,9 @@
   .get .top img { width: 64px; height: 64px; }
   .get .ver { font-family: var(--font-mono); font-size: 12.5px; color: var(--dim); }
   .get .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
-  .get .half { margin-top: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  @media (max-width: 760px) { .get .half { grid-template-columns: 1fr; } .get .top { grid-template-columns: 48px 1fr; } .get .top img { width: 48px; height: 48px; } }
-  .get .half .box { background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-card); padding: 16px 18px; }
+  .get .half { margin-top: 28px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 760px) { .get .half { grid-template-columns: minmax(0, 1fr); } .get .top { grid-template-columns: 48px 1fr; } .get .top img { width: 48px; height: 48px; } }
+  .get .half .box { min-width: 0; background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-card); padding: 16px 18px; }
   .get .half .box h3 { margin: 0 0 6px; font-size: 14.5px; }
   .get .half .box p { font-size: 13.5px; color: var(--dim); }
   .get .half .box pre { margin-top: 10px; background: var(--card); font-size: 12px; }
@@ -215,7 +215,7 @@
         <a class="link" href="#support">Support</a>
         <a class="link" href="#faq">FAQ</a>
         <a class="link" href="https://github.com/anatoliv/seedbed" rel="noopener">Source</a>
-        <a class="btn btn-primary btn-small" href="/Seedbed_0.1.14_universal.dmg" data-version="0.1.14">Download</a>
+        <a class="btn btn-primary btn-small" href="/Seedbed_0.1.15_universal.dmg" data-version="0.1.15">Download</a>
       </nav>
     </div>
   </div>
@@ -236,7 +236,7 @@
             Press <kbd>⌥</kbd><kbd>⌘</kbd><kbd>P</kbd> anywhere, pick the model, and the long version is on your clipboard.
           </p>
           <div class="row">
-            <a class="btn btn-primary" href="/Seedbed_0.1.14_universal.dmg" data-version="0.1.14">
+            <a class="btn btn-primary" href="/Seedbed_0.1.15_universal.dmg" data-version="0.1.15">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M7 12l5 5 5-5"/><path d="M5 21h14"/></svg>
               Download for macOS
             </a>
@@ -699,12 +699,12 @@ decided by: semantic
         <div class="top">
           <img src="/seedbed-app-icon.svg?v=20260907" alt="" width="64" height="64">
           <div>
-            <p class="ver">Seedbed <span data-version-label>0.1.14</span> · universal DMG · signed and notarized · updates itself through Sparkle</p>
+            <p class="ver">Seedbed <span data-version-label>0.1.15</span> · universal DMG · signed and notarized · updates itself through Sparkle</p>
             <h2 id="install-title" class="t-h2" style="margin-top:6px">Plant it.</h2>
           </div>
         </div>
         <div class="row">
-          <a class="btn btn-primary" href="/Seedbed_0.1.14_universal.dmg" data-version="0.1.14">
+          <a class="btn btn-primary" href="/Seedbed_0.1.15_universal.dmg" data-version="0.1.15">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M7 12l5 5 5-5"/><path d="M5 21h14"/></svg>
             Download for macOS
           </a>
@@ -717,8 +717,8 @@ brew install --cask seedbed</code></pre>
 
         <div class="half">
           <div class="box">
-            <h3>Installing the app is half the job</h3>
-            <p>Seedbed is a front end and does not carry the prompts. It needs a checkout of the repository, which is the library, and Python 3.11 or newer for <code>tomllib</code>. The DMG says so in <em>Before you start.txt</em>, and a copy with neither reports an empty library rather than pretending it has one.</p>
+            <h3>The app creates your library</h3>
+            <p>Seedbed is a front end and does not carry the prompts. On first launch it clones the public library if no valid checkout exists. This needs internet access and Git. You also need Python 3.11 or newer for <code>tomllib</code>. If automatic setup fails, you can clone the library yourself:</p>
             <pre><code>mkdir -p "$HOME/Library/Application Support/Seedbed"
 git clone https://github.com/anatoliv/seedbed \
   "$HOME/Library/Application Support/Seedbed/Library"</code></pre>
@@ -733,7 +733,7 @@ git clone https://github.com/anatoliv/seedbed \
           <li>MIT licence</li>
           <li>macOS 14 Sonoma or later</li>
           <li>Apple silicon and Intel</li>
-          <li>No dependencies beyond Python 3.11</li>
+          <li>Git for setup and Python 3.11 to run</li>
           <li>CLI and web page work without the app</li>
         </ul>
       </div>

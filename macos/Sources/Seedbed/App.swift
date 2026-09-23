@@ -75,6 +75,41 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return LibraryClient.defaultRoot
     }
 
+    /// A fresh install needs the package and registry, not merely a directory.
+    /// Clone off the main actor so first launch stays responsive. Explicit
+    /// custom selections are left alone, including temporarily missing drives.
+    private func prepareLibraryThenReload() {
+        let preferred = root
+        guard LibraryBootstrap.shouldPrepare(preferred) else {
+            model.reload()
+            return
+        }
+        model.show("Creating your library…")
+        Task.detached { [weak self] in
+            do {
+                let prepared = try LibraryBootstrap.ensureDefaultLibrary()
+                await self?.finishedPreparingLibrary(prepared, expected: preferred)
+            } catch {
+                await self?.failedPreparingLibrary(error.localizedDescription)
+            }
+        }
+    }
+
+    private func finishedPreparingLibrary(_ prepared: URL, expected: URL) {
+        if model.client.root.standardizedFileURL == expected.standardizedFileURL {
+            let client = LibraryClient(root: prepared)
+            model.client = client
+            libraryModel?.client = client
+        }
+        model.reload()
+        libraryModel?.reload()
+    }
+
+    private func failedPreparingLibrary(_ message: String) {
+        model.show(message, isError: true)
+        libraryModel?.report(message, isError: true)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)   // menu bar only, no Dock tile
 
@@ -175,7 +210,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // probe is up to seven process spawns and the first caller pays for
         // them. See LibraryClient.resolvedPython.
         LibraryClient.warmUpInterpreter()
-        model.reload()
+        prepareLibraryThenReload()
 
         // Prints the menu and exits. The menu can only be opened by clicking,
         // so this is the only way to check it builds without driving the mouse.

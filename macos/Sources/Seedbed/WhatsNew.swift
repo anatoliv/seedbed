@@ -48,6 +48,16 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.15",
+            date: "23 September 2026",
+            highlight: "Seedbed prepares a library on first launch.",
+            changes: [
+                WhatsNewChange(kind: .added, text:
+                    "When no library exists, Seedbed downloads a starter library into "
+                    + "Application Support and opens it automatically. Existing libraries "
+                    + "and folders you chose in Settings are preserved."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.14",
             date: "23 September 2026",
             highlight: "The Library finds the real checkout, and New Prompt works safely.",

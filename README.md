@@ -43,16 +43,13 @@ already in `/Applications` from a DMG, add `--force` to let the cask take it
 over, since otherwise Homebrew refuses rather than overwrite an app it did not
 install.
 
-**Installing the app is half the job.** Seedbed is a front end and does not carry
-the prompts: it also needs a checkout of this repository and Python 3.11 or
-newer. The cask says so in its caveats and the DMG says so in *Before you start.txt*
-— both generated from the same file — and a copy with neither reports an empty
-library rather than pretending it has one.
-
-On first load the Mac app points to
-`~/Library/Application Support/Seedbed/Library`. A library chosen in Settings
-always wins, and a valid legacy `~/Projects/seedbed` checkout remains an
-automatic fallback for upgrades.
+Seedbed is a front end and does not carry the prompts. On first launch, it
+clones the public library into `~/Library/Application Support/Seedbed/Library`
+if no valid checkout is already present. This needs an internet connection and
+Git. A library chosen in Settings always wins, and a valid legacy
+`~/Projects/seedbed` checkout remains an automatic fallback for upgrades. If
+the automatic clone fails, the app explains why and you can choose a checkout
+in Settings. Python 3.11 or newer is also required to run the library.
 
 macOS 14 (Sonoma) or later, Apple silicon or Intel. The cask is marked
 `auto_updates`, so Seedbed keeps itself current through Sparkle rather than
@@ -121,9 +118,9 @@ staleness, guidance and the enhancer have one implementation. See `macos/README.
 builds a Developer ID signed, notarized, stapled `Seedbed_<version>_universal.dmg`
 in `macos/dist/`, generates the Sparkle appcast, and points `Casks/seedbed.rb` at
 what it just built. A Mac installing that DMG needs no Swift toolchain — which
-was previously the only way to get the app onto one. It still needs what the app
-is a front end *to*: a clone of this repository and Python 3.11+. The DMG carries
-those two instructions inside it, in the same words the cask uses.
+was previously the only way to get the app onto one. On first launch it creates
+the library by cloning this repository if needed; the Mac needs internet access,
+Git, and Python 3.11+. The DMG explains this in the same words as the cask.
 
 The site at seedbed.dev is part of that surface rather than a separate thing:
 its download links name the DMG by file name, so `release.sh` rewrites them

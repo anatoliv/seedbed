@@ -3,8 +3,8 @@ cask "seedbed" do
   # sparkle:version, and Homebrew's Sparkle livecheck strategy reports them as one
   # comma value. Pinning only the short version fails `brew audit --online` with
   # "differs from ... retrieved by livecheck" and breaks autobumping.
-  version "0.1.14,15"
-  sha256 "12ba4bd2206681a536e51b274decc0305a1cb9cc490b79ada80cd916bbb894ed"
+  version "0.1.15,16"
+  sha256 "e2ec35a1ae2c7db19feeac7e9dde599397efb8fe44cc6d28def69d0932129e1e"
 
   # No `verified:` parameter: Homebrew 6 deprecated it and `brew audit --online`
   # fails on one. It is unnecessary here anyway — the download host and the
@@ -34,8 +34,9 @@ cask "seedbed" do
   # "net.amnesia.seedbed.mcp") and are intentionally NOT removed by `zap` — a
   # reinstall should not silently invalidate the configuration you pasted into
   # Claude Code or Cursor. Remove them by hand from Keychain Access if you want
-  # them gone. The prompt library itself is a git checkout you chose the location
-  # of, and is never touched: `zap` removing someone's repository would be a
+  # them gone. The prompt library itself is a git checkout, created at the
+  # default location or chosen by the user, and is never touched: `zap` removing
+  # someone's repository would be a
   # data-loss bug wearing an uninstall's clothes.
   zap trash: [
     "~/Library/Caches/net.amnesia.seedbed",
@@ -48,9 +49,8 @@ cask "seedbed" do
   # interpreter locations and takes the first that can import what it needs, so a
   # Mac with python.org's 3.12 or an Xcode 3.11 already satisfies it; declaring a
   # formula would install a second Python on those machines to no purpose. The
-  # cost of leaving it out is that a Mac with neither gets an app that opens and
-  # reports an empty library, which is what the caveats below and the menu's own
-  # "No Python 3.11+ found." exist to explain.
+  # cost of leaving it out is that a Mac without Python opens the app but cannot
+  # read its library. The menu's "No Python 3.11+ found." explains that failure.
   #
   # The caveats are GENERATED from macos/Packaging/dmg-readme.txt by
   # macos/Scripts/sync-cask.sh, so the DMG and the cask cannot drift into telling
@@ -61,13 +61,13 @@ cask "seedbed" do
 
     1. The library. Seedbed reads and writes a git checkout of the seedbed
        repository, and it runs the Python package inside that checkout to do the
-       work. Create Seedbed's common application-data folder, then clone the
-       library there:
+       work. On first launch, Seedbed clones the public repository into
+       ~/Library/Application Support/Seedbed/Library automatically. This needs an
+       internet connection and Git. If automatic setup fails, you can clone it:
 
            mkdir -p "$HOME/Library/Application Support/Seedbed"
            git clone https://github.com/anatoliv/seedbed "$HOME/Library/Application Support/Seedbed/Library"
 
-       On first load Seedbed points to ~/Library/Application Support/Seedbed/Library.
        An existing valid ~/Projects/seedbed checkout remains an automatic fallback
        for upgrades. Anywhere else is fine: menu bar icon, Settings, General,
        Choose. A folder without a promptlib directory in it is refused, and says why.

@@ -229,10 +229,10 @@ Two consequences worth knowing:
   Xcode's 3.9 and every call fails. It probes known locations and picks the
   first interpreter that can actually `import tomllib`. Override with:
   `defaults write net.amnesia.seedbed PythonPath /path/to/python3`
-- **It needs the library checkout.** A first load points to
-  `~/Library/Application Support/Seedbed/Library`; change it from the menu-bar
-  menu. A valid legacy `~/Projects/seedbed` checkout remains an automatic
-  fallback for upgrades.
+- **It needs the library checkout.** If there is no valid checkout, first launch
+  clones one into `~/Library/Application Support/Seedbed/Library`. This needs
+  internet access and Git. Change the library from the menu-bar menu. A valid
+  legacy `~/Projects/seedbed` checkout remains an automatic fallback.
 
 ## Check for Updates…
 
@@ -274,12 +274,12 @@ leaves the copy dragged into `/Applications` needing to reach Apple to be
 verified, which fails on a Mac that is offline or behind a filter.
 
 **The DMG is not the whole install.** This app is a front end; the prompts and
-the code that renders them are the checkout. On the other Mac you also need a
-clone of this repository and Python 3.11+, and a first load points at
-`~/Library/Application Support/Seedbed/Library` unless Settings → General →
-Choose says otherwise. A valid legacy `~/Projects/seedbed` checkout is still
-recognized. That is
-why `Packaging/dmg-readme.txt` rides along inside the image as *Before you start*.
+the code that renders them are the checkout. On the other Mac, first launch
+clones the library to `~/Library/Application Support/Seedbed/Library` if none
+exists. It needs internet access, Git, and Python 3.11+. Settings → General →
+Choose can select another checkout, and a valid legacy `~/Projects/seedbed`
+checkout is still recognized. `Packaging/dmg-readme.txt` rides along inside
+the image as *Before you start*.
 
 Guards worth knowing about before the first run, all of them ported from
 Reference after they earned their place there:

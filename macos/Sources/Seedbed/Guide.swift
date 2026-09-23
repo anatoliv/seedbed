@@ -166,7 +166,7 @@ extension Guide {
                   body: """
         Seedbed is a front end. The prompts, the renders and the code that makes them live in a git checkout, and the app runs that code rather than reimplementing it.
 
-        On first load it looks in `~/Library/Application Support/Seedbed/Library`. To point it somewhere else, open the menu bar icon, then **Settings**, then **General**, then **Choose**. An existing valid `~/Projects/seedbed` checkout remains an automatic fallback for upgrades from Seedbed 0.1.7 and earlier.
+        On first launch it clones the public library into `~/Library/Application Support/Seedbed/Library` if no valid checkout exists. This needs internet access and Git. To point it somewhere else, open the menu bar icon, then **Settings**, then **General**, then **Choose**. An existing valid `~/Projects/seedbed` checkout remains an automatic fallback for upgrades from Seedbed 0.1.7 and earlier.
 
         A folder is only a library if it contains the `promptlib` package. Picking a folder of loose markdown files is refused, with the reason, rather than failing three actions later with an import error.
 
@@ -480,7 +480,7 @@ extension Guide {
 
         Install the app from the disk image: drag it to Applications and it launches. That Mac needs no Swift toolchain and no build.
 
-        Then give it the library: clone the repository into `~/Library/Application Support/Seedbed/Library`, or choose another checkout under **Settings**, then **General**. An existing valid `~/Projects/seedbed` checkout is still recognized. That Mac also needs **Python 3.11 or newer**.
+        On first launch Seedbed clones the repository into `~/Library/Application Support/Seedbed/Library` if no valid checkout exists. This needs internet access and Git. You can also choose another checkout under **Settings**, then **General**. An existing valid `~/Projects/seedbed` checkout is still recognized. That Mac also needs **Python 3.11 or newer**.
 
         Until both halves are there the app opens and says which one is missing rather than showing an empty list. An empty library and an unreadable one look identical otherwise, and only one of them is your fault.
         """),

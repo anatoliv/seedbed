@@ -57,27 +57,30 @@
       <div class="article">
         <div class="cue"><span class="rows" aria-hidden="true"><i></i><i></i><i></i></span><span class="n">Privacy</span></div>
         <h1 class="t-h2" style="font-size:clamp(2rem,4.5vw,2.8rem)">What leaves your Mac, and when.</h1>
-        <p class="stamp">Last updated 7 September 2026. Applies to Seedbed for macOS and to the Python package and local web page in the same repository.</p>
+        <p class="stamp">Last updated 23 September 2026. Applies to Seedbed for macOS and to the Python package and local web page in the same repository.</p>
 
         <div class="short">
-          <p>Seedbed has no account, no sign-up, no analytics and no server of its own. Your prompts are files in a git repository you control. Everything that goes over the network happens because you asked for it, and this page says what each of those things is.</p>
+          <p>Seedbed has no account, no sign-up, no analytics and no server of its own. Your prompts are files in a git repository you control. First launch may download that repository automatically. This page says what else can go over the network.</p>
         </div>
 
         <h2>What Seedbed stores, and where</h2>
         <ul>
-          <li><strong>Your library</strong> is plain markdown in a git checkout you chose the location of. Seeds, rendered prompts and the model registry are all files you can read, diff and delete. Seedbed never copies them anywhere else.</li>
+          <li><strong>Your library</strong> is plain markdown in a git checkout at the default location or one you chose. Seeds, rendered prompts and the model registry are all files you can read, diff and delete. Seedbed never copies them anywhere else.</li>
           <li><strong>Copy counts and the values you type into placeholders</strong> stay on the machine that typed them. Both files are excluded from the repository on purpose, so a project name you filled in on one Mac is not pushed to another.</li>
           <li><strong>Fetched vendor guidance</strong> is cached on disk and also kept out of the repository, because it is a download rather than something you own.</li>
           <li><strong>Settings</strong> live in the app's own preferences. The tokens for the local agent server live in your login Keychain, not in a file.</li>
         </ul>
 
         <h2>What leaves your Mac</h2>
-        <p>Four things, and each is the result of something you did.</p>
+        <p>First launch may download the public library. The other network actions follow a command or setting you choose.</p>
 
-        <h3>1. Fetching a model's prompting guidance</h3>
+        <h3>1. Creating the library</h3>
+        <p>If no valid library exists on first launch, Seedbed clones the public repository from GitHub. GitHub receives an ordinary download request, not your prompts. An existing library is used without this request.</p>
+
+        <h3>2. Fetching a model's prompting guidance</h3>
         <p>When you refresh guidance, Seedbed downloads the vendor documentation pages listed in the model registry, from those vendors. Your prompts are not part of that request. It is an ordinary page fetch, and you can point a model at a local file instead.</p>
 
-        <h3>2. Building a rendered prompt</h3>
+        <h3>3. Building a rendered prompt</h3>
         <p>Building sends the seed, the cached guidance and an instruction to whichever enhancer you configured. That destination is your choice, and it is the only place a prompt of yours is sent:</p>
         <ul>
           <li>By default, the <code>claude</code> command-line tool already installed on your Mac, under whatever subscription you already have. Seedbed adds no key and no account.</li>
@@ -86,10 +89,10 @@
         </ul>
         <p>Copying a prompt sends nothing. The render is already a file, so copying is a file read and works offline.</p>
 
-        <h3>3. Checking for updates</h3>
+        <h3>4. Checking for updates</h3>
         <p>A copy installed from the disk image asks seedbed.dev for the signed update feed, the way any Sparkle-based Mac app does. That request carries no identifier for you. A copy built from source in a checkout checks the git repository instead and never contacts the site.</p>
 
-        <h3>4. Crash reports, if you turn them on</h3>
+        <h3>5. Crash reports, if you turn them on</h3>
         <p><strong>Off by default, and behind two gates that both have to be open.</strong> You have to switch reporting on, and the build has to carry a reporting key that is injected at packaging time and never committed. A copy you compile from the public source has no key, so it cannot report anything however the switch is set.</p>
         <p>When it is on, a report carries the stack trace, the app and system versions, and nothing else that identifies you. The reporting library is told not to attach your IP address or any user identifier, the machine name is cleared from every event, and any long run of hexadecimal, which is the shape an access token takes, is replaced before sending.</p>
         <p><strong>Prompt text is never captured.</strong> That is a design decision before it is a filter: nothing in the app hands library content to the reporter. Errors from the Python core can quote a prompt, so they are shown to you in the window and deliberately not reported. A single launch may send at most twenty events, so a fault that repeats cannot turn into a flood.</p>
