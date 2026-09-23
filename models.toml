@@ -83,6 +83,33 @@ guides  = [
 ]
 notes   = "Reached via the ChatGPT OAuth path, not a paid API key."
 
+[models."grok-4.7"]
+name    = "Grok 4.7"
+family  = "grok"
+guides  = [
+  "https://docs.x.ai/developers/models/grok-4.7",
+  "https://docs.x.ai/developers/model-capabilities/text/reasoning",
+]
+notes   = "Use for difficult, long-running coding and knowledge work. State the outcome, relevant context, constraints, and how to verify completion. Reasoning defaults to high and can be tuned from low to xhigh."
+
+[models."grok-4.6"]
+name    = "Grok 4.6"
+family  = "grok"
+guides  = [
+  "https://docs.x.ai/developers/models/grok-4.6",
+  "https://docs.x.ai/developers/model-capabilities/text/reasoning",
+]
+notes   = "Use for complex coding and agentic tasks. Give a clear goal, relevant context, constraints, and a checkable done condition. Reasoning defaults to high and supports low, medium, high, and xhigh effort."
+
+[models."composer-2.5"]
+name    = "Composer 2.5"
+family  = "composer"
+guides  = [
+  "https://cursor.com/docs/models/cursor-composer-2-5",
+  "https://cursor.com/docs/agent/prompting",
+]
+notes   = "Use for agentic coding in Cursor. Name the desired change, point to relevant files when known, state constraints and tests, and ask it to verify the result with its tools. The fast variant is Cursor's default."
+
 [models."llama-3.3-70b"]
 name    = "Llama 3.3 70B (local)"
 family  = "llama"

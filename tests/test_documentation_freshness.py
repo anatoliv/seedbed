@@ -53,7 +53,7 @@ class DocumentationFreshnessTests(unittest.TestCase):
         if not PLAN:
             self.skipTest("the design plan is not published in this checkout")
         models = tomllib.loads((ROOT / "models.toml").read_text())["models"]
-        number = {5: "Five", 11: "Eleven"}.get(len(models), str(len(models)))
+        number = {5: "Five", 11: "Eleven", 14: "Fourteen"}.get(len(models), str(len(models)))
         self.assertIn(f"{number} ship", PLAN)
 
     def test_mcp_compatibility_path_matches_the_server(self) -> None:
