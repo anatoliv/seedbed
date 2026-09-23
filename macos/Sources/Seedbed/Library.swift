@@ -276,6 +276,35 @@ struct LibraryClient {
         resolveDefaultRoot(isLibrary: isLibrary)
     }
 
+    /// A client can outlive the folder decision that created it. The Library
+    /// window is cached, and older releases also kept the first-run
+    /// Application Support destination even when it was not a checkout. If
+    /// that preferred folder is one of Seedbed's conventional defaults and is
+    /// invalid, but the other default is a real library, use the real one.
+    /// Keeping this at the client boundary makes reads and writes recover
+    /// together: `load` and `save` (including New Prompt) cannot disagree about
+    /// which checkout is active.
+    ///
+    /// A custom folder never falls through to another checkout. It may be a
+    /// removable disk or a temporarily unavailable share, and silently writing
+    /// into a different repository would be worse than the actionable error.
+    /// The same is true when no valid fallback exists: retain the preferred URL
+    /// so the error names the folder the person actually chose.
+    static func resolveUsableRoot(preferred: URL,
+                                  isLibrary: (URL) -> Bool) -> URL {
+        if isLibrary(preferred) { return preferred }
+        let path = preferred.standardizedFileURL.path
+        let isConventionalDefault = path == commonRoot.standardizedFileURL.path
+            || path == legacyDefaultRoot.standardizedFileURL.path
+        guard isConventionalDefault else { return preferred }
+        let fallback = resolveDefaultRoot(isLibrary: isLibrary)
+        return isLibrary(fallback) ? fallback : preferred
+    }
+
+    var usableRoot: URL {
+        Self.resolveUsableRoot(preferred: root, isLibrary: Self.isLibrary)
+    }
+
     /// Resolution is separate from the filesystem predicate so the migration
     /// order can be tested: common first, valid legacy second, common as the
     /// first-run destination when neither checkout exists.
@@ -441,10 +470,13 @@ struct LibraryClient {
     }
 
     private func run(_ arguments: [String], timeout: TimeInterval = 600) throws -> String {
+        let usableRoot = self.usableRoot
         // Checked here and not only at the picker, so every path gets the
-        // explanation rather than just the one that chose the folder.
-        if let reason = Self.whyNotALibrary(root) {
-            throw LibraryError.rootMissing("\(reason) (\(root.lastPathComponent))")
+        // explanation rather than just the one that chose the folder. Resolve
+        // again for every command because a cached window can outlive a moved
+        // or deleted checkout.
+        if let reason = Self.whyNotALibrary(usableRoot) {
+            throw LibraryError.rootMissing("\(reason) (\(usableRoot.lastPathComponent))")
         }
         guard let python = Self.resolvedPython else {
             throw LibraryError.noPython
@@ -452,7 +484,7 @@ struct LibraryClient {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: python)
         process.arguments = ["-m", "promptlib"] + arguments
-        process.currentDirectoryURL = root
+        process.currentDirectoryURL = usableRoot
         process.environment = Self.childEnvironment
 
         let out = Pipe(), err = Pipe()

@@ -36,10 +36,17 @@ class LibraryDefaultTests(unittest.TestCase):
         self.assertLess(legacy, fallback)
         self.assertIn('.appendingPathComponent("Projects/seedbed"', self.library)
 
-    def test_an_explicit_saved_selection_still_wins(self) -> None:
+    def test_an_explicit_saved_selection_is_validated_before_it_wins(self) -> None:
         saved = self.app.index("UserDefaults.standard.string(forKey: Self.rootKey)")
+        recovery = self.app.index("LibraryClient.resolveUsableRoot", saved)
         default = self.app.index("return LibraryClient.defaultRoot", saved)
-        self.assertLess(saved, default)
+        self.assertLess(saved, recovery)
+        self.assertLess(recovery, default)
+
+    def test_every_library_command_recovers_before_reading_or_writing(self) -> None:
+        run = self.library.split("private func run", 1)[1]
+        self.assertIn("let usableRoot = self.usableRoot", run)
+        self.assertIn("process.currentDirectoryURL = usableRoot", run)
 
     def test_install_instructions_clone_to_the_first_run_location(self) -> None:
         common = "$HOME/Library/Application Support/Seedbed/Library"

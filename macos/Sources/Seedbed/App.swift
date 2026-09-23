@@ -67,7 +67,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var root: URL {
         if let saved = UserDefaults.standard.string(forKey: Self.rootKey), !saved.isEmpty {
-            return URL(fileURLWithPath: saved)
+            return LibraryClient.resolveUsableRoot(
+                preferred: URL(fileURLWithPath: saved),
+                isLibrary: LibraryClient.isLibrary
+            )
         }
         return LibraryClient.defaultRoot
     }
@@ -899,9 +902,15 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             alert.runModal()
             return
         }
+        let client = LibraryClient(root: url)
         UserDefaults.standard.set(url.path, forKey: Self.rootKey)
-        model.client = LibraryClient(root: url)
+        model.client = client
         model.reload()
+        // The Library window is cached. Retarget its client as well as the HUD,
+        // or New Prompt and Save keep writing through the folder that was
+        // active when the window first opened.
+        libraryModel?.client = client
+        libraryModel?.reload()
     }
 
     /// Rebuilding calls the enhancer for every stale pair, so it can run for

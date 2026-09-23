@@ -48,6 +48,20 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.14",
+            date: "23 September 2026",
+            highlight: "The Library finds the real checkout, and New Prompt works safely.",
+            changes: [
+                WhatsNewChange(kind: .fixed, text:
+                    "When the conventional Application Support folder is not a checkout, "
+                    + "the Library now recovers to the valid legacy checkout instead of "
+                    + "showing an empty list and a persistent error."),
+                WhatsNewChange(kind: .fixed, text:
+                    "New Prompt now reads the checkout's current inventory before choosing "
+                    + "a filename, creates the first unused scaffold, and selects it after "
+                    + "reload without relying on a timing delay."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.13",
             date: "23 September 2026",
             highlight: "Seedbed knows the latest Anthropic and OpenAI model families.",

@@ -148,31 +148,28 @@ final class LibraryModel: ObservableObject {
     /// prompt with no name cannot be written to a file.
     func newPrompt() {
         guard !busy else { return }
-        var candidate = "new-prompt"
-        var suffix = 2
-        let taken = Set(prompts.map(\.id))
-        while taken.contains(candidate) {
-            candidate = "new-prompt-\(suffix)"
-            suffix += 1
-        }
         busy = true
         report("Creating…")
-        let id = candidate
         Task.detached { [client] in
             do {
-                _ = try client.save(id: id, title: "New prompt",
-                                    body: "describe the task in one line",
-                                    category: "", targets: [], context: "agent")
+                // Do not choose the id from the visible list. A failed or
+                // stale reload can leave that list empty while the recovered
+                // checkout already contains `new-prompt.md`; saving under the
+                // guessed id would overwrite it. Pin this operation to the
+                // recovered root, read its real inventory, then create.
+                let activeClient = LibraryClient(root: client.usableRoot)
+                let data = try activeClient.load()
+                let id = Self.nextNewPromptID(existing: Set(data.seeds.map(\.id)))
+                _ = try activeClient.save(id: id, title: "New prompt",
+                                          body: "describe the task in one line",
+                                          category: "", targets: [], context: "agent")
                 await MainActor.run {
                     self.busy = false
                     self.report("Created. Edit it, then Save")
                     self.search = ""
                     self.categoryFilter = nil
+                    self.pendingSelection = id
                     self.reload()
-                    // Select it once the reload has landed.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        self.select(id)
-                    }
                 }
             } catch {
                 await MainActor.run {
@@ -181,6 +178,16 @@ final class LibraryModel: ObservableObject {
                 }
             }
         }
+    }
+
+    /// The scaffold name is deliberately boring, but it must never collide
+    /// with a file that exists in the checkout. Kept pure for the regression
+    /// test; the caller supplies the inventory it just loaded from disk.
+    nonisolated static func nextNewPromptID(existing: Set<String>) -> String {
+        if !existing.contains("new-prompt") { return "new-prompt" }
+        var suffix = 2
+        while existing.contains("new-prompt-\(suffix)") { suffix += 1 }
+        return "new-prompt-\(suffix)"
     }
 
     // MARK: - Row actions
