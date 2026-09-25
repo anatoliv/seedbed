@@ -3,11 +3,22 @@
 
 set -euo pipefail
 
-TARGET="${1:?usage: check-rollback-target.sh <Seedbed.app|Seedbed.dmg> <version> <build> <commit> <signer>}"
-EXPECTED_VERSION="${2:?usage: check-rollback-target.sh <Seedbed.app|Seedbed.dmg> <version> <build> <commit> <signer>}"
-EXPECTED_BUILD="${3:?usage: check-rollback-target.sh <Seedbed.app|Seedbed.dmg> <version> <build> <commit> <signer>}"
-EXPECTED_COMMIT="${4:?usage: check-rollback-target.sh <Seedbed.app|Seedbed.dmg> <version> <build> <commit> <signer>}"
-EXPECTED_SIGNER="${5:?usage: check-rollback-target.sh <Seedbed.app|Seedbed.dmg> <version> <build> <commit> <signer>}"
+# With --tag-commit, <commit> is the rollback tag's commit rather than the build
+# commit. make-app.sh stamps HEAD at build time and the tag lands on the later
+# cask and site pin commit, so the artifact's own baked commit is accepted when
+# it is that tag commit or an ancestor of it with identical Seedbed sources.
+# Without it, <commit> is compared exactly, as an explicit rollback requires.
+METADATA_MODE=()
+if [[ "${1:-}" == "--tag-commit" ]]; then
+    METADATA_MODE=(--tag-commit)
+    shift
+fi
+
+TARGET="${1:?usage: check-rollback-target.sh [--tag-commit] <Seedbed.app|Seedbed.dmg> <version> <build> <commit> <signer>}"
+EXPECTED_VERSION="${2:?usage: check-rollback-target.sh [--tag-commit] <Seedbed.app|Seedbed.dmg> <version> <build> <commit> <signer>}"
+EXPECTED_BUILD="${3:?usage: check-rollback-target.sh [--tag-commit] <Seedbed.app|Seedbed.dmg> <version> <build> <commit> <signer>}"
+EXPECTED_COMMIT="${4:?usage: check-rollback-target.sh [--tag-commit] <Seedbed.app|Seedbed.dmg> <version> <build> <commit> <signer>}"
+EXPECTED_SIGNER="${5:?usage: check-rollback-target.sh [--tag-commit] <Seedbed.app|Seedbed.dmg> <version> <build> <commit> <signer>}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
@@ -71,8 +82,9 @@ elif [[ "${APP##*/}" != "Seedbed.app" || ! -d "$APP" || -L "$APP" ]]; then
     exit 1
 fi
 
-if ! python3 "$SCRIPT_DIR/support/rollback_metadata.py" \
-    "$REPO" "$APP" "$EXPECTED_VERSION" "$EXPECTED_BUILD" "$EXPECTED_COMMIT"; then
+if ! BUILD_COMMIT="$(python3 "$SCRIPT_DIR/support/rollback_metadata.py" \
+    ${METADATA_MODE[@]+"${METADATA_MODE[@]}"} \
+    "$REPO" "$APP" "$EXPECTED_VERSION" "$EXPECTED_BUILD" "$EXPECTED_COMMIT")"; then
     echo "error: the rollback artifact metadata is not an allowed Seedbed rollback identity." >&2
     exit 1
 fi
@@ -102,6 +114,6 @@ fi
 PROVIDER="$(/usr/libexec/PlistBuddy -c 'Print :CrashReportingProvider' "$PLIST" 2>/dev/null || true)"
 REPORTING="${PROVIDER:-disabled}"
 
-echo "rollback identity: net.amnesia.seedbed@${EXPECTED_COMMIT}"
+echo "rollback identity: net.amnesia.seedbed@${BUILD_COMMIT}"
 echo "rollback version: $EXPECTED_VERSION ($EXPECTED_BUILD)"
 echo "rollback reporting: $REPORTING"

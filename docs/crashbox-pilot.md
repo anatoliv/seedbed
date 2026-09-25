@@ -43,7 +43,11 @@ Scripts/verify-reporting-artifact.sh build/Seedbed.app \
 The production pilot must be Developer ID signed and notarized. Ad-hoc signing
 is only for the isolated local canary. Upload the matching zipped dSYM through
 the private project-scoped `crashbox-artifact-upload dsym` path, then verify
-both Mach-O architecture UUIDs in the catalog. Do not publish the dSYM or add a
+both Mach-O architecture UUIDs in the catalog. `Scripts/upload-dsym.sh`
+performs that upload from the built app and its dSYM, as the service account
+and with no token, and prints the `CRASHBOX_DSYM_ARTIFACT` and
+`CRASHBOX_DSYM_UUIDS` values `Scripts/release.sh` requires; it is operator
+tooling and is not in the public snapshot. Do not publish the dSYM or add a
 remote upload credential to this repository.
 
 Reporting is fail-open for Seedbed itself. Launch, preference changes, SDK

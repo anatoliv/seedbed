@@ -502,6 +502,9 @@ final class MCPServer: ObservableObject {
             try await Self.send(response, on: connection)
         } catch {
             log.debug("MCP connection closed early: \(error.localizedDescription, privacy: .public)")
+            if let refusal = Self.response(refusing: error) {
+                try? await Self.send(refusal, on: connection)
+            }
         }
     }
 
@@ -517,10 +520,10 @@ final class MCPServer: ObservableObject {
             if let headerEnd = buffer.range(of: separator) {
                 let headerBlock = buffer.subdata(in: buffer.startIndex ..< headerEnd.lowerBound)
                 let (method, path, headers) = try parseHead(headerBlock)
-                let contentLength = headers["content-length"].flatMap { Int($0) } ?? 0
-                guard contentLength <= MCPConstants.maxRequestBytes else {
-                    throw MCPServerError.requestTooLarge
-                }
+                let contentLength = try declaredBodyLength(
+                    method: method, headers: headers,
+                    bytesAfterHead: buffer.distance(from: headerEnd.upperBound, to: buffer.endIndex)
+                )
                 var body = buffer.subdata(in: headerEnd.upperBound ..< buffer.endIndex)
                 while body.count < contentLength {
                     let chunk = try await receive(connection)
@@ -537,6 +540,46 @@ final class MCPServer: ObservableObject {
                 throw MCPServerError.requestTooLarge
             }
         }
+    }
+
+    /// How many body bytes to read, decided from the head alone.
+    ///
+    /// This runs before the bearer token is checked, so every rule here is
+    /// reachable by any local process. `Content-Length` must be plain decimal
+    /// digits: `Int("-1")` used to pass the size cap and then trap in
+    /// `body.prefix(-1)`, crashing the app with one request. A garbled or
+    /// missing length is refused rather than read as zero, and chunked bodies
+    /// are refused because nothing here decodes them. A missing length is
+    /// accepted only for a request with no body at all, which a POST to this
+    /// endpoint never is.
+    nonisolated static func declaredBodyLength(
+        method: String, headers: [String: String], bytesAfterHead: Int
+    ) throws -> Int {
+        if let encoding = headers["transfer-encoding"], encoding.lowercased().contains("chunked") {
+            throw MCPServerError.malformedRequest
+        }
+        guard let raw = headers["content-length"] else {
+            guard method.uppercased() != "POST", bytesAfterHead == 0 else {
+                throw MCPServerError.malformedRequest
+            }
+            return 0
+        }
+        // `Int` alone also accepts "+5" and "-1"; neither is a valid length.
+        guard !raw.isEmpty, raw.allSatisfy({ $0.isASCII && $0.isNumber }),
+              let contentLength = Int(raw)
+        else { throw MCPServerError.malformedRequest }
+        guard contentLength <= MCPConstants.maxRequestBytes else {
+            throw MCPServerError.requestTooLarge
+        }
+        return contentLength
+    }
+
+    /// What to write back when reading the request failed. Only a malformed
+    /// request is answered; the other failures keep closing the connection
+    /// without a word, as they always have.
+    nonisolated static func response(refusing error: Error) -> HTTPResponseData? {
+        guard case MCPServerError.malformedRequest = error else { return nil }
+        return HTTPResponseData(status: 400, body: Data(#"{"error":"bad request"}"#.utf8))
     }
 
     nonisolated static func parseHead(

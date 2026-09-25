@@ -321,6 +321,122 @@ class ARollbackTargetCannotRestoreHostedSentry(RollbackFixture):
         self.assertIn("exact Developer ID Application identity", result.stderr)
 
 
+class ATaggedRollbackIsCheckedAgainstTheCommitItWasBuiltFrom(RollbackFixture):
+    """make-app.sh stamps HEAD at build time, and the release tag lands on the
+    cask and site pin commit made after the build. So a tagged release's own
+    DMG never names the tag commit, and comparing the two exactly refused every
+    automatically selected rollback target (0.1.15: DMG built at c704021,
+    tagged at c11ce90). In --tag-commit mode the build commit is read from the
+    artifact, must sit under the tag with identical Seedbed sources, and the
+    identity and source-digest checks run against it. The explicit override
+    stays exact."""
+
+    def git(self, *args: str) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=self.repo, check=True, text=True, capture_output=True,
+        ).stdout.strip()
+
+    def commit_all(self, message: str) -> str:
+        self.git("add", ".")
+        self.git("commit", "-qm", message)
+        return self.git("rev-parse", "HEAD")
+
+    def pin_and_tag(self) -> str:
+        """The release shape: build, then a pin commit, and the tag on that."""
+        (self.repo / "Casks").mkdir(exist_ok=True)
+        (self.repo / "Casks/seedbed.rb").write_text(f'version "{self.VERSION}"\n')
+        tag = self.commit_all("Point cask and site")
+        self.git("tag", f"v{self.VERSION}")
+        return tag
+
+    def tagged(self, app: Path, tag: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, str(METADATA), "--tag-commit", str(self.repo), str(app),
+             self.VERSION, self.BUILD, tag],
+            text=True, capture_output=True, check=False,
+        )
+
+    def test_a_build_commit_under_the_tag_passes_and_is_reported(self) -> None:
+        app = self.artifact()
+        tag = self.pin_and_tag()
+        self.assertNotEqual(self.commit, tag)
+        result = self.tagged(app, tag)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(self.commit, result.stdout.strip())
+
+    def test_a_build_commit_equal_to_the_tag_passes(self) -> None:
+        self.git("tag", f"v{self.VERSION}")
+        result = self.tagged(self.artifact(), self.commit)
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_the_explicit_path_still_compares_the_commit_exactly(self) -> None:
+        app = self.artifact()
+        tag = self.pin_and_tag()
+        result = self.metadata(app, self.VERSION, self.BUILD, tag)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("wrong source release identity", result.stderr)
+
+    def test_a_build_commit_off_the_tag_history_is_refused(self) -> None:
+        self.git("checkout", "-qb", "side")
+        (self.repo / "NOTES").write_text("not on the release line\n")
+        side = self.commit_all("side")
+        self.git("checkout", "-q", "-")
+        tag = self.pin_and_tag()
+        result = self.tagged(
+            self.artifact(CrashReportingRelease=f"net.amnesia.seedbed@{side}"), tag)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("is not the rollback tag commit", result.stderr)
+
+    def test_sources_changed_between_build_and_tag_are_refused(self) -> None:
+        app = self.artifact()
+        (self.repo / "macos/Sources/Seedbed/App.swift").write_text("struct Changed {}\n")
+        tag = self.pin_and_tag()
+        result = self.tagged(app, tag)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("Seedbed sources changed", result.stderr)
+
+    def test_the_source_digest_is_still_checked_against_the_build_commit(self) -> None:
+        app = self.artifact(SeedbedSourceDigest="sha256:" + "0" * 64)
+        result = self.tagged(app, self.pin_and_tag())
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("source digest", result.stderr)
+
+    def test_a_malformed_or_unknown_baked_commit_is_refused(self) -> None:
+        tag = self.pin_and_tag()
+        for release in ("net.amnesia.seedbed@short", f"com.example@{self.commit}",
+                        "net.amnesia.seedbed@" + "a" * 40, ""):
+            with self.subTest(release=release):
+                result = self.tagged(self.artifact(CrashReportingRelease=release), tag)
+                self.assertNotEqual(0, result.returncode)
+
+    def test_only_the_automatic_path_passes_tag_mode(self) -> None:
+        source = RELEASE.read_text()
+        explicit = source.index('ROLLBACK_COMMIT="${SEEDBED_ROLLBACK_COMMIT:-}"')
+        from_tag = source.index('ROLLBACK_COMMIT="$(git rev-parse "${ROLLBACK_TAG}^{commit}")"')
+        self.assertEqual(1, source.count("ROLLBACK_MODE=(--tag-commit)"))
+        mode = source.index("ROLLBACK_MODE=(--tag-commit)")
+        self.assertLess(source.index("ROLLBACK_MODE=()"), from_tag)
+        self.assertLess(explicit, from_tag)
+        self.assertLess(from_tag, mode)
+        self.assertLess(mode, source.index('if [[ -n "$ROLLBACK_DMG" ]]', from_tag),
+                        "tag mode must be set inside the automatic selection branch "
+                        "only, so an explicit SEEDBED_ROLLBACK_COMMIT stays exact")
+        call = source[source.index("if ! Scripts/check-rollback-target.sh"):][:300]
+        self.assertIn('${ROLLBACK_MODE[@]+"${ROLLBACK_MODE[@]}"}', call)
+
+    def test_the_outer_helper_accepts_and_forwards_tag_mode(self) -> None:
+        helper = CHECK_TARGET.read_text()
+        self.assertIn('${METADATA_MODE[@]+"${METADATA_MODE[@]}"}', helper)
+        self.assertIn('net.amnesia.seedbed@${BUILD_COMMIT}', helper)
+        result = subprocess.run(
+            [str(CHECK_TARGET), "--tag-commit", str(self.root / "missing.app"),
+             self.VERSION, self.BUILD, self.commit, "Developer ID Application: Somebody"],
+            text=True, capture_output=True, check=False,
+        )
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("exact Developer ID Application identity", result.stderr)
+
+
 class RollbackTagSelectionIsMeasured(RollbackFixture):
     def select(self, version: str = "2.0.0", *, first: bool = False) -> subprocess.CompletedProcess[str]:
         cask = self.root / "seedbed.rb"

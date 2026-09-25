@@ -16,6 +16,7 @@ CRASHBOX_DSN = re.compile(
     r"https://[A-Za-z0-9._~-]+@ingest\.crashbox\.dev/[0-9]+"
 )
 EXECUTABLE_NAME = re.compile(r"[A-Za-z0-9._-]+")
+RELEASE_IDENTITY = re.compile(r"net\.amnesia\.seedbed@([0-9a-f]{40})")
 
 
 def refuse(reason: str) -> None:
@@ -73,25 +74,50 @@ def text(info: dict[str, object], key: str) -> str:
     return value if isinstance(value, str) else ""
 
 
+def build_commit_under_tag(repo: Path, info: dict[str, object], tag_commit: str) -> str:
+    """The commit the artifact was built from, bound to the tag it shipped as.
+
+    make-app.sh stamps HEAD at build time, and the cask and site pin commit
+    that the tag points at comes after the build, so a tagged release's own
+    DMG never names the tag commit. The artifact's baked commit is accepted
+    only when it is the tag commit or one of its ancestors, and only when the
+    tag's Seedbed sources are byte-for-byte the ones that commit built.
+    """
+    match = RELEASE_IDENTITY.fullmatch(text(info, "CrashReportingRelease"))
+    if not match:
+        refuse("the rollback artifact has the wrong source release identity")
+    build_commit = match.group(1)
+    git(repo, "cat-file", "-e", f"{build_commit}^{{commit}}")
+    ancestry = subprocess.run(
+        ["git", "-C", os.fspath(repo), "merge-base", "--is-ancestor",
+         build_commit, tag_commit],
+        capture_output=True,
+        check=False,
+    )
+    if ancestry.returncode != 0:
+        refuse(
+            f"the rollback artifact was built from {build_commit}, which is not "
+            f"the rollback tag commit {tag_commit} or an ancestor of it"
+        )
+    if source_digest(repo, build_commit) != source_digest(repo, tag_commit):
+        refuse(
+            f"the Seedbed sources changed between the artifact's build commit "
+            f"{build_commit} and the rollback tag commit {tag_commit}"
+        )
+    return build_commit
+
+
 def validate(
     repo: Path,
     app: Path,
     expected_version: str,
     expected_build: str,
     expected_commit: str,
-) -> None:
+    from_tag: bool = False,
+) -> str:
     if not re.fullmatch(r"[0-9a-f]{40}", expected_commit):
         refuse("the expected rollback commit is not 40 lowercase hex characters")
     git(repo, "cat-file", "-e", f"{expected_commit}^{{commit}}")
-
-    committed = plist_at_commit(repo, expected_commit)
-    if text(committed, "CFBundleShortVersionString") != expected_version:
-        refuse("the expected version does not match the expected commit")
-    if text(committed, "CFBundleVersion") != expected_build:
-        refuse("the expected build does not match the expected commit")
-    committed_executable = text(committed, "CFBundleExecutable")
-    if not committed_executable:
-        refuse("the expected commit has no executable identity")
 
     if app.name != "Seedbed.app" or app.is_symlink() or not app.is_dir():
         refuse("the rollback app must be a non-symlink Seedbed.app directory")
@@ -111,6 +137,18 @@ def validate(
         info = plistlib.loads(plist.read_bytes())
     except (OSError, plistlib.InvalidFileException, ValueError):
         refuse("the rollback artifact has no readable Seedbed Info.plist")
+
+    if from_tag:
+        expected_commit = build_commit_under_tag(repo, info, expected_commit)
+
+    committed = plist_at_commit(repo, expected_commit)
+    if text(committed, "CFBundleShortVersionString") != expected_version:
+        refuse("the expected version does not match the expected commit")
+    if text(committed, "CFBundleVersion") != expected_build:
+        refuse("the expected build does not match the expected commit")
+    committed_executable = text(committed, "CFBundleExecutable")
+    if not committed_executable:
+        refuse("the expected commit has no executable identity")
 
     if text(info, "CFBundleIdentifier") != "net.amnesia.seedbed":
         refuse("the rollback artifact is not net.amnesia.seedbed")
@@ -149,6 +187,7 @@ def validate(
     executable = macos / executable_name
     if executable.is_symlink() or not executable.is_file():
         refuse("the rollback artifact has no contained non-symlink executable")
+    return expected_commit
 
 
 def main() -> int:
@@ -158,18 +197,26 @@ def main() -> int:
     parser.add_argument("expected_version")
     parser.add_argument("expected_build")
     parser.add_argument("expected_commit")
+    parser.add_argument(
+        "--tag-commit",
+        action="store_true",
+        help="expected_commit is the rollback tag's commit; the artifact's own "
+        "build commit must be it or an ancestor with identical Seedbed sources",
+    )
     args = parser.parse_args()
     try:
-        validate(
+        build_commit = validate(
             args.repo.resolve(),
             args.app,
             args.expected_version,
             args.expected_build,
             args.expected_commit,
+            args.tag_commit,
         )
     except ValueError as error:
         print(f"error: {error}.", file=sys.stderr)
         return 1
+    print(build_commit)
     return 0
 
 

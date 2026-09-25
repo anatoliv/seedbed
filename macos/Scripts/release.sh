@@ -286,7 +286,9 @@ REPORTING_PROVIDER="$(Scripts/configure-crash-reporting.sh --provider-only)"
 #      path, as that host's own service account. Read the artifact id out of
 #      the upload's result, and confirm the catalog holds it as ready with one
 #      row per architecture. That path is deliberately not described here; it
-#      is the operator's, and this file is published.
+#      is the operator's, and this file is published. Scripts/upload-dsym.sh
+#      does it from the built app and its dSYM and prints both values below;
+#      it is operator tooling and the public snapshot does not carry it.
 #   3. Re-run this script with both values set.
 if [[ "$REPORTING_PROVIDER" == "crashbox" ]]; then
     if [[ -z "${CRASHBOX_DSYM_ARTIFACT:-}" || -z "${CRASHBOX_DSYM_UUIDS:-}" ]]; then
@@ -300,6 +302,12 @@ error: this build reports to Crashbox, and Crashbox symbolicates only from a
       CRASHBOX_DSYM_ARTIFACT=<artifact uuid from the upload's JSON> \
       CRASHBOX_DSYM_UUIDS="<arm64 uuid> <x86_64 uuid>" \
       Scripts/release.sh
+
+  Scripts/upload-dsym.sh performs the upload from a signed, un-notarized
+  build (Scripts/make-app.sh with no NOTARY_PROFILE) and prints both lines:
+      Scripts/upload-dsym.sh build/Seedbed.app \
+          .build/apple/Products/Release/Seedbed.dSYM seedbed-macos
+  It is operator tooling, not part of the public snapshot.
 
   The UUIDs are re-checked against the shipped binary after the build, so a
   dSYM from a different build stops the release instead of quietly producing
@@ -359,6 +367,7 @@ if [[ "$REPORTING_PROVIDER" == "crashbox" ]]; then
     ROLLBACK_BUILD="${SEEDBED_ROLLBACK_BUILD:-}"
     ROLLBACK_COMMIT="${SEEDBED_ROLLBACK_COMMIT:-}"
     ROLLBACK_TAG=""
+    ROLLBACK_MODE=()
     if [[ -n "$ROLLBACK_DMG" \
         && ( -z "$ROLLBACK_VERSION" || -z "$ROLLBACK_BUILD" || -z "$ROLLBACK_COMMIT" ) ]]; then
         echo "error: SEEDBED_ROLLBACK_DMG, SEEDBED_ROLLBACK_VERSION," >&2
@@ -397,6 +406,13 @@ if [[ "$REPORTING_PROVIDER" == "crashbox" ]]; then
         ROLLBACK_DMG="${ROLLBACK_DMGS[0]}"
         ROLLBACK_VERSION="${ROLLBACK_TAG#v}"
         ROLLBACK_COMMIT="$(git rev-parse "${ROLLBACK_TAG}^{commit}")"
+        # The tag sits on the cask and site pin commit, which lands after the
+        # build, so the DMG's baked commit is an ancestor of this one rather
+        # than equal to it. --tag-commit reads that build commit from the DMG,
+        # requires it under the tag with the same Seedbed sources, and runs the
+        # identity and source-digest checks against it. An explicit
+        # SEEDBED_ROLLBACK_COMMIT is still compared exactly.
+        ROLLBACK_MODE=(--tag-commit)
         TAG_PLIST="$(mktemp -t seedbed-rollback-plist)"
         if ! git show "${ROLLBACK_COMMIT}:macos/Packaging/Info.plist" >"$TAG_PLIST"; then
             rm -f "$TAG_PLIST"
@@ -432,6 +448,7 @@ MSG
             exit 1
         fi
         if ! Scripts/check-rollback-target.sh \
+            ${ROLLBACK_MODE[@]+"${ROLLBACK_MODE[@]}"} \
             "$ROLLBACK_DMG" "$ROLLBACK_VERSION" "$ROLLBACK_BUILD" \
             "$ROLLBACK_COMMIT" "$IDENTITY"; then
             cat >&2 <<MSG

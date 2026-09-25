@@ -48,6 +48,19 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.17",
+            date: "25 September 2026",
+            highlight: "The MCP server turns away a malformed request instead of quitting.",
+            changes: [
+                WhatsNewChange(kind: .fixed, text:
+                    "A request to the MCP server with a negative or unreadable length could "
+                    + "make Seedbed quit before the access token was checked. The server now "
+                    + "answers that request with an error and keeps running."),
+                WhatsNewChange(kind: .improved, text:
+                    "The MCP server also refuses a chunked request body, and a POST that "
+                    + "does not state its length."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.16",
             date: "23 September 2026",
             highlight: "The MCP server moves to the next free port when its port is taken.",

@@ -412,14 +412,24 @@ uploaded, and then checks the name against what it built:
     Scripts/release.sh
 
 The order is forced by the fact that a dSYM does not exist until something is
-built. Build the release binary first, without notarizing, which produces the
-dSYM under the release build directory:
+built. Build the bundle first, without notarizing (no `NOTARY_PROFILE`), which
+produces the app and its dSYM under the release build directory:
 
-    swift build -c release --build-system native -Xswiftc -g --arch arm64 --arch x86_64
+    Scripts/make-app.sh
 
 Signing does not change `LC_UUID`, so that dSYM pairs with the signed binary
-the release produces from the same sources. Upload it, note the artifact id and
-the UUIDs the catalog recorded, then run the release with both values set.
+the release produces from the same sources. Upload it with
+`Scripts/upload-dsym.sh`, which is operator tooling and is not in the public
+snapshot. It takes the built app and its dSYM, never a build directory, refuses
+unless `Scripts/verify-reporting-artifact.sh` accepts the pair, checks the
+upload receipt against the archive it sent, and prints the two assignments
+`release.sh` wants:
+
+    CRASHBOX_SSH_HOST=<the Crashbox host> Scripts/upload-dsym.sh \
+        build/Seedbed.app .build/apple/Products/Release/Seedbed.dSYM seedbed-macos
+
+Record the artifact id and the UUIDs on the task, then run the release with
+both values set.
 
 After the build, `release.sh` runs `dwarfdump --uuid` on the executable inside
 the bundle and compares it with the declared set, refusing on any difference.

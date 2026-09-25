@@ -91,7 +91,6 @@ final class MCPPortScanTests: XCTestCase {
 /// step around are running on this Mac while the suite does.
 @MainActor
 final class MCPPortCollisionTests: XCTestCase {
-    private var suiteName = ""
     private var scratch: UserDefaults!
     private var moves: [MCPPortMove] = []
     private var servers: [MCPServer] = []
@@ -99,8 +98,7 @@ final class MCPPortCollisionTests: XCTestCase {
     private var sockets: [Int32] = []
 
     override func setUp() async throws {
-        suiteName = "net.amnesia.seedbed.tests.\(UUID().uuidString)"
-        scratch = UserDefaults(suiteName: suiteName)
+        scratch = ThrowawayDefaults.make("port-collision")
         moves = []
     }
 
@@ -114,7 +112,6 @@ final class MCPPortCollisionTests: XCTestCase {
         listeners = []
         sockets.forEach { close($0) }
         sockets = []
-        scratch.removePersistentDomain(forName: suiteName)
     }
 
     private func makeServer() -> MCPServer {
