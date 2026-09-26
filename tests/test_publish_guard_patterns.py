@@ -36,11 +36,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PUBLISH = ROOT / "Scripts" / "publish-repo.sh"
 
-# Read as text and scanned; anything else is what `grep -I` skips.
-BINARY_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".icns", ".pdf", ".zip",
-                   ".dmg", ".woff", ".woff2", ".ttf", ".otf", ".ico"}
-
-
 def script() -> str:
     return PUBLISH.read_text(encoding="utf-8")
 
@@ -121,7 +116,7 @@ def published_files() -> list[Path]:
         if not path.is_file() or path.is_symlink():
             continue
         rel = path.relative_to(ROOT)
-        if excluded(rel) or path.suffix.lower() in BINARY_SUFFIXES:
+        if excluded(rel):
             continue
         kept.append(path)
     return kept
@@ -171,18 +166,25 @@ class PublishGuardsTests(unittest.TestCase):
                          "the credential guard must still read .gitignore")
 
     def test_no_published_file_trips_a_snapshot_guard(self) -> None:
+        """Every published file, binaries included, read as bytes.
+
+        The guards scan binaries (no `grep -I`) under LC_ALL=C, so this reads
+        each file as bytes and splits it on newlines as grep does. An icon or
+        a font that happened to hold a guarded shape would abort the publish,
+        and this is where that should surface first.
+        """
         offences = []
         for name, pattern, skip_names, skip_dirs in guards():
-            expression = re.compile(pattern)
+            expression = re.compile(pattern.encode("ascii"))
             for path in self.files:
                 rel = path.relative_to(ROOT)
                 if path.name in skip_names or skip_dirs & set(rel.parts):
                     continue
                 try:
-                    body = path.read_text(encoding="utf-8")
-                except (UnicodeDecodeError, OSError):
+                    body = path.read_bytes()
+                except OSError:
                     continue
-                for number, line in enumerate(body.splitlines(), 1):
+                for number, line in enumerate(body.split(b"\n"), 1):
                     # Where, never what: the guard it mirrors reports path:line
                     # only, because a matched credential printed by a test run is
                     # copied into the transcript of whoever ran it.

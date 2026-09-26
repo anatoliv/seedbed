@@ -17,7 +17,11 @@ Every planted value is assembled from fragments at runtime, so this file holds
 nothing either script's guards, or `test_publish_guard_patterns.py`, would
 refuse. All of them are fake.
 
-Both scripts are private ops tooling that the public snapshot excludes, so
+The history purge's content verifier is held to the same rule: it names the
+pattern and the blob sha, never a sample of the match. It is run here against a
+throwaway repository, never a real one.
+
+All three scripts are private ops tooling that the public snapshot excludes, so
 these skip rather than fail where the scripts are absent: a test that reads a
 private-only file unconditionally breaks the publish it protects.
 """
@@ -35,6 +39,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PUBLISH_REPO = ROOT / "Scripts" / "publish-repo.sh"
 PUBLISH_SITE = ROOT / "Scripts" / "publish-site.sh"
+PURGE_HISTORY = ROOT / "Scripts" / "purge-public-history.sh"
 
 GUARDS_START = 'bold "==> Secrets guard"'
 GUARDS_END = "# (e) The cask"
@@ -140,6 +145,30 @@ class PublishRepoGuardsRedact(Redaction, unittest.TestCase):
         result = self.run_guards(LC_ALL="en_US.UTF-8", LANG="en_US.UTF-8")
         self.assert_redacted(result, secret, "docs/legacy.txt:2", "guard (c)")
 
+    def test_a_hit_inside_a_binary_file_still_refuses(self) -> None:
+        """A file grep takes for binary is scanned like any other.
+
+        With `-I` the guards skipped any file holding a NUL byte, so a key
+        planted after one passed the whole block and the snapshot went out
+        with it. The report is still where, never what: a line number, not
+        grep's "Binary file matches" notice and not the bytes around the hit.
+        """
+        cases = {
+            "guard (b)": "AK" + "IA" + "Q7ZK4M2XW9" + "PB",
+            "guard (c)": "/Us" + "ers/" + "planteduser",
+        }
+        for guard, secret in cases.items():
+            with self.subTest(guard=guard):
+                for old in self.mirror.rglob("blob.bin"):
+                    old.unlink()
+                path = self.mirror / "assets" / "blob.bin"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"\x00\x01\x02header\n\x00"
+                                 + f"{secret} {CANARY}".encode() + b"\x00\xff\n")
+                result = self.run_guards()
+                self.assert_redacted(result, secret, "assets/blob.bin:2", guard)
+                self.assertNotIn("Binary file", result.stdout + result.stderr)
+
     def test_excluded_file_reference_guard(self) -> None:
         secret = "docs/experi" + "ments/" + "run-73.md"
         where = self.plant("guide/intro.md", secret)
@@ -214,6 +243,87 @@ class PublishSiteGuardRedacts(Redaction, unittest.TestCase):
             b"\x89PNG\r\n\x00\x01" + f"{secret} {CANARY}".encode() + b"\x00\xff")
         self.assert_redacted(self.publish(), secret, "site/og.png:2", "names something internal")
 
+
+
+@unittest.skipUnless(PURGE_HISTORY.is_file(),
+                     "Scripts/purge-public-history.sh is private ops tooling, excluded "
+                     "from the public snapshot")
+class PurgeHistoryVerifierRedacts(unittest.TestCase):
+    """The blob-content verifier, run alone against a throwaway repository.
+
+    Only the verifier's own Python is taken out of the script and run, with the
+    temporary repository as its argument, so nothing clones, rewrites or pushes.
+    """
+
+    START = 'bold "==> Verifying (1/2): blob contents"'
+
+    def setUp(self) -> None:
+        text = PURGE_HISTORY.read_text(encoding="utf-8")
+        self.assertIn(self.START, text)
+        after = text[text.index(self.START):]
+        body_start = after.index("<<'PYTHON'")
+        body_start = after.index("\n", body_start) + 1
+        self.verifier = after[body_start:after.index("\nPYTHON\n", body_start)]
+        self.assertIn("rev-list", self.verifier, "the verifier was not found")
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = Path(tmp.name)
+        self.fresh_repo("repo")
+
+    def fresh_repo(self, name: str) -> None:
+        """One repository per case, so one case's blob cannot answer another's."""
+        self.repo = self.tmp / name
+        self.repo.mkdir()
+        self.git("init", "-q", "-b", "main")
+
+    def git(self, *args: str) -> str:
+        env = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+        return subprocess.run(
+            ["git", "-C", str(self.repo), "-c", "user.name=t", "-c",
+             "user.email=t@example.test", "-c", "commit.gpgsign=false", *args],
+            env=env, capture_output=True, text=True, check=True).stdout.strip()
+
+    def commit(self, rel: str, body: str) -> str:
+        path = self.repo / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(body)
+        self.git("add", rel)
+        self.git("commit", "-q", "-m", "change")
+        return self.git("rev-parse", f"HEAD:{rel}")
+
+    def verify(self) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(["python3", "-", str(self.repo)], input=self.verifier,
+                              capture_output=True, text=True, errors="replace",
+                              timeout=60, check=False)
+
+    def test_a_clean_history_passes(self) -> None:
+        self.commit("README.md", "A prompt library.\n")
+        result = self.verify()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_a_hit_in_history_names_pattern_and_blob_only(self) -> None:
+        """Planted in a dead revision, so only the history carries it."""
+        cases = {
+            "credential": "AK" + "IA" + "R4TX8N2QW7" + "LM",
+            "tracker-id": "T" + "BX-" + "60412",
+        }
+        for name, secret in cases.items():
+            with self.subTest(pattern=name):
+                self.fresh_repo(name)
+                self.commit("README.md", "A prompt library.\n")
+                sha = self.commit("docs/notes.md", f"see {secret} {CANARY}\n")
+                self.commit("docs/notes.md", "nothing here now\n")
+                result = self.verify()
+                output = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0,
+                                    f"the verifier passed a planted hit\n{output}")
+                self.assertIn(f"{name}: {sha}", output,
+                              "the report does not name the pattern and blob")
+                # assertFalse, not assertNotIn: a failure message must not
+                # repeat the output it is refusing.
+                for piece in fragments(secret) + [CANARY]:
+                    self.assertFalse(piece in output,
+                                     "the verifier printed part of what it matched")
 
 if __name__ == "__main__":
     unittest.main()
