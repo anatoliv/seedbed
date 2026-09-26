@@ -168,8 +168,10 @@ fi
 #      feed looks correct, the DMG downloads, the release appears to succeed.
 #      Nothing downstream can see it either, which is why it is checked here
 #      rather than discovered by users going quiet.
-GK_BIN="${GK_BIN:-$(find "$HOME/Library/Developer" "$HOME/Library/Caches/org.swift.swiftpm" \
-    ./.build "$HOME/Projects" -type f -name generate_keys -path '*Sparkle*' 2>/dev/null | head -1)}"
+#      Scripts/support/find-sparkle-tool.sh does the search; a find piped to head
+#      under pipefail used to end the whole release silently here whenever a
+#      directory it walked vanished.
+GK_BIN="${GK_BIN:-$(Scripts/support/find-sparkle-tool.sh generate_keys || true)}"
 PLIST_ED_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' Packaging/Info.plist 2>/dev/null || true)"
 if [[ -n "${GK_BIN:-}" && -x "$GK_BIN" && -n "$PLIST_ED_KEY" ]]; then
     KEYCHAIN_ED_KEY="$("$GK_BIN" -p 2>/dev/null | tr -d '[:space:]' || true)"
@@ -241,6 +243,19 @@ if [[ "$DIRTY" == "1" && "${ALLOW_DIRTY:-}" != "1" ]]; then
     echo "         commit ${COMMIT}. Commit first if this build is going anywhere" >&2
     echo "         you will later have to reason about." >&2
 fi
+
+# 0e1. Ship only what origin/main already contains (the release kit's main guard):
+#      a release built or published from a commit main lacks is taken back by the next
+#      release from main. ALLOW_UNMERGED_RELEASE="<reason>" is the logged emergency override.
+#      Also: the version users have now (the cask pin) must be tagged, or the build
+#      number check below compares against an older release.
+# shellcheck source=Scripts/release-kit/lib/main-guard.sh
+. Scripts/release-kit/lib/main-guard.sh
+release_main_guard "$PWD" || exit 1
+git fetch -q --tags origin 2>/dev/null || true
+# shellcheck source=Scripts/release-kit/lib/tags.sh
+. Scripts/release-kit/lib/tags.sh
+rk_require_live_tag "$(sed -nE 's/^[[:space:]]*version "([^",]+).*/\1/p' ../Casks/seedbed.rb | head -1)" "$VERSION" "$PWD" || exit 1
 
 # 0e2. A tag that already exists means this version has already been released,
 #      and the artifact under that name is somewhere it cannot be recalled from.
@@ -565,8 +580,7 @@ xcrun stapler validate "$DMG" && echo "    staple validated"
 # 5. The appcast. generate_appcast EdDSA-signs every DMG in dist/ from the
 #     keychain key and writes dist/appcast.xml — the whole feed, not one item,
 #     so a copy on an older version can still find a path forward.
-GA_BIN="${GA_BIN:-$(find "$HOME/Library/Developer" "$HOME/Library/Caches/org.swift.swiftpm" \
-    ./.build "$HOME/Projects" -type f -name generate_appcast -path '*Sparkle*' 2>/dev/null | head -1)}"
+GA_BIN="${GA_BIN:-$(Scripts/support/find-sparkle-tool.sh generate_appcast || true)}"
 if [[ -n "${GA_BIN:-}" && -x "$GA_BIN" ]]; then
     # 5a. Release notes, before the feed is generated. generate_appcast embeds
     #     the contents of "<archive name>.html" sitting beside each DMG as that
@@ -675,9 +689,18 @@ elif git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null 2>&1; then
 else
     echo "==> Tagging v${VERSION}"
     git tag -a "v${VERSION}" -m "Seedbed ${VERSION} (${BUILD_NUM})"
-    git push -q origin "v${VERSION}" 2>/dev/null \
-        && echo "    pushed v${VERSION} to origin" \
-        || echo "    tagged locally; push it when the remote is reachable"
+    # A push that "succeeds" is not proof: confirm origin serves the tag on this commit,
+    # the same check as the release kit's rk_tag_release (written out here because this
+    # block is also run on its own by tests/test_release_tag_contains_its_pin.py). Not
+    # fatal, since nothing is published yet, but loud: the next release's
+    # rk_require_live_tag preflight refuses while a live version has no tag.
+    git push -q origin "v${VERSION}" 2>/dev/null || true
+    if [[ "$(git ls-remote origin "refs/tags/v${VERSION}^{}" 2>/dev/null | cut -f1)" == "$(git rev-parse HEAD)" ]]; then
+        echo "    pushed v${VERSION} to origin (confirmed)"
+    else
+        echo "    WARNING: tagged locally, but origin does not serve v${VERSION} on this commit."
+        echo "             Push it before publishing: git push origin v${VERSION}"
+    fi
 fi
 
 SHA="$(shasum -a 256 "$DMG" | awk '{print $1}')"

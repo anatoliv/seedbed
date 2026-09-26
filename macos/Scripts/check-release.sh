@@ -186,6 +186,13 @@ if [[ -n "$PREV_TAG" ]]; then
     esac
 fi
 
+# The release kit: the vendored guards are exactly their pinned version, and their own
+# tests pass on those bytes. Seconds.
+bash Scripts/release-kit/check.sh >/dev/null || {
+    echo "error: release kit check failed. Run: bash Scripts/release-kit/check.sh" >&2
+    exit 1
+}
+
 if [[ "${PREFLIGHT_ONLY:-}" == "1" ]]; then
     echo "preflight ok: $VERSION ($BUILD_NUM) — Python and Swift suites, design tokens, release notes, build number"
     exit 0

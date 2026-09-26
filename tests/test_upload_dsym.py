@@ -26,6 +26,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 MACOS = REPO / "macos"
 UPLOAD = MACOS / "Scripts" / "upload-dsym.sh"
+VERIFY = MACOS / "Scripts" / "verify-dsym-coverage.sh"
 RELEASE = MACOS / "Scripts" / "release.sh"
 PUBLISH = REPO / "Scripts" / "publish-repo.sh"
 
@@ -53,6 +54,15 @@ case "$cmd" in
     release="$(printf '%s' "$cmd" | sed -E "s/.*--release '([^']+)'.*/\1/")"
     printf '{"artifact_id":"%s","project_id":"%s","release":"%s","sha256":"%s","state":"ready","type":"apple_dsym"}\n' \
       "$STUB_ARTIFACT" "$STUB_PROJECT_ID" "$release" "$sha" ;;
+  *artifact-coverage*)
+    release="$(printf '%s' "$cmd" | sed -E "s/.*--release '([^']+)'.*/\1/")"
+    [ -n "${STUB_COVERAGE_RELEASE:-}" ] && release="$STUB_COVERAGE_RELEASE"
+    status="${STUB_COVERAGE_STATUS:-covered}"
+    if [ "$status" = covered ]; then covered='["apple_dsym"]'; missing='[]'; reason=null
+    else covered='[]'; missing='["apple_dsym"]'; reason='"uncovered"'; fi
+    printf '{"exit_reason":%s,"projects":[{"covered":%s,"missing":%s,"project_id":"%s","release":"%s","slug":"seedbed-macos","status":"%s"}],"uncovered":0}\n' \
+      "$reason" "$covered" "$missing" "$STUB_PROJECT_ID" "$release" "$status"
+    exit "${STUB_COVERAGE_EXIT:-0}" ;;
   readlink*) path="${cmd##* }"; echo "${path%/current}/releases/r1" ;;
   *.pyc*) echo "${STUB_PYC:-0}" ;;
   *) : ;;
@@ -232,6 +242,80 @@ class UploadDsymAgainstAStubbedHost(unittest.TestCase):
         self.assertEqual(result.stdout, "")
 
 
+@unittest.skipUnless(UPLOAD.is_file() and VERIFY.is_file(), "private operator tooling, excluded from the snapshot")
+class CoverageIsTheLastWord(unittest.TestCase):
+    """Crashbox's closeout step 5: after the receipt, the catalogue's own verdict
+    on the exact release. Nothing is declared to release.sh without it."""
+
+    # The uploader's stubbed host, borrowed rather than inherited so its own
+    # tests do not run a second time here.
+    setUp = UploadDsymAgainstAStubbedHost.setUp
+    run_upload = UploadDsymAgainstAStubbedHost.run_upload
+    log = UploadDsymAgainstAStubbedHost.log
+
+    def test_the_upload_asks_for_the_exact_release_as_the_service_account(self) -> None:
+        result = self.run_upload()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.log("ssh.log").splitlines()
+        coverage = [c for c in calls if "artifact-coverage" in c]
+        self.assertEqual(len(coverage), 1)
+        self.assertIn("--uid=crashbox", coverage[0])
+        self.assertIn(f"--project 'seedbed-macos' --release '{RELEASE_ID}' --require apple_dsym",
+                      coverage[0])
+        upload = next(i for i, c in enumerate(calls) if "artifact-upload" in c)
+        self.assertGreater(calls.index(coverage[0]), upload, "coverage was asked before the upload")
+        self.assertIn("coverage: covered", result.stderr)
+
+    def test_an_uncovered_release_declares_nothing(self) -> None:
+        result = self.run_upload(STUB_COVERAGE_STATUS="uncovered", STUB_COVERAGE_EXIT="1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "", "release.sh was handed values for an uncovered dSYM")
+        self.assertIn("no ready dSYM", result.stderr)
+
+    def test_a_verdict_for_another_release_declares_nothing(self) -> None:
+        result = self.run_upload(STUB_COVERAGE_RELEASE="net.amnesia.seedbed@" + "b" * 40)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("a different release", result.stderr)
+
+
+@unittest.skipUnless(VERIFY.is_file(), "verify-dsym-coverage.sh is private, excluded from the snapshot")
+class TheVerifierStandsAlone(unittest.TestCase):
+    setUp = UploadDsymAgainstAStubbedHost.setUp
+    log = UploadDsymAgainstAStubbedHost.log
+
+    def verify(self, *args: str, **env: str) -> subprocess.CompletedProcess:
+        argv = list(args) or [RELEASE_ID, "seedbed-macos"]
+        return subprocess.run(["bash", str(VERIFY), *argv], cwd=MACOS,
+                              env={**self.env, **env}, capture_output=True, text=True, timeout=60)
+
+    def test_a_covered_release_passes_and_touches_nothing_else(self) -> None:
+        result = self.verify()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"covered: Crashbox holds a ready apple_dsym for {RELEASE_ID}", result.stdout)
+        calls = self.log("ssh.log").splitlines()
+        self.assertEqual(len(calls), 1, "the verifier did more than ask")
+        self.assertIn("artifact-coverage", calls[0])
+        self.assertEqual(self.log("scp.log"), "")
+
+    def test_a_report_that_could_not_be_produced_is_not_coverage(self) -> None:
+        result = self.verify(STUB_COVERAGE_EXIT="2")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("could not produce a coverage verdict", result.stderr)
+
+    def test_a_malformed_release_is_refused_before_any_host_contact(self) -> None:
+        for release in ("net.amnesia.seedbed@1.8", "other@" + "a" * 40, "net.amnesia.seedbed@" + "A" * 40):
+            with self.subTest(release=release):
+                self.assertEqual(self.verify(release, "seedbed-macos").returncode, 64)
+        self.assertEqual(self.log("ssh.log"), "")
+
+    def test_it_pins_the_same_project_as_the_uploader(self) -> None:
+        pinned = lambda text, key: re.search(rf'^{key}="([^"]+)"', text, re.M).group(1)
+        up, ver = UPLOAD.read_text(), VERIFY.read_text()
+        for key in ("SLUG_EXPECTED", "PROJECT_ID", "VENV"):
+            self.assertEqual(pinned(up, key), pinned(ver, key), f"{key} drifted between the two scripts")
+
+
 class TheRefusalNamesTheRoute(unittest.TestCase):
     """release.sh is published; the script it names is not. The refusal still
     has to say where the permitted route is, or the next lane improvises one."""
@@ -251,6 +335,8 @@ class TheRefusalNamesTheRoute(unittest.TestCase):
         self.assertIn('"$MIRROR"/macos/Scripts/upload-dsym.sh', source,
                       "an exclude without the purge leaves a previously published "
                       "copy on the mirror")
+        self.assertIn("--exclude='macos/Scripts/verify-dsym-coverage.sh'", source)
+        self.assertIn('"$MIRROR"/macos/Scripts/verify-dsym-coverage.sh', source)
 
 
 if __name__ == "__main__":

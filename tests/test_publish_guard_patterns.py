@@ -65,18 +65,19 @@ def excludes() -> list[str]:
 def guards() -> list[tuple[str, str, set[str], set[str]]]:
     """The scanning guards: (name, regex, excluded basenames, excluded dirs).
 
-    Each is a `grep -rInE` over the mirror. The per-guard `--exclude` and
-    `--exclude-dir` flags are part of the guard, not decoration: guard (a) skips
-    the test tree on purpose because fixtures there carry private addresses, and
-    reading that flag rather than assuming it is the difference between checking
-    what the script checks and checking something adjacent to it.
+    Each is a `guard_hits E` call, a recursive grep over the mirror. The
+    per-guard `--exclude` and `--exclude-dir` flags are part of the guard, not
+    decoration: guard (a) skips the test tree on purpose because fixtures there
+    carry private addresses, and reading that flag rather than assuming it is
+    the difference between checking what the script checks and checking
+    something adjacent to it.
     """
     text = script()
     found = []
-    # The flags are not adjacent to the pattern: `"$MIRROR"` sits between them,
-    # and on guard (a) they follow it on the next line. So the command is taken
-    # whole, up to the `; then` that closes it, and the flags read out of that.
-    for match in re.finditer(r"grep -rInE\s+(?:\"\$(\w+)\"|'((?:[^'\\]|\\.)*)')"
+    # The flags follow the pattern, on a continuation line for most guards. So
+    # the command is taken whole, up to the `; then` that closes it, and the
+    # flags read out of that.
+    for match in re.finditer(r"guard_hits E\s+(?:\"\$(\w+)\"|'((?:[^'\\]|\\.)*)')"
                              r"(.*?);\s*then", text, re.S):
         variable, literal, flags = match.groups()
         if variable:
@@ -182,12 +183,14 @@ class PublishGuardsTests(unittest.TestCase):
                 except (UnicodeDecodeError, OSError):
                     continue
                 for number, line in enumerate(body.splitlines(), 1):
-                    hit = expression.search(line)
-                    if hit:
-                        offences.append(f"{name}: {rel}:{number} matched {hit.group(0)!r}")
+                    # Where, never what: the guard it mirrors reports path:line
+                    # only, because a matched credential printed by a test run is
+                    # copied into the transcript of whoever ran it.
+                    if expression.search(line):
+                        offences.append(f"{name}: {rel}:{number}")
         self.assertEqual(offences, [], "\n  " + "\n  ".join(offences[:25])
                          + f"\n  ({len(offences)} total) — the next publish would "
-                         "abort naming the guard rather than the sentence")
+                         "abort at these lines; open them to see the match")
 
 
 if __name__ == "__main__":

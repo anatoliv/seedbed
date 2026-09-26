@@ -247,9 +247,6 @@ class TheRetryLoopRuns(unittest.TestCase):
         return script
 
     def drive(self, command: Path, attempts: int = 3, wall_clock: int = 1):
-        # notarize_abandon_hook is replaced because the real one pkills
-        # `notarytool submit`, and a test run has no business killing a real
-        # notarization that happens to be in flight on this Mac.
         # NOTARIZE_TIMEOUT_BIN is set so the loop does not re-run the one second
         # probe on every case here; the probe has tests of its own below.
         return run_bash(f"""
@@ -258,7 +255,6 @@ class TheRetryLoopRuns(unittest.TestCase):
             NOTARIZE_ATTEMPTS={attempts}
             . Scripts/support/notarize.sh
             NOTARIZE_TIMEOUT_BIN="{self.timeout_bin}"
-            notarize_abandon_hook() {{ :; }}
             notarize_retry_loop "{command}"
             echo "rc=$?"
         """)
@@ -303,6 +299,96 @@ class TheRetryLoopRuns(unittest.TestCase):
         result = self.drive(self.fake("hangs", "exec sleep 30"), attempts=1)
         self.assertIn("rc=1", result.stdout, result.stderr)
         self.assertEqual(1, self.attempts())
+
+
+class AnAbandonedAttemptReapsOnlyItself(unittest.TestCase):
+    """Several apps notarize on this Mac at once. The retry used to run
+    `pkill -f "notarytool submit"` after every failed attempt, which matches
+    every app's upload, so one app's retry could kill another's mid-flight.
+
+    Driven for real: a pkill stub that records any call, a decoy
+    "notarytool submit" standing in for another app's upload, and a fake xcrun
+    that spawns its own notarytool grandchild and hangs, the way the real
+    upload does. Apple is never contacted.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        if not HELPER.is_file():
+            raise unittest.SkipTest(f"{HELPER} is absent")
+        cls.timeout_bin = shutil.which("timeout") or shutil.which("gtimeout")
+        if cls.timeout_bin is None:
+            raise unittest.SkipTest("no GNU timeout on PATH (brew install coreutils)")
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+        self.bin = self.dir / "bin"
+        self.bin.mkdir()
+        self.pkill_log = self.dir / "pkill.log"
+        self.children = self.dir / "children"
+        self.attempts = self.dir / "attempts"
+        for f in (self.pkill_log, self.children, self.attempts):
+            f.write_text("")
+        self.write(self.bin / "pkill", f'echo "$@" >> "{self.pkill_log}"\nexit 0')
+        self.write(self.bin / "notarytool", "exec sleep 60")
+        self.write(self.bin / "xcrun", f"""echo x >> "{self.attempts}"
+"{self.bin}/notarytool" "$@" &
+echo $! >> "{self.children}"
+wait""")
+        self.decoy = subprocess.Popen(
+            [str(self.bin / "notarytool"), "submit", "other-app.zip"],
+            start_new_session=True)
+        self.addCleanup(self.stop_decoy)
+
+    def write(self, path: Path, body: str) -> None:
+        path.write_text(f"#!/bin/sh\n{body}\n")
+        path.chmod(0o755)
+
+    def stop_decoy(self) -> None:
+        if self.decoy.poll() is None:
+            self.decoy.kill()
+        self.decoy.wait()
+
+    def alive(self, pid: int) -> bool:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        return True
+
+    def test_the_retry_touches_nothing_but_its_own_attempt(self) -> None:
+        result = run_bash(f"""
+            set -uo pipefail
+            NOTARIZE_WALL_CLOCK=1
+            NOTARIZE_ATTEMPTS=3
+            NOTARIZE_KILL_AFTER=1
+            . Scripts/support/notarize.sh
+            NOTARIZE_TIMEOUT_BIN="{self.timeout_bin}"
+            notarize_retry_loop "{self.bin}/xcrun" notarytool submit this-app.zip
+            echo "rc=$?"
+        """, path=f"{self.bin}:{os.environ.get('PATH', '')}")
+        self.assertIn("rc=1", result.stdout, f"{result.stdout}{result.stderr}")
+        self.assertEqual(3, len(self.attempts.read_text().split()),
+                         "three hung attempts did not all run and fail closed")
+        self.assertEqual("", self.pkill_log.read_text(),
+                         "the retry ran pkill, which matches every app's notarization")
+        self.assertIsNone(self.decoy.poll(),
+                          "another app's notarytool submit was killed by this retry")
+        children = [int(p) for p in self.children.read_text().split()]
+        self.assertEqual(3, len(children))
+        for pid in children:
+            self.assertFalse(self.alive(pid),
+                             f"attempt's own notarytool {pid} outlived its wall clock")
+
+    def test_pkill_is_gone_from_the_helper(self) -> None:
+        code = [line for line in HELPER.read_text().splitlines()
+                if not line.lstrip().startswith("#")]
+        self.assertFalse(any("pkill" in line for line in code),
+                         "pkill is back in notarize.sh; it kills every app's notarization")
+        self.assertIn("--kill-after=", HELPER.read_text(),
+                      "an attempt that ignores TERM would not be ended")
 
 
 class TheLoopRefusesWithoutAClock(unittest.TestCase):
@@ -367,7 +453,6 @@ class TheLoopRefusesWithoutAClock(unittest.TestCase):
             anything.chmod(0o755)
             result = run_bash(f"""
                 . Scripts/support/notarize.sh
-                notarize_abandon_hook() {{ :; }}
                 notarize_retry_loop "{anything}"
                 echo "rc=$?"
             """, path=self.bare_path)

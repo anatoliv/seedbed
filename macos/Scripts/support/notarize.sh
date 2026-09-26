@@ -111,16 +111,19 @@ MSG
     return 0
 }
 
-# Called after an attempt has been abandoned. `timeout` kills its own child, but
-# notarytool's upload can outlive it, and a second submission racing the first
-# is how one hang becomes two.
+# How an abandoned attempt is cleaned up: by the clock, and only that attempt.
 #
-# It is a hook rather than a line in the loop so the tests can replace it. They
-# drive the loop with a fake hanging command, and a test run has no business
-# pkilling a real notarization that happens to be in flight on this Mac.
-notarize_abandon_hook() {
-    pkill -f "notarytool submit" 2>/dev/null || true
-}
+# GNU timeout (without --foreground) makes itself a process-group leader and, when
+# the clock runs out, signals that whole group. `xcrun` and the `notarytool` it
+# spawns are both in it, so an upload that hangs is stopped along with the
+# command that started it, and nothing outside the group is touched.
+# --kill-after follows the TERM with a KILL for anything that ignores it.
+#
+# There used to be a `pkill -f "notarytool submit"` here after every failed
+# attempt. That pattern matches every notarization on this Mac, and several
+# apps' releases run on it at once, so one app's retry could kill another app's
+# upload mid-flight. tests/test_notarization_wall_clock.py fails if it returns.
+NOTARIZE_KILL_AFTER="${NOTARIZE_KILL_AFTER:-30}"
 
 # Run "$@" under the wall clock, up to NOTARIZE_ATTEMPTS times; return 0 as soon
 # as one attempt succeeds, non-zero when every attempt has been abandoned.
@@ -134,13 +137,13 @@ notarize_retry_loop() {
         require_wall_clock || return 1
     fi
     for (( attempt = 1; attempt <= NOTARIZE_ATTEMPTS; attempt++ )); do
-        if "$NOTARIZE_TIMEOUT_BIN" "$NOTARIZE_WALL_CLOCK" "$@"; then
+        if "$NOTARIZE_TIMEOUT_BIN" --kill-after="$NOTARIZE_KILL_AFTER" \
+            "$NOTARIZE_WALL_CLOCK" "$@"; then
             return 0
         fi
         if (( attempt < NOTARIZE_ATTEMPTS )); then
             echo "    WARNING: attempt $attempt did not finish within ${NOTARIZE_WALL_CLOCK}s — retrying" >&2
         fi
-        notarize_abandon_hook
     done
     return 1
 }

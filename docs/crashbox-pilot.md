@@ -173,10 +173,14 @@ The reporting-disabled rollback artifact was built from exact 0.1.9 source
 source. It records version 0.1.9, build 10, the exact source release and source
 digest, and empty provider, DSN and environment fields. Apple accepted the app
 and DMG notarization submissions; both the inner app and outer DMG were stapled.
-The current fail-closed verifier accepted the copy retained in the operator's
-artifact archive as
+The current fail-closed verifier accepted the copy then retained in the
+operator's artifact archive as
 `Seedbed_0.1.9_10_5eb48_reporting-disabled_universal.dmg`, with SHA-256
-`4df8d742a95d63ee52fbd161a9ec8245e8084285c03faf4199fa80f668eabf39`.
+`4df8d742a95d63ee52fbd161a9ec8245e8084285c03faf4199fa80f668eabf39`. That copy
+was retired on 2026-09-26: every release since 0.1.17 reports to Crashbox, so
+the release path falls back to the previous release's retained DMG and no
+longer needs a reporting-disabled one. The digest above is the record of what
+the drill used.
 
 Immediately before the drill, one authorized real crash from the installed
 Crashbox build produced event `c385a561-8560-4008-8da2-923a5f0fc2e4`. The
