@@ -318,6 +318,15 @@ Reference after they earned their place there:
   receipt.** Crash reports with no function names or line numbers are most of
   the way to no crash reports at all, and you find out months later on the one
   that mattered. The public release script never reads an upload credential.
+- **A build that cannot report crashes refuses to release at all.** 0.1.11 to
+  0.1.16 each shipped with every reporting field empty, because they were built
+  in checkouts with no `Packaging/crashbox-dsn.local` and every reporting check
+  was scoped to "if a provider is configured". `check-release.sh` now refuses a
+  provider of `none` in its preflight, before the suites run, and its artifact
+  half reads the fields out of both `build/Seedbed.app` and the app inside the
+  DMG with `Scripts/check-bundle-reporting.sh`. `publish.sh` runs that gate, so
+  the image about to be uploaded is the one asked. To ship a non-reporting build
+  on purpose, set `ALLOW_NO_REPORTING=1` on `release.sh` and `publish.sh`.
 
 ## Publishing a release
 
@@ -335,6 +344,12 @@ checked mechanically rather than remembered.
 `publish.sh` deliberately cannot build. A script that can do both is one that can
 publish something the release gate never saw, so this one re-runs the gate and
 refuses if it does not pass.
+
+The gate holds the bundle to the commit it was built from, and allows exactly
+one thing on top of it: the cask and site pin that `release.sh` writes after the
+build. So the order its tagging step gives (commit the pin, tag, then publish)
+works, and so does publishing before the pin is committed. Any other change
+after the build is refused, and the fix is to rebuild.
 
 The order is **DMG first, then appcast**, each landed atomically through a temp
 path and `install` (the document root is root-owned). Two failure modes close
@@ -426,7 +441,7 @@ upload receipt against the archive it sent, and prints the two assignments
 `release.sh` wants:
 
     CRASHBOX_SSH_HOST=<the Crashbox host> Scripts/upload-dsym.sh \
-        build/Seedbed.app .build/apple/Products/Release/Seedbed.dSYM seedbed-macos
+        build/Seedbed.app .build/out/Products/Release/Seedbed.dSYM seedbed-macos
 
 Record the artifact id and the UUIDs on the task, then run the release with
 both values set.

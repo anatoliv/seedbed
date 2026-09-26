@@ -48,6 +48,21 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.18",
+            date: "25 September 2026",
+            highlight: "The MCP server answers only requests addressed to this Mac.",
+            changes: [
+                WhatsNewChange(kind: .improved, text:
+                    "The MCP server checks the address a request is for before it looks at "
+                    + "the access token. A request for a web domain is refused straight away, "
+                    + "so it no longer counts toward the wrong-token lockout or raises the "
+                    + "alert about a refused client."),
+                WhatsNewChange(kind: .improved, text:
+                    "The server now accepts localhost, a loopback address such as 127.0.0.1, "
+                    + "or this Mac's own hostname. Another machine's IP address or .local "
+                    + "name is refused, since the server only listens on this Mac."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.17",
             date: "25 September 2026",
             highlight: "The MCP server turns away a malformed request instead of quitting.",

@@ -246,11 +246,12 @@ enum Manual {
             example: nil, key: nil),
         ManualTopic(
             page: .help, section: "Letting an agent ask for a prompt",
-            term: "Point the client at localhost or an IP, never at a domain name",
+            term: "Point the client at localhost or 127.0.0.1, never at a domain name",
             detail: """
-                That is the rule. Seedbed answers requests addressed to localhost, an IP \
-                address, a .local name, or this Mac's own hostname, and refuses everything \
-                else with "forbidden".
+                That is the rule. Seedbed answers requests addressed to localhost, a \
+                loopback address such as 127.0.0.1 or ::1, or this Mac's own hostname, and \
+                refuses everything else with "forbidden". That includes another machine's \
+                address or .local name, because the server only listens on this Mac.
 
                 The reason is worth knowing once. Without that rule, a web page you happen \
                 to be visiting could point its own domain at your Mac and read the whole \
@@ -693,9 +694,10 @@ enum Manual {
             page: .faq, section: "Safety of the server",
             term: "Why would a request be refused as forbidden?",
             detail: """
-                Because the client connected to a domain name. Point it at localhost or an \
-                IP address instead. Seedbed answers requests addressed to localhost, an IP \
-                address, a .local name, or this Mac's own hostname, and refuses the rest.
+                Because the client connected to a name that isn't this Mac. Point it at \
+                localhost or 127.0.0.1 instead. Seedbed answers requests addressed to \
+                localhost, a loopback address, or this Mac's own hostname, and refuses \
+                the rest, including another machine's IP address or .local name.
 
                 The reason that rule exists: without it, a web page you happen to be \
                 visiting could point its own domain at your Mac and read the library \

@@ -711,16 +711,33 @@ enum MCPRequestGuard {
         return value
     }
 
+    /// The listener binds to loopback only, so every name a real client can use
+    /// is a loopback name or this Mac's own. The rule used to accept any IP
+    /// literal and any `.local` name, which was broader than "this Mac" for no
+    /// client's benefit: `Host: 203.0.113.5` or `another-mac.local` both passed.
     static func isTrustedHostname(_ name: String, localName: String) -> Bool {
         if name == "localhost" || name.hasSuffix(".localhost") { return true }
-        if name.hasSuffix(".local") { return true }
-        if IPv4Address(name) != nil || IPv6Address(name) != nil { return true }
-        let local = localName.lowercased()
+        if isLoopbackLiteral(name) { return true }
+        let local = normalizedHostname(localName)
         if !local.isEmpty, name == local { return true }
         // `ProcessInfo.hostName` is usually the Bonjour form; accept the bare
         // label too, since a client may be configured either way.
         if let bare = local.split(separator: ".").first, !bare.isEmpty, name == String(bare) {
             return true
+        }
+        return false
+    }
+
+    /// 127.0.0.0/8, ::1, and 127.0.0.0/8 in IPv4-mapped form. Any other literal is
+    /// some other machine, which a loopback-only listener has no reason to serve.
+    ///
+    /// The first octet, not `IPv4Address.isLoopback`, which is true for
+    /// 127.0.0.1 alone and would refuse the rest of the block.
+    static func isLoopbackLiteral(_ name: String) -> Bool {
+        if let v4 = IPv4Address(name) { return v4.rawValue.first == 127 }
+        if let v6 = IPv6Address(name) {
+            if v6.isLoopback { return true }
+            if v6.isIPv4Mapped, let v4 = v6.asIPv4 { return v4.rawValue.first == 127 }
         }
         return false
     }
@@ -839,13 +856,13 @@ actor MCPRequestHandler {
     }
 
     func handle(_ request: HTTPRequestData) async -> HTTPResponseData {
-        guard let access = access(for: request) else {
-            return rejectUnauthenticated(
-                credentialPresented: request.headers["authorization"] != nil
-            )
-        }
-        throttle.recordSuccess()
-        clearAuthAlert()
+        // Before the token, not after. A rebound browser request is refused for
+        // what it is, a request to a name this server does not answer to, and
+        // never reaches the auth throttle or the "a client was refused" alert. It
+        // used to: a rebinding page could count against the owner's wrong-token
+        // budget and raise an alert pointing at a credential problem that was
+        // not one. The token is the second defence here, not the one that
+        // happens to stop a rebind.
         guard MCPRequestGuard.isTrusted(request, localName: localHostName) else {
             log.error("MCP request rejected: untrusted Host/Origin")
             return HTTPResponseData(status: 403, body: jsonObject([
@@ -854,6 +871,13 @@ actor MCPRequestHandler {
                     + "Connect to the address shown in Seedbed → MCP Server.",
             ]))
         }
+        guard let access = access(for: request) else {
+            return rejectUnauthenticated(
+                credentialPresented: request.headers["authorization"] != nil
+            )
+        }
+        throttle.recordSuccess()
+        clearAuthAlert()
         guard MCPRequestGuard.isAllowedPath(request.path) else {
             return HTTPResponseData(status: 404, body: jsonObject([
                 "error": "not found",

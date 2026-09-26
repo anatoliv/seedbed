@@ -118,9 +118,9 @@ client is using the read-only access token.
 
 Nothing on your network can connect to it. The listener binds to the loopback interface, and there is no switch anywhere in the app that changes that. On top of that, every single request has to carry the access token. Both of those, not either one.
 
-### Point the client at localhost or an IP, never at a domain name
+### Point the client at localhost or 127.0.0.1, never at a domain name
 
-That is the rule. Seedbed answers requests addressed to localhost, an IP address, a .local name, or this Mac's own hostname, and refuses everything else with "forbidden".
+That is the rule. Seedbed answers requests addressed to localhost, a loopback address such as 127.0.0.1 or ::1, or this Mac's own hostname, and refuses everything else with "forbidden". That includes another machine's address or .local name, because the server only listens on this Mac.
 
 The reason is worth knowing once. Without that rule, a web page you happen to be visiting could point its own domain at your Mac and read the whole library through your browser, because the browser would happily send the request for it. That attack has a name, DNS rebinding, and checking the address a request claims to be for is what stops it. A client of yours configured with some other hostname is refused outright rather than half working.
 

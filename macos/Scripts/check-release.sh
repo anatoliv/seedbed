@@ -7,7 +7,8 @@
 #   Scripts/check-release.sh                     everything, after the DMG exists
 #
 # Overrides, each of which prints loudly rather than passing quietly:
-#   SKIP_TESTS=1        do not run either suite — the Python one or the Swift one
+#   SKIP_TESTS=1          do not run either suite — the Python one or the Swift one
+#   ALLOW_NO_REPORTING=1  ship a build that cannot report crashes
 #
 # The two-moment structure is the point: a stale release note or a failing test is
 # knowable in seconds, and finding out after a build plus two notarizations has
@@ -33,6 +34,32 @@ source_digest() {
         | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256 \
         | awk '{print $1}'
 }
+
+# --- Crash reporting must be on -----------------------------------------------
+# First, because it costs nothing and the suites below cost minutes.
+#
+# 0.1.11 to 0.1.16 all shipped unable to report a crash. Each was built in a
+# checkout with no Packaging/crashbox-dsn.local, so the provider resolved to
+# "none", and every reporting check in this file and in release.sh was written
+# as "if a provider is configured, verify it". A missing DSN turned all of them
+# off together and the gate stayed green. "none" is a result, not a scope.
+#
+# No history heuristic ("refuse only if the last release reported"): a gate that
+# depends on the previous release being right is the one that let six in a row
+# through. Refuse always; a build that should not report says so by name.
+REPORTING_PROVIDER="$(Scripts/configure-crash-reporting.sh --provider-only)"
+if [[ "$REPORTING_PROVIDER" == "none" ]]; then
+    if [[ "${ALLOW_NO_REPORTING:-}" == "1" ]]; then
+        echo "WARNING: ALLOW_NO_REPORTING=1 — this release cannot report crashes" >&2
+    else
+        echo "error: this checkout would build a release that cannot report crashes." >&2
+        echo "       Packaging/crashbox-dsn.local is missing (and SEEDBED_CRASHBOX_DSN is" >&2
+        echo "       unset), so the provider resolves to \"none\". Copy the DSN file in" >&2
+        echo "       from the main checkout at mode 0600 and re-run. Nothing was built." >&2
+        echo "       To ship without reporting, deliberately: ALLOW_NO_REPORTING=1" >&2
+        exit 1
+    fi
+fi
 
 # --- The test suite -----------------------------------------------------------
 # The Python core owns the library: staleness, guidance, the enhancer, the
@@ -272,12 +299,23 @@ if [[ ! "$BUNDLE_RELEASE" =~ ^net\.amnesia\.seedbed@[0-9a-f]{40}$ ]]; then
     echo "       Scripts/make-app.sh records it; 'swift build' alone does not." >&2
     exit 1
 fi
+# HEAD may also be the build commit plus the release pin, and nothing else.
+# release.sh repins the cask and the site after building, and its tagging step
+# says to commit that pin before tagging so the tag contains it. Comparing with
+# HEAD exactly made publish.sh refuse the release once that instruction was
+# followed. Scripts/support/pin_only_since.py allows exactly those two files on
+# top of the recorded commit, so a source change after the build still refuses.
 HEAD_COMMIT="$(git rev-parse HEAD 2>/dev/null || true)"
+BUILD_COMMIT="${BUNDLE_RELEASE#*@}"
 if [[ -n "$HEAD_COMMIT" && "$BUNDLE_RELEASE" != "net.amnesia.seedbed@$HEAD_COMMIT" ]]; then
-    echo "error: the bundle records ${BUNDLE_RELEASE#*@} but HEAD is $HEAD_COMMIT." >&2
-    echo "       Rebuild, or you will publish an artifact whose recorded origin is" >&2
-    echo "       not the source you are about to tag." >&2
-    exit 1
+    if ! python3 Scripts/support/pin_only_since.py .. "$BUILD_COMMIT" "$HEAD_COMMIT"; then
+        echo "error: the bundle records $BUILD_COMMIT but HEAD is $HEAD_COMMIT." >&2
+        echo "       Rebuild, or you will publish an artifact whose recorded origin is" >&2
+        echo "       not the source you are about to tag. Only the cask and site pin" >&2
+        echo "       may be committed on top of the build." >&2
+        exit 1
+    fi
+    echo "    HEAD is the build commit ${BUILD_COMMIT:0:12} plus the release pin"
 fi
 
 # Notarization is the whole point of the exercise: without a stapled ticket on
@@ -297,27 +335,30 @@ if ! spctl --assess --type execute "$APP" >/dev/null 2>&1; then
     exit 1
 fi
 
-# If a DSN source exists, injection must actually have happened. It is a
+# The artifacts must be able to report, asked of the artifacts. The preflight
+# above asked the configuration; that is not the same question. Injection is a
 # PlistBuddy write into a copied file, and if it silently does not happen the
 # build looks identical, ships, reports nothing, and the first anyone knows is a
 # crash nobody hears about.
+#
+# Both the app in build/ and the app inside the DMG, because the DMG is what is
+# downloaded and publish.sh runs this gate against it. A DMG re-staged by hand
+# after release.sh ran would otherwise be checked by proxy.
 REPORTING_PROVIDER="$(Scripts/configure-crash-reporting.sh --provider-only)"
 if [[ "$REPORTING_PROVIDER" != "none" ]]; then
-    BUNDLED_DSN="$(/usr/libexec/PlistBuddy -c 'Print :CrashReportingDSN' "$APP/Contents/Info.plist" 2>/dev/null || true)"
-    BUNDLED_PROVIDER="$(/usr/libexec/PlistBuddy -c 'Print :CrashReportingProvider' "$APP/Contents/Info.plist" 2>/dev/null || true)"
-    BUNDLED_RELEASE="$(/usr/libexec/PlistBuddy -c 'Print :CrashReportingRelease' "$APP/Contents/Info.plist" 2>/dev/null || true)"
-    BUNDLED_ENVIRONMENT="$(/usr/libexec/PlistBuddy -c 'Print :CrashReportingEnvironment' "$APP/Contents/Info.plist" 2>/dev/null || true)"
-    EXPECTED_RELEASE="net.amnesia.seedbed@$(git rev-parse HEAD)"
-    if [[ -z "$BUNDLED_DSN" ]]; then
-        echo "error: a reporting DSN is configured but the bundle's CrashReportingDSN is empty." >&2
-        echo "       This build cannot report crashes however anyone sets the toggle." >&2
-        exit 1
-    fi
-    if [[ "$BUNDLED_PROVIDER" != "$REPORTING_PROVIDER" || "$BUNDLED_RELEASE" != "$EXPECTED_RELEASE" \
-          || "$BUNDLED_ENVIRONMENT" != "${SEEDBED_ERROR_ENVIRONMENT:-production}" ]]; then
-        echo "error: the bundle's reporting provider/release/environment does not match this build." >&2
-        exit 1
-    fi
+    # The recorded commit, already held to HEAD or HEAD minus the pin above.
+    EXPECTED_RELEASE="net.amnesia.seedbed@$BUILD_COMMIT"
+    EXPECTED_ENVIRONMENT="${SEEDBED_ERROR_ENVIRONMENT:-production}"
+    for artifact in "$APP" "$DMG"; do
+        Scripts/check-bundle-reporting.sh "$artifact" "$REPORTING_PROVIDER" \
+            "$EXPECTED_RELEASE" "$EXPECTED_ENVIRONMENT" || exit 1
+    done
+else
+    # Reached only under ALLOW_NO_REPORTING=1; the preflight refused otherwise.
+    # The helper re-checks the override itself, so a caller cannot skip it.
+    for artifact in "$APP" "$DMG"; do
+        Scripts/check-bundle-reporting.sh "$artifact" none || exit 1
+    done
 fi
 
 # --- The feed ------------------------------------------------------------------
@@ -411,6 +452,11 @@ fi
 
 echo "release ok: $VERSION ($BUILD_NUM)"
 echo "  app and DMG stapled, Gatekeeper accepts the app, bundle matches the plist"
+if [[ "$REPORTING_PROVIDER" == "none" ]]; then
+    echo "  CANNOT REPORT CRASHES (ALLOW_NO_REPORTING=1)"
+else
+    echo "  app and the app inside the DMG both report to $REPORTING_PROVIDER"
+fi
 echo "  cask, appcast and site all pin this release"
 echo "  appcast offers $APPCAST_VERSION ($APPCAST_BUILD), EdDSA signed"
 echo "  cask pins $WANT_VERSION and this DMG's sha256, caveats match the DMG readme"

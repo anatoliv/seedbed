@@ -13,6 +13,8 @@
 #   FORCE_REBUILD=1     rebuild a DMG for a version already packaged
 #   ALLOW_DIRTY=1       skip the "which commit is this?" warning
 #   SKIP_TESTS=1        package without running either suite (prints loudly)
+#   ALLOW_NO_REPORTING=1  package a build that cannot report crashes; without it
+#                       a checkout with no crash-reporting DSN is refused
 #
 # A build that reports to Crashbox needs two more, because its symbols are
 # uploaded out of band and this script has to refuse to ship until they are:
@@ -306,7 +308,7 @@ error: this build reports to Crashbox, and Crashbox symbolicates only from a
   Scripts/upload-dsym.sh performs the upload from a signed, un-notarized
   build (Scripts/make-app.sh with no NOTARY_PROFILE) and prints both lines:
       Scripts/upload-dsym.sh build/Seedbed.app \
-          .build/apple/Products/Release/Seedbed.dSYM seedbed-macos
+          .build/out/Products/Release/Seedbed.dSYM seedbed-macos
   It is operator tooling, not part of the public snapshot.
 
   The UUIDs are re-checked against the shipped binary after the build, so a

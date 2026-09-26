@@ -98,7 +98,7 @@ A correct token is served throughout, even in the middle of a lockout, so nobody
 
 ### Why would a request be refused as forbidden?
 
-Because the client connected to a domain name. Point it at localhost or an IP address instead. Seedbed answers requests addressed to localhost, an IP address, a .local name, or this Mac's own hostname, and refuses the rest.
+Because the client connected to a name that isn't this Mac. Point it at localhost or 127.0.0.1 instead. Seedbed answers requests addressed to localhost, a loopback address, or this Mac's own hostname, and refuses the rest, including another machine's IP address or .local name.
 
 The reason that rule exists: without it, a web page you happen to be visiting could point its own domain at your Mac and read the library through your browser, since the browser would send the request on its behalf. The attack is called DNS rebinding, and checking the address a request claims to be for is what stops it.
 

@@ -37,7 +37,7 @@ printing or sending the DSN:
 ```console
 IDENTITY=- ./Scripts/make-app.sh
 Scripts/verify-reporting-artifact.sh build/Seedbed.app \
-  .build/apple/Products/Release/Seedbed.dSYM
+  .build/out/Products/Release/Seedbed.dSYM
 ```
 
 The production pilot must be Developer ID signed and notarized. Ad-hoc signing
