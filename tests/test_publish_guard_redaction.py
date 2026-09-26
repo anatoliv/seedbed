@@ -169,6 +169,50 @@ class PublishRepoGuardsRedact(Redaction, unittest.TestCase):
                 self.assert_redacted(result, secret, "assets/blob.bin:2", guard)
                 self.assertNotIn("Binary file", result.stdout + result.stderr)
 
+    def test_an_unreadable_file_or_directory_refuses(self) -> None:
+        """A file the scan cannot read is not a file the scan passed.
+
+        The listing grep ran inside a process substitution, which discards its
+        exit status, so a file it could not open was simply absent from the
+        list and every guard passed over it. Planted under tests/ so guard (a),
+        which skips that tree, stays clean and guard (b) is the one to answer.
+        """
+        secret = "AK" + "IA" + "V6NB3J8XQ1" + "TZ"
+        for shape in ("file", "directory"):
+            with self.subTest(shape=shape):
+                for old in self.mirror.rglob("locked*"):
+                    old.chmod(0o755 if old.is_dir() else 0o644)
+                    if old.is_dir():
+                        shutil.rmtree(old)
+                    else:
+                        old.unlink()
+                if shape == "file":
+                    locked = self.mirror / "tests" / "locked.py"
+                    locked.parent.mkdir(parents=True, exist_ok=True)
+                    locked.write_text(f"see {secret} {CANARY}\n")
+                    mode = 0o644
+                else:
+                    locked = self.mirror / "tests" / "locked"
+                    locked.mkdir(parents=True)
+                    (locked / "inner.py").write_text(f"see {secret} {CANARY}\n")
+                    mode = 0o755
+                locked.chmod(0o000)
+                # Restored even if an assertion fails, so the temporary
+                # directory can still be removed.
+                self.addCleanup(lambda p=locked, m=mode: p.exists() and p.chmod(m))
+                if os.access(locked, os.R_OK):
+                    self.skipTest("mode 000 is still readable here (running as root?), "
+                                  "so the scan cannot be made to fail")
+                result = self.run_guards()
+                locked.chmod(mode)
+                output = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0,
+                                    "the guards passed a snapshot they could not read")
+                self.assertIn("guard (b)", result.stderr, "the refusal does not name the guard")
+                self.assertIn("grep exit 2", output, "the refusal does not say why")
+                for piece in fragments(secret) + [CANARY]:
+                    self.assertFalse(piece in output, "the guard printed part of the file")
+
     def test_excluded_file_reference_guard(self) -> None:
         secret = "docs/experi" + "ments/" + "run-73.md"
         where = self.plant("guide/intro.md", secret)
@@ -283,10 +327,13 @@ class PurgeHistoryVerifierRedacts(unittest.TestCase):
              "user.email=t@example.test", "-c", "commit.gpgsign=false", *args],
             env=env, capture_output=True, text=True, check=True).stdout.strip()
 
-    def commit(self, rel: str, body: str) -> str:
+    def commit(self, rel: str, body: str | bytes) -> str:
         path = self.repo / rel
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(body)
+        if isinstance(body, bytes):
+            path.write_bytes(body)
+        else:
+            path.write_text(body)
         self.git("add", rel)
         self.git("commit", "-q", "-m", "change")
         return self.git("rev-parse", f"HEAD:{rel}")
@@ -324,6 +371,45 @@ class PurgeHistoryVerifierRedacts(unittest.TestCase):
                 for piece in fragments(secret) + [CANARY]:
                     self.assertFalse(piece in output,
                                      "the verifier printed part of what it matched")
+
+    def test_a_hit_inside_a_binary_blob_in_history_is_reported(self) -> None:
+        """A NUL byte does not excuse a blob from the scan.
+
+        The verifier once skipped any blob with a NUL near its start, and the
+        path scan only checks a fixed list of names, so a key stored after a
+        NUL anywhere in history was certified clean. The report is still the
+        pattern and the blob sha, never the bytes around the hit.
+        """
+        cases = {
+            "credential": "AK" + "IA" + "W3PZ7K5QN2" + "RD",
+            "tracker-id": "T" + "BX-" + "51923",
+            "personal-path": "/Us" + "ers/" + "anat" + "oli",
+        }
+        for name, secret in cases.items():
+            with self.subTest(pattern=name):
+                self.fresh_repo(f"binary-{name}")
+                self.commit("README.md", "A prompt library.\n")
+                body = (b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0d" + b"\x00" * 64
+                        + f"{secret} {CANARY}".encode() + b"\x00\xff\xfe")
+                sha = self.commit("assets/art.png", body)
+                self.commit("assets/art.png", b"\x89PNG\r\n\x1a\n\x00\x00")
+                result = self.verify()
+                output = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0,
+                                    f"the verifier passed a hit in a binary\n{output}")
+                self.assertIn(f"{name}: {sha}", output,
+                              "the report does not name the pattern and blob")
+                for piece in fragments(secret) + [CANARY]:
+                    self.assertFalse(piece in output,
+                                     "the verifier printed part of what it matched")
+
+    def test_a_clean_binary_in_history_passes(self) -> None:
+        """Scanning binaries must not refuse one that holds nothing."""
+        self.commit("README.md", "A prompt library.\n")
+        self.commit("assets/art.png", b"\x89PNG\r\n\x1a\n\x00\x01\x02\xff" * 32)
+        result = self.verify()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
