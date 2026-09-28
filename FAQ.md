@@ -115,11 +115,13 @@ If it is running, the client is almost certainly using an old token, a port the 
 
 ## The library itself
 
+### How do I back up or move everything?
+
+In Settings, then General, choose Export encrypted backup. The file holds your prompts, renders, models, saved values, app settings and Seedbed's Keychain secrets. Choose a password you can keep separately: Seedbed cannot recover it. Import encrypted backup creates a new library folder and leaves the old one alone. Sign-ins owned by other apps, such as the Claude Code CLI, are not included.
+
 ### Where does everything live?
 
-In the library folder, as plain markdown in a git repository. prompts/ holds the seeds you maintain and rendered/ holds what each model made of them.
-
-That is why history, sharing and backup come for free, and why you can read a diff to see exactly how an expansion changed.
+In the library folder, as plain markdown. prompts/ holds the seeds you maintain and rendered/ holds what each model made of them. An installed app keeps its writable copy under Application Support; an explicitly selected Git checkout keeps its own history. Use the encrypted backup for a portable copy that also includes settings and Seedbed secrets.
 
 ```
 prompts/fix-bug-and-test.md            the seed

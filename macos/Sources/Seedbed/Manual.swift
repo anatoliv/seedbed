@@ -729,14 +729,25 @@ enum Manual {
     private static let faqLibrary: [ManualTopic] = [
         ManualTopic(
             page: .faq, section: "The library itself",
+            term: "How do I back up or move everything?",
+            detail: """
+                In Settings, then General, choose Export encrypted backup. The file holds \
+                your prompts, renders, models, saved values, app settings and Seedbed's \
+                Keychain secrets. Choose a password you can keep separately: Seedbed \
+                cannot recover it. Import encrypted backup creates a new library folder \
+                and leaves the old one alone. Sign-ins owned by other apps, such as the \
+                Claude Code CLI, are not included.
+                """,
+            example: nil, key: nil),
+        ManualTopic(
+            page: .faq, section: "The library itself",
             term: "Where does everything live?",
             detail: """
-                In the library folder, as plain markdown in a git repository. prompts/ \
-                holds the seeds you maintain and rendered/ holds what each model made of \
-                them.
-
-                That is why history, sharing and backup come for free, and why you can read \
-                a diff to see exactly how an expansion changed.
+                In the library folder, as plain markdown. prompts/ holds the seeds you \
+                maintain and rendered/ holds what each model made of them. An installed \
+                app keeps its writable copy under Application Support; an explicitly \
+                selected Git checkout keeps its own history. Use the encrypted backup \
+                for a portable copy that also includes settings and Seedbed secrets.
                 """,
             example: """
                 prompts/fix-bug-and-test.md            the seed

@@ -15,6 +15,7 @@ __pycache__/
 
 # Secrets. API keys live in the login Keychain, never in the tree.
 *.local
+*.seedbedbackup
 
 # Copy counts: machine-local by design (see promptlib/usage.py)
 .usage.json

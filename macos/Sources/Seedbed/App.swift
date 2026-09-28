@@ -730,7 +730,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 onSyncMCP: { self.syncMCPServer() },
                 onReloadLibrary: { self.model.reload() },
                 onRevealLibrary: { self.revealRoot() },
-                onChooseLibrary: { self.chooseRoot() })
+                onChooseLibrary: { self.chooseRoot() },
+                onExportBackup: { self.exportBackup() },
+                onImportBackup: { self.importBackup() })
                 .environment(\.textScale, .reading)
         }
     }
@@ -950,6 +952,121 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // active when the window first opened.
         libraryModel?.client = client
         libraryModel?.reload()
+    }
+
+    private func backupPassword(confirm: Bool) -> String? {
+        let alert = NSAlert()
+        alert.messageText = confirm ? "Protect this backup" : "Unlock this backup"
+        alert.informativeText = confirm
+            ? "Enter a password of at least 12 characters. The backup includes your Keychain secrets."
+            : "Enter the password used when this backup was exported."
+        alert.addButton(withTitle: confirm ? "Export" : "Continue")
+        alert.addButton(withTitle: "Cancel")
+        let password = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        password.placeholderString = "Password"
+        let fields = NSStackView()
+        fields.orientation = .vertical
+        fields.spacing = 8
+        fields.addArrangedSubview(password)
+        var repeated: NSSecureTextField?
+        if confirm {
+            let second = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+            second.placeholderString = "Repeat password"
+            fields.addArrangedSubview(second)
+            repeated = second
+        }
+        fields.frame = NSRect(x: 0, y: 0, width: 320, height: confirm ? 58 : 26)
+        alert.accessoryView = fields
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        guard !confirm || password.stringValue == repeated?.stringValue else {
+            backupAlert("Passwords did not match")
+            return nil
+        }
+        return password.stringValue
+    }
+
+    private func backupAlert(_ message: String, detail: String = "") {
+        let alert = NSAlert()
+        alert.messageText = message
+        alert.informativeText = detail
+        alert.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+    }
+
+    private func exportBackup() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "Seedbed-\(Date.now.formatted(.iso8601.year().month().day().dateSeparator(.dash))).seedbedbackup"
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let destination = panel.url,
+              let password = backupPassword(confirm: true) else { return }
+        do {
+            let payload = try SeedbedBackup.collect(
+                from: model.client.usableRoot,
+                launchAtLogin: LaunchAtLogin.isEnabled,
+                automaticUpdates: Updater.shared?.canCheck == true
+                    ? Updater.shared?.automaticallyChecks : nil)
+            let archive = try SeedbedBackup.seal(payload, password: password)
+            try archive.write(to: destination, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600],
+                                                  ofItemAtPath: destination.path)
+            backupAlert("Backup exported", detail: "Saved \(payload.promptCount) prompts and their settings to \(destination.lastPathComponent).")
+        } catch {
+            backupAlert("Could not export backup", detail: error.localizedDescription)
+        }
+    }
+
+    private func importBackup() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let source = panel.url,
+              let password = backupPassword(confirm: false) else { return }
+        do {
+            let size = try source.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+            guard size <= 256 * 1024 * 1024 else { throw SeedbedBackup.Failure.tooLarge }
+            let archive = try Data(contentsOf: source)
+            let payload = try SeedbedBackup.open(archive, password: password)
+            let alert = NSAlert()
+            alert.messageText = "Import \(payload.promptCount) prompts?"
+            alert.informativeText = "Seedbed will create a new library folder and restore its settings and Keychain secrets. Your current library will remain on disk."
+            alert.addButton(withTitle: "Import")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+            let parent = LibraryClient.commonRoot.deletingLastPathComponent()
+            let restored = try SeedbedBackup.restoreFiles(
+                payload, runtimeRoot: model.client.usableRoot, parent: parent)
+            do {
+                let preferences = try SeedbedBackup.restoredPreferences(payload, root: restored)
+                _ = try LibraryClient(root: restored).load()
+                try SeedbedBackup.restoreSecrets(payload.secrets)
+                let domain = Bundle.main.bundleIdentifier ?? "net.amnesia.seedbed"
+                UserDefaults.standard.setPersistentDomain(preferences, forName: domain)
+                if let updates = payload.automaticUpdates {
+                    Updater.shared?.automaticallyChecks = updates
+                }
+                let loginProblem = LaunchAtLogin.isEnabled == payload.launchAtLogin
+                    ? nil : LaunchAtLogin.set(payload.launchAtLogin)
+                CrashReporting.apply(enabled: CrashReporting.isEnabled)
+                let client = LibraryClient(root: restored)
+                model.client = client
+                model.reload()
+                libraryModel?.client = client
+                libraryModel?.reload()
+                syncMCPServer()
+                let detail = loginProblem.map { "Library restored. Open at login could not be changed: \($0)" }
+                    ?? "Library restored to \(restored.path). The old library remains untouched."
+                backupAlert("Backup imported", detail: detail)
+            } catch {
+                try? FileManager.default.removeItem(at: restored)
+                throw error
+            }
+        } catch {
+            backupAlert("Could not import backup", detail: error.localizedDescription)
+        }
     }
 
     /// Rebuilding calls the enhancer for every stale pair, so it can run for

@@ -48,6 +48,18 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.20",
+            date: "28 September 2026",
+            highlight: "Back up your library and settings in one encrypted file.",
+            changes: [
+                WhatsNewChange(kind: .added, text:
+                    "Settings now lets you export prompts, model settings, app preferences, "
+                    + "and Seedbed's saved secrets to a password-protected backup file."),
+                WhatsNewChange(kind: .added, text:
+                    "You can import that file on another Mac. Seedbed checks the backup "
+                    + "before switching libraries and keeps the current library intact."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.19",
             date: "28 September 2026",
             highlight: "Your prompts now live in Seedbed's own data folder, apart from any Git checkout.",

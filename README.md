@@ -155,7 +155,13 @@ it must never listen on a routable address.
 
 The repository includes a versioned starter library. Your working prompts,
 renders and comparisons live in the local data copy after first launch. The
-app does not sync or back up that copy; export it if you want it on another Mac.
+app does not sync that copy. In Settings → General, **Export encrypted backup**
+saves your prompts, renders, model registry, library and app settings, and
+Seedbed-held Keychain credentials in a password-protected `.seedbedbackup` file.
+**Import encrypted backup** makes a new library folder and switches to it; the
+previous folder stays untouched. Keep the password separately, since Seedbed
+cannot recover it. Credentials owned by other apps, such as Claude Code CLI
+sign-in, are not part of the Seedbed backup.
 
 ## Layout
 

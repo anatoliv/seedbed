@@ -48,6 +48,8 @@ struct SettingsWindowView: View {
     var onReloadLibrary: () -> Void
     var onRevealLibrary: () -> Void
     var onChooseLibrary: () -> Void
+    var onExportBackup: () -> Void
+    var onImportBackup: () -> Void
 
     var body: some View {
         HStack(spacing: 0) {
@@ -81,7 +83,10 @@ struct SettingsWindowView: View {
             // a path you can change.
             GeneralSettings(libraryPath: library.client.root.path,
                             onReveal: onRevealLibrary,
-                            onChoose: onChooseLibrary)
+                            onChoose: onChooseLibrary,
+                            onExportBackup: onExportBackup,
+                            onImportBackup: onImportBackup)
+                .id(library.client.root)
         case .models:
             ModelsPane(library: library, onReloadLibrary: onReloadLibrary)
         case .building:
@@ -97,6 +102,8 @@ struct GeneralSettings: View {
     let libraryPath: String
     var onReveal: () -> Void
     var onChoose: () -> Void
+    var onExportBackup: () -> Void
+    var onImportBackup: () -> Void
 
     /// Not `@AppStorage`: `Paster.isEnabled` owns the default, which is on, and
     /// two sources for one setting is how it ends up half-on.
@@ -192,16 +199,32 @@ struct GeneralSettings: View {
                     }
                     SettingsBullets([
                         ("The folder shown above",
-                         "your prompts and everything generated from them, as plain markdown "
-                         + "in a git repository. Seedbed is a front end to it and carries no "
-                         + "prompts of its own, so without a checkout the library reads as "
-                         + "empty."),
-                        ("Reveal in Finder", "opens that folder, which is where you go to "
-                         + "commit, push or pull it."),
-                        ("Choose…", "points Seedbed at a different checkout. Everything reloads "
+                         "holds your prompts, renders, model registry and enhancer settings. "
+                         + "An installed app uses a writable copy under Application Support; "
+                         + "you can choose a different library here."),
+                        ("Reveal in Finder", "opens that folder so you can inspect its files."),
+                        ("Choose…", "points Seedbed at a different library. Everything reloads "
                          + "from the new folder, and settings you save afterwards, including "
                          + "the model registry and the enhancer, are written into it rather "
                          + "than the old one."),
+                    ])
+                }
+
+                SettingsGroup("Backup and restore") {
+                    HStack(spacing: Tokens.Space.tight) {
+                        Button("Export encrypted backup…", action: onExportBackup)
+                        Button("Import encrypted backup…", action: onImportBackup)
+                        Spacer()
+                    }
+                    SettingsBullets([
+                        ("Export encrypted backup…",
+                         "saves prompts, renders, model profiles, library settings, app settings, "
+                         + "and Seedbed's Keychain secrets in one password-protected file. Keep the "
+                         + "password separately; Seedbed cannot recover it."),
+                        ("Import encrypted backup…",
+                         "creates a new library folder and switches Seedbed to it. Your current "
+                         + "library stays untouched, and the backup's secrets and settings "
+                         + "become active on this Mac."),
                     ])
                 }
 
