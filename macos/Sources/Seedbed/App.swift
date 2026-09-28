@@ -15,23 +15,66 @@ final class HUDPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// AppKit keeps the active secure field's newest text in the field editor until
-/// editing ends. An NSAlert can close before that value reaches stringValue.
+/// Keep the alert's default button unavailable until its password fields are
+/// complete. Return in the first field should move to confirmation, not submit.
 @MainActor
-final class BackupPasswordEdits: NSObject, NSTextFieldDelegate {
-    private var latest: [ObjectIdentifier: String] = [:]
+final class BackupPasswordForm: NSObject, NSTextFieldDelegate {
+    let password: NSSecureTextField
+    let confirmation: NSSecureTextField?
+    let hint: NSTextField?
+    let submitButton: NSButton
 
-    func controlTextDidChange(_ notification: Notification) {
-        guard let field = notification.object as? NSSecureTextField else { return }
-        let editor = notification.userInfo?["NSFieldEditor"] as? NSText
-        latest[ObjectIdentifier(field)] = editor?.string
-            ?? field.currentEditor()?.string ?? field.stringValue
+    init(password: NSSecureTextField, confirmation: NSSecureTextField?,
+         hint: NSTextField?, submitButton: NSButton) {
+        self.password = password
+        self.confirmation = confirmation
+        self.hint = hint
+        self.submitButton = submitButton
+        super.init()
+        password.delegate = self
+        confirmation?.delegate = self
+        if let confirmation {
+            password.nextKeyView = confirmation
+            password.target = self
+            password.action = #selector(focusConfirmation)
+        }
+        update()
     }
 
-    func value(in field: NSSecureTextField) -> String {
-        let active = field.currentEditor()?.string
-        field.validateEditing()
-        return active ?? latest[ObjectIdentifier(field)] ?? field.stringValue
+    @objc private func focusConfirmation() {
+        guard let confirmation else { return }
+        password.window?.makeFirstResponder(confirmation)
+    }
+
+    func controlTextDidChange(_ notification: Notification) { update() }
+    func controlTextDidEndEditing(_ notification: Notification) { update() }
+
+    func update() {
+        let entered = password.stringValue
+        guard let confirmation else {
+            submitButton.isEnabled = !entered.isEmpty
+            return
+        }
+        let repeated = confirmation.stringValue
+        let message: String
+        if entered.count < 12 {
+            message = "Use at least 12 characters."
+        } else if repeated.isEmpty {
+            message = "Repeat your password to continue."
+        } else if entered != repeated {
+            message = "Passwords do not match."
+        } else {
+            message = "Passwords match."
+        }
+        hint?.stringValue = message
+        submitButton.isEnabled = entered.count >= 12 && entered == repeated
+    }
+
+    func acceptedPassword() -> String? {
+        password.validateEditing()
+        confirmation?.validateEditing()
+        update()
+        return submitButton.isEnabled ? password.stringValue : nil
     }
 }
 
@@ -983,36 +1026,33 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 : "Enter the password used when this backup was exported."
             alert.addButton(withTitle: confirm ? "Export" : "Continue")
             alert.addButton(withTitle: "Cancel")
-            let edits = BackupPasswordEdits()
             let password = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
             password.placeholderString = "Password"
-            password.delegate = edits
             let fields = NSStackView()
             fields.orientation = .vertical
             fields.spacing = 8
             fields.addArrangedSubview(password)
             var repeated: NSSecureTextField?
+            var hint: NSTextField?
             if confirm {
                 let second = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
                 second.placeholderString = "Repeat password"
-                second.delegate = edits
                 fields.addArrangedSubview(second)
                 repeated = second
+                let message = NSTextField(labelWithString: "")
+                message.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+                message.textColor = .secondaryLabelColor
+                fields.addArrangedSubview(message)
+                hint = message
             }
-            fields.frame = NSRect(x: 0, y: 0, width: 320, height: confirm ? 58 : 26)
+            fields.frame = NSRect(x: 0, y: 0, width: 320, height: confirm ? 82 : 26)
+            let form = BackupPasswordForm(password: password, confirmation: repeated,
+                                          hint: hint, submitButton: alert.buttons[0])
             alert.accessoryView = fields
             NSApp.activate(ignoringOtherApps: true)
             guard alert.runModal() == .alertFirstButtonReturn else { return nil }
-            let entered = edits.value(in: password)
-            if confirm, let repeated, entered != edits.value(in: repeated) {
-                backupAlert("Passwords did not match", detail: "Enter them again to export the backup.")
-                continue
-            }
-            if confirm && entered.count < 12 {
-                backupAlert("Password is too short", detail: "Use at least 12 characters.")
-                continue
-            }
-            return entered
+            if let entered = form.acceptedPassword() { return entered }
+            backupAlert("Complete the password fields", detail: "Enter matching passwords to export.")
         }
     }
 
