@@ -183,6 +183,16 @@ class PublishAgainstAFakeHost(unittest.TestCase):
         self.assertIn(DELTA, result.stderr)
         self.assertEqual(self.events(), [], "something was uploaded from a feed that cannot be served")
 
+    def test_a_failed_gate_shows_its_output_and_uploads_nothing(self) -> None:
+        self.stub(self.macos / "Scripts" / "check-release.sh",
+                  "#!/bin/sh\necho 'FAIL: release kit case'\necho 'gate stderr' >&2\nexit 1\n")
+        result = self.publish()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("FAIL: release kit case", result.stderr)
+        self.assertIn("gate stderr", result.stderr)
+        self.assertIn("the release gate does not pass", result.stderr)
+        self.assertEqual(self.events(), [], "a failed gate uploaded release files")
+
 
 if __name__ == "__main__":
     unittest.main()

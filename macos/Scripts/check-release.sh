@@ -188,7 +188,8 @@ fi
 
 # The release kit: the vendored guards are exactly their pinned version, and their own
 # tests pass on those bytes. Seconds.
-bash Scripts/release-kit/check.sh >/dev/null || {
+KIT_OUT="$(bash Scripts/release-kit/check.sh 2>&1)" || {
+    printf '%s\n' "$KIT_OUT" >&2
     echo "error: release kit check failed. Run: bash Scripts/release-kit/check.sh" >&2
     exit 1
 }
