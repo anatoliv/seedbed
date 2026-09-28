@@ -48,6 +48,21 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.23",
+            date: "28 September 2026",
+            highlight: "Azure OpenAI setup and test feedback are clearer.",
+            changes: [
+                WhatsNewChange(kind: .fixed, text:
+                    "The Azure OpenAI preset uses the current chat completions endpoint "
+                    + "and requires a deployment name before testing."),
+                WhatsNewChange(kind: .fixed, text:
+                    "Legacy Azure deployment endpoints send requests in the format "
+                    + "those endpoints expect, including through a gateway."),
+                WhatsNewChange(kind: .improved, text:
+                    "The Building pane keeps the result of a connection test visible, "
+                    + "and saving an API key reports Keychain failures."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.22",
             date: "28 September 2026",
             highlight: "Backup export checks both password entries as you type.",

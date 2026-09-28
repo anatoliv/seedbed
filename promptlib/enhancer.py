@@ -55,8 +55,8 @@ PRESETS: list[Preset] = [
     Preset("anthropic", "Anthropic Claude API (paid)",
            "https://api.anthropic.com/v1/chat/completions", "claude-haiku-4-5"),
     Preset("azure", "Azure OpenAI (paid, api-key header)",
-           "https://YOUR-RESOURCE.openai.azure.com/openai/deployments/YOUR-DEPLOYMENT"
-           "/chat/completions?api-version=2024-10-21", "", "azure_api_key"),
+           "https://YOUR-RESOURCE.openai.azure.com/openai/v1/chat/completions",
+           "YOUR-DEPLOYMENT", "azure_api_key"),
     Preset("github", "GitHub Models (free personal tier)",
            "https://models.inference.ai.azure.com/chat/completions", "gpt-4o-mini"),
     Preset("groq", "Groq (very cheap, fast llama variants)",
@@ -84,6 +84,13 @@ PRESETS: list[Preset] = [
 AUTH_MODES = ["cli", "sdk", "api_key", "azure_api_key", "chatgpt_oauth"]
 
 
+def azure_legacy_deployment_url(endpoint: str) -> bool:
+    """The older Azure route identifies the deployment in its URL, not its body."""
+    segments = urlparse(endpoint).path.strip("/").split("/")
+    return (len(segments) >= 5 and segments[-5:-3] == ["openai", "deployments"]
+            and bool(segments[-3]) and segments[-2:] == ["chat", "completions"])
+
+
 def keychain_get(service: str) -> str:
     """Read a secret. A missing item is normal, not an error."""
     try:
@@ -94,15 +101,19 @@ def keychain_get(service: str) -> str:
     return out.stdout.strip() if out.returncode == 0 else ""
 
 
-def keychain_set(service: str, value: str) -> None:
-    """Store or clear a secret. Never written to the config file."""
+def keychain_set(service: str, value: str) -> bool:
+    """Store or clear a secret; report a failed write instead of hiding it."""
     if not value:
         subprocess.run(["security", "delete-generic-password", "-s", service],
                        capture_output=True, text=True)
-        return
-    subprocess.run(["security", "add-generic-password", "-U", "-s", service,
-                    "-a", "promptlib", "-w", value],
-                   capture_output=True, text=True, check=False)
+        return True
+    try:
+        result = subprocess.run(["security", "add-generic-password", "-U", "-s", service,
+                                 "-a", "promptlib", "-w", value],
+                                capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
 
 
 def endpoint_is_acceptable(url: str) -> bool:
@@ -209,12 +220,18 @@ class EnhancerConfig:
                 issues.append(
                     f"{self.endpoint} is not an acceptable endpoint: https, or http "
                     "only to localhost or a private address")
-            if not self.model:
+            if not self.model and not (self.auth == "azure_api_key"
+                                       and azure_legacy_deployment_url(self.endpoint)):
                 issues.append("no model set")
         if self.auth == "api_key" and not self.api_key and not self._is_local():
             issues.append("no API key in the Keychain (fine for a local server, not for a paid one)")
         if self.auth == "azure_api_key" and not self.api_key:
             issues.append("Azure needs an api-key in the Keychain")
+        if self.auth == "azure_api_key":
+            if "YOUR-RESOURCE" in self.endpoint.upper():
+                issues.append("replace YOUR-RESOURCE with your Azure resource name")
+            if "YOUR-DEPLOYMENT" in (self.model + self.endpoint).upper():
+                issues.append("replace YOUR-DEPLOYMENT with your Azure deployment name")
         if self.auth == "chatgpt_oauth" and not self._codex_signed_in():
             issues.append("not signed in to ChatGPT. Run: "
                           "python3 -m promptlib enhancer login")

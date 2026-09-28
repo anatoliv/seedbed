@@ -369,7 +369,7 @@ def cmd_enhancer(args, lib: Library, models: dict, cache: GuideCache) -> int:
             config.preset = chosen.id
             config.auth = chosen.auth
             config.endpoint = chosen.endpoint
-            config.model = chosen.model or config.model
+            config.model = chosen.model
         if args.auth:
             if args.auth not in AUTH_MODES:
                 return _fail(f"auth must be one of: {', '.join(AUTH_MODES)}")
@@ -386,9 +386,11 @@ def cmd_enhancer(args, lib: Library, models: dict, cache: GuideCache) -> int:
             config.fallback_model = args.fallback_model
         # Keys go to the Keychain, never to the config file, and never echoed.
         if args.key is not None:
-            keychain_set(KEYCHAIN_SERVICE, args.key)
+            if not keychain_set(KEYCHAIN_SERVICE, args.key):
+                return _fail("could not save the enhancer API key in the login Keychain")
         if args.fallback_key is not None:
-            keychain_set(FALLBACK_KEYCHAIN_SERVICE, args.fallback_key)
+            if not keychain_set(FALLBACK_KEYCHAIN_SERVICE, args.fallback_key):
+                return _fail("could not save the fallback API key in the login Keychain")
 
         config.save()
         print(f"enhancer: {config.describe()}")

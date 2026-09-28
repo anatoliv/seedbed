@@ -22,6 +22,7 @@ TIMEOUT = 300
 RETRYABLE = {408, 409, 425, 429, 500, 502, 503, 504}
 
 from .store import CONTEXTS, DEFAULT_CONTEXT
+from .enhancer import azure_legacy_deployment_url
 
 SYSTEM = """You rewrite short prompts into precise, effective prompts for a \
 specific target model.
@@ -160,18 +161,17 @@ def _via_http(prompt: str, endpoint: str, model: str, key: str,
     import urllib.error
     import urllib.request
 
-    if not endpoint or not model:
+    legacy_azure = auth == "azure_api_key" and azure_legacy_deployment_url(endpoint)
+    if not endpoint or (not model and not legacy_azure):
         raise EnhancerError("the enhancer has no endpoint or model set")
 
-    payload = json.dumps(
-        {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ],
-        }
-    ).encode()
+    request_body = {"messages": [
+        {"role": "system", "content": system},
+        {"role": "user", "content": prompt},
+    ]}
+    if not legacy_azure:
+        request_body["model"] = model
+    payload = json.dumps(request_body).encode()
     headers = {"Content-Type": "application/json"}
     if key:
         # Azure wants its key in its own header; everyone else takes a Bearer.

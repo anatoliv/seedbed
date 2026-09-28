@@ -87,7 +87,8 @@ final class EnhancerEditorModel: ObservableObject {
     var needsEndpoint: Bool { ["api_key", "azure_api_key", "chatgpt_oauth"].contains(auth) }
     var needsKey: Bool { ["api_key", "azure_api_key"].contains(auth) }
 
-    func load() {
+    /// Refresh fields and key-present indicators without erasing a Test result.
+    func load(preservingStatus: Bool = false) {
         Task.detached { [client] in
             let loaded: EnhancerConfigData
             do {
@@ -117,8 +118,10 @@ final class EnhancerEditorModel: ObservableObject {
                 self.fallbackModel = loaded.fallbackModel
                 self.key = ""            // never round-tripped; blank means "leave it"
                 self.fallbackKey = ""
-                self.status = loaded.problems.first ?? loaded.summary
-                self.statusIsError = !loaded.problems.isEmpty
+                if !preservingStatus {
+                    self.status = loaded.problems.first ?? loaded.summary
+                    self.statusIsError = !loaded.problems.isEmpty
+                }
             }
         }
         refreshCodexAccount()
@@ -174,7 +177,7 @@ final class EnhancerEditorModel: ObservableObject {
     func apply(preset: EnhancerConfigData.PresetData) {
         auth = preset.auth
         endpoint = preset.endpoint
-        if !preset.model.isEmpty { model = preset.model }
+        model = preset.model
     }
 
     func save(thenTest: Bool = false) {
@@ -198,14 +201,14 @@ final class EnhancerEditorModel: ObservableObject {
                     self.key = ""; self.fallbackKey = ""
                     self.status = result ?? "Saved"
                     self.statusIsError = false
-                    self.load()
+                    self.load(preservingStatus: thenTest)
                 }
             } catch {
                 await MainActor.run {
                     self.busy = false
                     self.status = error.localizedDescription
                     self.statusIsError = true
-                    self.load()
+                    self.load(preservingStatus: true)
                 }
             }
         }
