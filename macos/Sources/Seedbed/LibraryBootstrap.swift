@@ -1,8 +1,7 @@
 import Foundation
 
-/// Creates the default library on a fresh install. A library must contain the
-/// Python package and model registry, so making an empty directory would only
-/// turn the first launch into a permanent "no promptlib/" error.
+/// Creates a writable data library from an older checkout or the starter repo.
+/// The result has no Git metadata, so app edits stay local.
 enum LibraryBootstrap {
     static let repository = "https://github.com/anatoliv/seedbed.git"
 
@@ -26,21 +25,19 @@ enum LibraryBootstrap {
     static func shouldPrepare(_ preferred: URL) -> Bool {
         let path = preferred.standardizedFileURL.path
         return !LibraryClient.isLibrary(preferred)
-            && (path == LibraryClient.commonRoot.standardizedFileURL.path
-                || path == LibraryClient.legacyDefaultRoot.standardizedFileURL.path)
+            && path == LibraryClient.commonRoot.standardizedFileURL.path
     }
 
-    /// The clone is made beside the final folder and moved into place only
-    /// after validation. A failed download cannot leave a half-built library.
-    /// A valid legacy checkout wins, and an existing nonempty folder is never
-    /// replaced, since it may contain work the app does not understand.
+    /// Stage and validate the library before moving it into place. Existing
+    /// checkouts are read only: their current prompts and renders are copied,
+    /// including uncommitted edits, while their Git metadata stays untouched.
     static func ensureDefaultLibrary(
         commonRoot: URL = LibraryClient.commonRoot,
+        previousRoot: URL = LibraryClient.previousDefaultRoot,
         legacyRoot: URL = LibraryClient.legacyDefaultRoot,
         clone: (URL) throws -> Void = cloneRepository
     ) throws -> URL {
         if LibraryClient.isLibrary(commonRoot) { return commonRoot }
-        if LibraryClient.isLibrary(legacyRoot) { return legacyRoot }
 
         let files = FileManager.default
         let parent = commonRoot.deletingLastPathComponent()
@@ -50,18 +47,35 @@ enum LibraryBootstrap {
         let staging = parent.appendingPathComponent(".Library-setup-\(UUID().uuidString)",
                                                 isDirectory: true)
         defer { try? files.removeItem(at: staging) }
-        try clone(staging)
+        if let source = [previousRoot, legacyRoot].first(where: LibraryClient.isLibrary) {
+            try copyDataLibrary(from: source, to: staging)
+        } else {
+            try clone(staging)
+            let git = staging.appendingPathComponent(".git")
+            if files.fileExists(atPath: git.path) { try files.removeItem(at: git) }
+        }
         guard LibraryClient.isLibrary(staging) else { throw Failure.invalidClone }
 
-        // Another launch may have finished while this one was cloning.
+        // Another launch may have finished while this one was staging.
         if LibraryClient.isLibrary(commonRoot) { return commonRoot }
-        if LibraryClient.isLibrary(legacyRoot) { return legacyRoot }
         try requireEmptyOrMissing(commonRoot)
         if files.fileExists(atPath: commonRoot.path) {
             try files.removeItem(at: commonRoot)
         }
         try files.moveItem(at: staging, to: commonRoot)
         return commonRoot
+    }
+
+    private static func copyDataLibrary(from source: URL, to destination: URL) throws {
+        let files = FileManager.default
+        try files.createDirectory(at: destination, withIntermediateDirectories: true)
+        for name in ["promptlib", "models.toml", "enhancer.toml", "prompts", "rendered",
+                     "comparisons", "assets", ".cache", ".usage.json", ".variables.json"] {
+            let sourceItem = source.appendingPathComponent(name)
+            if files.fileExists(atPath: sourceItem.path) {
+                try files.copyItem(at: sourceItem, to: destination.appendingPathComponent(name))
+            }
+        }
     }
 
     private static func requireEmptyOrMissing(_ root: URL) throws {

@@ -44,12 +44,12 @@ over, since otherwise Homebrew refuses rather than overwrite an app it did not
 install.
 
 Seedbed is a front end and does not carry the prompts. On first launch, it
-clones the public library into `~/Library/Application Support/Seedbed/Library`
-if no valid checkout is already present. This needs an internet connection and
-Git. A library chosen in Settings always wins, and a valid legacy
-`~/Projects/seedbed` checkout remains an automatic fallback for upgrades. If
-the automatic clone fails, the app explains why and you can choose a checkout
-in Settings. Python 3.11 or newer is also required to run the library.
+copies the starter library from an existing Seedbed checkout, or downloads it
+from the public repository, into `~/Library/Application Support/Seedbed/LibraryData`.
+That writable copy has no Git metadata, so edits stay local. An older library
+at `~/Library/Application Support/Seedbed/Library` or `~/Projects/seedbed` is
+copied without changing it. A library chosen in Settings still wins. A fresh
+download needs an internet connection and Git. Python 3.11 or newer runs the library.
 
 macOS 14 (Sonoma) or later, Apple silicon or Intel. The cask is marked
 `auto_updates`, so Seedbed keeps itself current through Sparkle rather than
@@ -132,8 +132,8 @@ and path this particular site is served from.
 **Check for Updates** follows how the copy was installed. A development build
 inside the checkout uses `git fetch` and tells you to pull and rebuild. A copy
 installed from a release uses the signed Sparkle feed and can install the newer
-app. Neither path updates the prompt library itself; that remains a git checkout
-you update with `git pull`.
+app. Neither path changes your local prompt library. The repository's starter
+snapshot is updated separately.
 
 Crash reporting exists for builds that leave this machine, and is off twice
 over: the user has to opt in, *and* the build has to carry exactly one reporting
@@ -153,19 +153,15 @@ it must never listen on a routable address.
 
 ## Why files and git
 
-Prompts change slowly and need to exist on more than one computer. Git gives
-sharing, history, backup and conflict resolution with no server, and it works
-off-LAN — which is why this is not built on Reference, whose sync is LAN-only
-with no catch-up for a machine that was asleep.
-
-Renders are committed, so `git diff` shows how an expansion changed when the
-guidance moved. You review a diff rather than trusting a black box.
+The repository includes a versioned starter library. Your working prompts,
+renders and comparisons live in the local data copy after first launch. The
+app does not sync or back up that copy; export it if you want it on another Mac.
 
 ## Layout
 
     models.toml               target registry: which guidance belongs to which model
-    prompts/<id>.md           seeds you maintain
-    rendered/<model>/<id>.md  generated expansions, with provenance
+    prompts/<id>.md           starter seeds in this repository
+    rendered/<model>/<id>.md  starter expansions, with provenance
     .cache/guides/            fetched guidance (gitignored, machine-local)
     assets/brand/README.md    which icon/mark belongs in each product context
     site/                     the public site served at seedbed.dev

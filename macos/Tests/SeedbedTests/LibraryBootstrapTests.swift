@@ -4,7 +4,8 @@ import XCTest
 
 final class LibraryBootstrapTests: XCTestCase {
     private var sandbox: URL!
-    private var common: URL { sandbox.appendingPathComponent("Support/Library") }
+    private var common: URL { sandbox.appendingPathComponent("Support/LibraryData") }
+    private var previous: URL { sandbox.appendingPathComponent("Support/Library") }
     private var legacy: URL { sandbox.appendingPathComponent("Projects/seedbed") }
 
     override func setUpWithError() throws {
@@ -41,7 +42,7 @@ final class LibraryBootstrapTests: XCTestCase {
         try FileManager.default.createDirectory(at: common, withIntermediateDirectories: true)
         var calls = 0
         let result = try LibraryBootstrap.ensureDefaultLibrary(
-            commonRoot: common, legacyRoot: legacy
+            commonRoot: common, previousRoot: previous, legacyRoot: legacy
         ) { destination in
             calls += 1
             try self.makeLibrary(at: destination)
@@ -50,19 +51,31 @@ final class LibraryBootstrapTests: XCTestCase {
         XCTAssertEqual(calls, 1)
         XCTAssertTrue(LibraryClient.isLibrary(common))
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(
-            atPath: common.deletingLastPathComponent().path), ["Library"])
+            atPath: common.deletingLastPathComponent().path), ["LibraryData"])
     }
 
-    func testValidLegacyCheckoutIsKeptWithoutCreatingAnotherLibrary() throws {
+    func testLegacyEditsAreCopiedWithoutChangingTheCheckout() throws {
         try makeLibrary(at: legacy)
+        let enhancer = legacy.appendingPathComponent("enhancer.toml")
+        try "[enhancer]\nmodel = \"local\"\n".write(to: enhancer,
+                                                     atomically: true, encoding: .utf8)
+        try FileManager.default.createDirectory(at: legacy.appendingPathComponent("prompts"),
+                                                withIntermediateDirectories: true)
+        let prompt = legacy.appendingPathComponent("prompts/local.md")
+        try "local edit".write(to: prompt, atomically: true, encoding: .utf8)
         let result = try LibraryBootstrap.ensureDefaultLibrary(
-            commonRoot: common, legacyRoot: legacy
+            commonRoot: common, previousRoot: previous, legacyRoot: legacy
         ) { _ in XCTFail("A valid library must not be cloned over") }
-        XCTAssertEqual(result, legacy)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: common.path))
+        XCTAssertEqual(result.standardizedFileURL.path, common.standardizedFileURL.path)
+        XCTAssertEqual(try String(contentsOf: common.appendingPathComponent("prompts/local.md")),
+                       "local edit")
+        XCTAssertEqual(try String(contentsOf: prompt), "local edit")
+        XCTAssertEqual(try String(contentsOf: common.appendingPathComponent("enhancer.toml")),
+                       try String(contentsOf: enhancer))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: common.appendingPathComponent(".git").path))
     }
 
-    func testRealGitCloneCreatesAUsableCheckout() throws {
+    func testRealGitCloneCreatesAUsableDataLibrary() throws {
         let source = sandbox.appendingPathComponent("source")
         try makeLibrary(at: source)
         try git(["init", "-q", source.path])
@@ -71,14 +84,14 @@ final class LibraryBootstrapTests: XCTestCase {
                  "-c", "user.email=test@example.invalid", "commit", "-qm", "fixture"])
 
         let result = try LibraryBootstrap.ensureDefaultLibrary(
-            commonRoot: common, legacyRoot: legacy
+            commonRoot: common, previousRoot: previous, legacyRoot: legacy
         ) { destination in
             try LibraryBootstrap.cloneRepository(into: destination, from: source.path)
             XCTAssertNil(LibraryClient.whyNotALibrary(destination))
         }
         XCTAssertEqual(result.path.split(separator: "/"), common.path.split(separator: "/"))
         XCTAssertTrue(LibraryClient.isLibrary(result))
-        XCTAssertTrue(FileManager.default.fileExists(
+        XCTAssertFalse(FileManager.default.fileExists(
             atPath: result.appendingPathComponent(".git").path))
     }
 
@@ -87,13 +100,13 @@ final class LibraryBootstrapTests: XCTestCase {
         let work = common.appendingPathComponent("my-prompt.md")
         try "keep me".write(to: work, atomically: true, encoding: .utf8)
         XCTAssertThrowsError(try LibraryBootstrap.ensureDefaultLibrary(
-            commonRoot: common, legacyRoot: legacy
+            commonRoot: common, previousRoot: previous, legacyRoot: legacy
         ) { _ in XCTFail("Must not clone into occupied folder") })
         XCTAssertEqual(try String(contentsOf: work), "keep me")
 
         try FileManager.default.removeItem(at: common)
         XCTAssertThrowsError(try LibraryBootstrap.ensureDefaultLibrary(
-            commonRoot: common, legacyRoot: legacy
+            commonRoot: common, previousRoot: previous, legacyRoot: legacy
         ) { destination in
             try FileManager.default.createDirectory(at: destination,
                                                     withIntermediateDirectories: true)

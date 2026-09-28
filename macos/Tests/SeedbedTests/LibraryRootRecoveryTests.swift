@@ -14,13 +14,13 @@ final class LibraryRootRecoveryTests: XCTestCase {
         XCTAssertEqual(resolved, invalid)
     }
 
-    func testAnInvalidCachedRootRecoversToTheValidLegacyCheckout() {
+    func testAnInvalidDataRootWaitsForBootstrapInsteadOfUsingLegacyCheckout() {
         let resolved = LibraryClient.resolveUsableRoot(
             preferred: LibraryClient.commonRoot
         ) { url in
             url == LibraryClient.legacyDefaultRoot
         }
-        XCTAssertEqual(resolved, LibraryClient.legacyDefaultRoot)
+        XCTAssertEqual(resolved, LibraryClient.commonRoot)
     }
 
     func testAnInvalidLegacyDefaultRecoversToTheCommonCheckout() {

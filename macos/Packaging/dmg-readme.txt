@@ -6,18 +6,18 @@ Drag Seedbed to Applications, then read this.
 The app is a front end; it does not carry the prompts. Two things it needs on
 this Mac:
 
-1. The library. Seedbed reads and writes a git checkout of the seedbed
-   repository, and it runs the Python package inside that checkout to do the
-   work. On first launch, Seedbed clones the public repository into
-   ~/Library/Application Support/Seedbed/Library automatically. This needs an
-   internet connection and Git. If automatic setup fails, you can clone it:
+1. The library. Seedbed keeps your writable prompts in
+   ~/Library/Application Support/Seedbed/LibraryData, separate from Git. On
+   first launch it copies an existing library or downloads the public starter
+   snapshot. A fresh download needs an internet connection and Git. If that
+   fails, clone the starter repository and relaunch:
 
        mkdir -p "$HOME/Library/Application Support/Seedbed"
        git clone https://github.com/anatoliv/seedbed "$HOME/Library/Application Support/Seedbed/Library"
 
-   An existing valid ~/Projects/seedbed checkout remains an automatic fallback
-   for upgrades. Anywhere else is fine: menu bar icon, Settings, General,
-   Choose. A folder without a promptlib directory in it is refused, and says why.
+   Seedbed copies that clone into LibraryData without changing it. An existing
+   ~/Projects/seedbed checkout is copied the same way, including local edits.
+   To use another library directly, choose it in Settings, General, Choose.
 
 2. Python 3.11 or newer, for tomllib:
 

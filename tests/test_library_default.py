@@ -21,20 +21,19 @@ class LibraryDefaultTests(unittest.TestCase):
 
     def test_first_run_points_to_the_common_application_support_library(self) -> None:
         self.assertIn("for: .applicationSupportDirectory, in: .userDomainMask", self.library)
-        self.assertIn('.appendingPathComponent("Seedbed/Library"', self.library)
+        self.assertIn('.appendingPathComponent("Seedbed/LibraryData"', self.library)
         resolver = self.library.split("static func resolveDefaultRoot", 1)[1]
         self.assertIn("if isLibrary(commonRoot) { return commonRoot }", resolver)
-        self.assertTrue(resolver.rstrip().endswith("}"))
         self.assertIn("return commonRoot", resolver)
 
-    def test_valid_legacy_checkout_remains_the_second_choice(self) -> None:
+    def test_older_checkouts_are_migration_sources(self) -> None:
         resolver = self.library.split("static func resolveDefaultRoot", 1)[1]
-        common = resolver.index("if isLibrary(commonRoot)")
-        legacy = resolver.index("if isLibrary(legacyDefaultRoot)")
-        fallback = resolver.index("return commonRoot", resolver.index("return legacyDefaultRoot"))
-        self.assertLess(common, legacy)
-        self.assertLess(legacy, fallback)
+        self.assertNotIn("if isLibrary(legacyDefaultRoot)", resolver)
         self.assertIn('.appendingPathComponent("Projects/seedbed"', self.library)
+        bootstrap = (ROOT / "macos" / "Sources" / "Seedbed" /
+                     "LibraryBootstrap.swift").read_text()
+        self.assertIn("[previousRoot, legacyRoot].first(where: LibraryClient.isLibrary)", bootstrap)
+        self.assertIn("copyDataLibrary(from: source, to: staging)", bootstrap)
 
     def test_an_explicit_saved_selection_is_validated_before_it_wins(self) -> None:
         saved = self.app.index("UserDefaults.standard.string(forKey: Self.rootKey)")
@@ -48,11 +47,10 @@ class LibraryDefaultTests(unittest.TestCase):
         self.assertIn("let usableRoot = self.usableRoot", run)
         self.assertIn("process.currentDirectoryURL = usableRoot", run)
 
-    def test_install_instructions_clone_to_the_first_run_location(self) -> None:
-        common = "$HOME/Library/Application Support/Seedbed/Library"
+    def test_install_instructions_name_the_data_location(self) -> None:
+        common = "~/Library/Application Support/Seedbed/LibraryData"
         self.assertIn(common, self.install_copy)
-        self.assertIn("git clone", self.install_copy)
-        self.assertIn("automatic fallback", self.install_copy)
+        self.assertIn("starter", self.install_copy.lower())
 
 
 if __name__ == "__main__":

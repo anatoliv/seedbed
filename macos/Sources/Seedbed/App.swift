@@ -67,6 +67,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var root: URL {
         if let saved = UserDefaults.standard.string(forKey: Self.rootKey), !saved.isEmpty {
+            if URL(fileURLWithPath: saved).standardizedFileURL
+                == LibraryClient.previousDefaultRoot.standardizedFileURL {
+                return LibraryClient.commonRoot
+            }
             return LibraryClient.resolveUsableRoot(
                 preferred: URL(fileURLWithPath: saved),
                 isLibrary: LibraryClient.isLibrary

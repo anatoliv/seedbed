@@ -253,18 +253,21 @@ enum LibraryError: LocalizedError {
     }
 }
 
-/// Runs `python3 -m promptlib …` inside the library checkout.
+/// Runs `python3 -m promptlib …` inside the selected library folder.
 struct LibraryClient {
     var root: URL
 
-    /// The shared per-user location a fresh install points at. Keeping the
-    /// checkout under Application Support gives the app, CLI, web UI, and MCP
-    /// one conventional library location without assuming a developer keeps a
-    /// `~/Projects` directory.
+    /// The writable library is local app data. The repository still carries a
+    /// starter snapshot, but edits made by the app do not change that checkout.
     static let commonRoot = FileManager.default.urls(
         for: .applicationSupportDirectory, in: .userDomainMask
     )[0]
-        .appendingPathComponent("Seedbed/Library", isDirectory: true)
+        .appendingPathComponent("Seedbed/LibraryData", isDirectory: true)
+
+    /// Earlier releases cloned the starter repository here. Keep it intact and
+    /// copy its current contents on first launch of the data-library release.
+    static let previousDefaultRoot = commonRoot.deletingLastPathComponent()
+        .appendingPathComponent("Library", isDirectory: true)
 
     /// Releases through 0.1.7 silently defaulted here. It remains a fallback
     /// when it is already a valid library so an upgrade never strands an
@@ -295,6 +298,7 @@ struct LibraryClient {
         if isLibrary(preferred) { return preferred }
         let path = preferred.standardizedFileURL.path
         let isConventionalDefault = path == commonRoot.standardizedFileURL.path
+            || path == previousDefaultRoot.standardizedFileURL.path
             || path == legacyDefaultRoot.standardizedFileURL.path
         guard isConventionalDefault else { return preferred }
         let fallback = resolveDefaultRoot(isLibrary: isLibrary)
@@ -305,16 +309,14 @@ struct LibraryClient {
         Self.resolveUsableRoot(preferred: root, isLibrary: Self.isLibrary)
     }
 
-    /// Resolution is separate from the filesystem predicate so the migration
-    /// order can be tested: common first, valid legacy second, common as the
-    /// first-run destination when neither checkout exists.
+    /// Always prefer the data location. Bootstrap copies an older checkout
+    /// there without changing its files or Git history.
     static func resolveDefaultRoot(isLibrary: (URL) -> Bool) -> URL {
         if isLibrary(commonRoot) { return commonRoot }
-        if isLibrary(legacyDefaultRoot) { return legacyDefaultRoot }
         return commonRoot
     }
 
-    /// Why a library folder is a whole checkout rather than a folder of prompts.
+    /// Why a library folder needs the Python package, not only prompts.
     ///
     /// `promptlib/cli.py` sets its root from its OWN location
     /// (`Path(__file__).resolve().parent.parent`), and this app never passes
@@ -351,18 +353,18 @@ struct LibraryClient {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: package.path,
                                              isDirectory: &isDirectory) else {
-            return "it has no promptlib/ folder. A Seedbed library is a clone of "
-                 + "the seedbed repository, not a folder of prompt files."
+            return "it has no promptlib/ folder. A Seedbed library needs "
+                 + "the promptlib package and model registry, not only prompt files."
         }
         let values = try? package.resourceValues(forKeys: [.isSymbolicLinkKey])
         if values?.isSymbolicLink == true {
             return "its promptlib/ is a symlink, so Seedbed would read and write "
                  + "the folder it points at rather than this one. Use a real "
-                 + "clone."
+                 + "folder."
         }
         guard isDirectory.boolValue else {
             return "its promptlib is a file, not a folder. A Seedbed library is "
-                 + "a clone of the seedbed repository."
+                 + "a folder containing promptlib and models.toml."
         }
         guard FileManager.default
             .fileExists(atPath: root.appendingPathComponent("models.toml").path)

@@ -238,10 +238,10 @@ Two consequences worth knowing:
   Xcode's 3.9 and every call fails. It probes known locations and picks the
   first interpreter that can actually `import tomllib`. Override with:
   `defaults write net.amnesia.seedbed PythonPath /path/to/python3`
-- **It needs the library checkout.** If there is no valid checkout, first launch
-  clones one into `~/Library/Application Support/Seedbed/Library`. This needs
-  internet access and Git. Change the library from the menu-bar menu. A valid
-  legacy `~/Projects/seedbed` checkout remains an automatic fallback.
+- **It needs a library.** First launch copies an older checkout or downloads
+  the starter snapshot into `~/Library/Application Support/Seedbed/LibraryData`.
+  This writable copy has no Git metadata. A fresh download needs internet
+  access and Git. Change the library from the menu-bar menu.
 
 ## Check for Updates…
 
@@ -253,7 +253,7 @@ shipped app would overwrite the build under development.
 A copy installed from a release DMG uses the signed Sparkle feed and offers to
 install a newer app. `Updates.wasBuiltFrom` distinguishes the checkout build;
 `Updater` owns Sparkle for an installed copy. Neither mechanism updates the
-library checkout itself, so prompts and renders still move with `git pull`.
+local data library, so app edits remain on this Mac.
 
 ## Signing
 
@@ -283,11 +283,12 @@ leaves the copy dragged into `/Applications` needing to reach Apple to be
 verified, which fails on a Mac that is offline or behind a filter.
 
 **The DMG is not the whole install.** This app is a front end; the prompts and
-the code that renders them are the checkout. On the other Mac, first launch
-clones the library to `~/Library/Application Support/Seedbed/Library` if none
-exists. It needs internet access, Git, and Python 3.11+. Settings → General →
-Choose can select another checkout, and a valid legacy `~/Projects/seedbed`
-checkout is still recognized. `Packaging/dmg-readme.txt` rides along inside
+the code that renders them are seeded from the repository. On the other Mac,
+first launch downloads the starter library into
+`~/Library/Application Support/Seedbed/LibraryData` if no older library is
+available. It needs internet access, Git, and Python 3.11+. Settings → General →
+Choose can select another library. An older `~/Projects/seedbed` checkout is
+copied into the writable data location without changing the checkout. `Packaging/dmg-readme.txt` rides along inside
 the image as *Before you start*.
 
 Guards worth knowing about before the first run, all of them ported from

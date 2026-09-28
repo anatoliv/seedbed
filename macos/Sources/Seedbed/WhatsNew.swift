@@ -48,6 +48,23 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.19",
+            date: "28 September 2026",
+            highlight: "Your prompts now live in Seedbed's own data folder, apart from any Git checkout.",
+            changes: [
+                WhatsNewChange(kind: .improved, text:
+                    "Seedbed keeps the library it edits in ~/Library/Application Support/"
+                    + "Seedbed/LibraryData. The first launch after this update copies your "
+                    + "current library there, with your build settings and any edits you never "
+                    + "committed, and leaves the original folder as it was."),
+                WhatsNewChange(kind: .improved, text:
+                    "A new install downloads the starter library without its Git history, so "
+                    + "the prompts you change stay on this Mac."),
+                WhatsNewChange(kind: .improved, text:
+                    "In the starter library, the Loop prompt now targets Claude Opus 5.5 and "
+                    + "GPT-6 Sol and comes with a render for each."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.18",
             date: "25 September 2026",
             highlight: "The MCP server answers only requests addressed to this Mac.",

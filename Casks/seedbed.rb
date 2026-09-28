@@ -3,8 +3,8 @@ cask "seedbed" do
   # sparkle:version, and Homebrew's Sparkle livecheck strategy reports them as one
   # comma value. Pinning only the short version fails `brew audit --online` with
   # "differs from ... retrieved by livecheck" and breaks autobumping.
-  version "0.1.18,19"
-  sha256 "3583c7516df5c06ec2458228f7542889a7cba187722fa22e5cad7e5b0f3d4070"
+  version "0.1.19,20"
+  sha256 "b5cef628fa7920e89bdd14684888beb6858600c458d071f9572ed8f5aff439ad"
 
   # No `verified:` parameter: Homebrew 6 deprecated it and `brew audit --online`
   # fails on one. It is unnecessary here anyway — the download host and the
@@ -34,10 +34,8 @@ cask "seedbed" do
   # "net.amnesia.seedbed.mcp") and are intentionally NOT removed by `zap` — a
   # reinstall should not silently invalidate the configuration you pasted into
   # Claude Code or Cursor. Remove them by hand from Keychain Access if you want
-  # them gone. The prompt library itself is a git checkout, created at the
-  # default location or chosen by the user, and is never touched: `zap` removing
-  # someone's repository would be a
-  # data-loss bug wearing an uninstall's clothes.
+  # them gone. The writable library is local app data and is never touched by
+  # `zap`. Deleting someone's prompts on uninstall would be data loss.
   zap trash: [
     "~/Library/Caches/net.amnesia.seedbed",
     "~/Library/HTTPStorages/net.amnesia.seedbed",
@@ -59,18 +57,18 @@ cask "seedbed" do
     The app is a front end; it does not carry the prompts. Two things it needs on
     this Mac:
 
-    1. The library. Seedbed reads and writes a git checkout of the seedbed
-       repository, and it runs the Python package inside that checkout to do the
-       work. On first launch, Seedbed clones the public repository into
-       ~/Library/Application Support/Seedbed/Library automatically. This needs an
-       internet connection and Git. If automatic setup fails, you can clone it:
+    1. The library. Seedbed keeps your writable prompts in
+       ~/Library/Application Support/Seedbed/LibraryData, separate from Git. On
+       first launch it copies an existing library or downloads the public starter
+       snapshot. A fresh download needs an internet connection and Git. If that
+       fails, clone the starter repository and relaunch:
 
            mkdir -p "$HOME/Library/Application Support/Seedbed"
            git clone https://github.com/anatoliv/seedbed "$HOME/Library/Application Support/Seedbed/Library"
 
-       An existing valid ~/Projects/seedbed checkout remains an automatic fallback
-       for upgrades. Anywhere else is fine: menu bar icon, Settings, General,
-       Choose. A folder without a promptlib directory in it is refused, and says why.
+       Seedbed copies that clone into LibraryData without changing it. An existing
+       ~/Projects/seedbed checkout is copied the same way, including local edits.
+       To use another library directly, choose it in Settings, General, Choose.
 
     2. Python 3.11 or newer, for tomllib:
 
