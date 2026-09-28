@@ -8,6 +8,7 @@ matches its master, a claim the measurements contradict, and a hostname buried
 in a raw model output.
 """
 
+import hashlib
 import re
 import struct
 import unittest
@@ -51,20 +52,22 @@ class SiteAssets(unittest.TestCase):
                     f"site/{name} drifted from assets/brand/{name}; copy it, do not edit it",
                 )
 
-    def test_every_icon_url_is_versioned(self) -> None:
-        # The host serves svg and png as `immutable` for 7 days and a CDN sits in
-        # front, so an icon replaced at a stable path keeps being served from the
-        # edge. On 2026-09-07 the site showed the pre-refresh mark for two days
-        # after the new one was deployed, and the origin was correct the whole
-        # time. Versioned URLs are a different cache key, so the swap is visible
-        # at once; bump the version whenever an icon changes.
+    def test_asset_stamps_match_the_bytes_shipped(self) -> None:
+        # A dated query can be forgotten. The content stamp changes with the
+        # asset, and a page with a stale reference fails before publication.
         for page in PAGES:
             html = text_of(page)
-            for ref in re.findall(r'(?:href|src|content)="((?:https://seedbed\.dev)?/[^"]+\.(?:svg|png))"', html):
-                if ref.endswith(".dmg"):
-                    continue
+            refs = re.findall(
+                r'(?:href|src|content)="((?:https://seedbed\.dev)?/[^"]+\.(?:svg|png|css)(?:\?[^"]*)?)"',
+                html,
+            )
+            self.assertTrue(refs, page)
+            for ref in refs:
                 with self.subTest(page=page.name, ref=ref):
-                    self.assertRegex(ref, r"\?v=\d{8}$", f"{ref} carries no version query")
+                    path, sep, query = ref.removeprefix("https://seedbed.dev").partition("?v=")
+                    self.assertEqual(sep, "?v=", f"{ref} has no content stamp")
+                    expected = hashlib.sha256((SITE / path.lstrip("/")).read_bytes()).hexdigest()[:12]
+                    self.assertEqual(query, expected)
 
     def test_og_image_is_the_social_card_size(self) -> None:
         head = (SITE / "og.png").read_bytes()[:24]

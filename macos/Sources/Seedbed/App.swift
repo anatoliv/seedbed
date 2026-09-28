@@ -15,6 +15,26 @@ final class HUDPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+/// AppKit keeps the active secure field's newest text in the field editor until
+/// editing ends. An NSAlert can close before that value reaches stringValue.
+@MainActor
+final class BackupPasswordEdits: NSObject, NSTextFieldDelegate {
+    private var latest: [ObjectIdentifier: String] = [:]
+
+    func controlTextDidChange(_ notification: Notification) {
+        guard let field = notification.object as? NSSecureTextField else { return }
+        let editor = notification.userInfo?["NSFieldEditor"] as? NSText
+        latest[ObjectIdentifier(field)] = editor?.string
+            ?? field.currentEditor()?.string ?? field.stringValue
+    }
+
+    func value(in field: NSSecureTextField) -> String {
+        let active = field.currentEditor()?.string
+        field.validateEditing()
+        return active ?? latest[ObjectIdentifier(field)] ?? field.stringValue
+    }
+}
+
 @MainActor
 final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
@@ -955,35 +975,45 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func backupPassword(confirm: Bool) -> String? {
-        let alert = NSAlert()
-        alert.messageText = confirm ? "Protect this backup" : "Unlock this backup"
-        alert.informativeText = confirm
-            ? "Enter a password of at least 12 characters. The backup includes your Keychain secrets."
-            : "Enter the password used when this backup was exported."
-        alert.addButton(withTitle: confirm ? "Export" : "Continue")
-        alert.addButton(withTitle: "Cancel")
-        let password = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
-        password.placeholderString = "Password"
-        let fields = NSStackView()
-        fields.orientation = .vertical
-        fields.spacing = 8
-        fields.addArrangedSubview(password)
-        var repeated: NSSecureTextField?
-        if confirm {
-            let second = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
-            second.placeholderString = "Repeat password"
-            fields.addArrangedSubview(second)
-            repeated = second
+        while true {
+            let alert = NSAlert()
+            alert.messageText = confirm ? "Protect this backup" : "Unlock this backup"
+            alert.informativeText = confirm
+                ? "Enter a password of at least 12 characters. The backup includes your Keychain secrets."
+                : "Enter the password used when this backup was exported."
+            alert.addButton(withTitle: confirm ? "Export" : "Continue")
+            alert.addButton(withTitle: "Cancel")
+            let edits = BackupPasswordEdits()
+            let password = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+            password.placeholderString = "Password"
+            password.delegate = edits
+            let fields = NSStackView()
+            fields.orientation = .vertical
+            fields.spacing = 8
+            fields.addArrangedSubview(password)
+            var repeated: NSSecureTextField?
+            if confirm {
+                let second = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+                second.placeholderString = "Repeat password"
+                second.delegate = edits
+                fields.addArrangedSubview(second)
+                repeated = second
+            }
+            fields.frame = NSRect(x: 0, y: 0, width: 320, height: confirm ? 58 : 26)
+            alert.accessoryView = fields
+            NSApp.activate(ignoringOtherApps: true)
+            guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+            let entered = edits.value(in: password)
+            if confirm, let repeated, entered != edits.value(in: repeated) {
+                backupAlert("Passwords did not match", detail: "Enter them again to export the backup.")
+                continue
+            }
+            if confirm && entered.count < 12 {
+                backupAlert("Password is too short", detail: "Use at least 12 characters.")
+                continue
+            }
+            return entered
         }
-        fields.frame = NSRect(x: 0, y: 0, width: 320, height: confirm ? 58 : 26)
-        alert.accessoryView = fields
-        NSApp.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
-        guard !confirm || password.stringValue == repeated?.stringValue else {
-            backupAlert("Passwords did not match")
-            return nil
-        }
-        return password.stringValue
     }
 
     private func backupAlert(_ message: String, detail: String = "") {

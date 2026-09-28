@@ -78,12 +78,12 @@ favicon-32.png,apple-touch-icon.png} site/
 Scripts/make-og-image.sh          # the social card, from the app-icon master
 ```
 
-and **bump the `?v=` query on every icon URL in `site/index.html` and
-`site/evidence/index.html`**. The site is served with a week-long `immutable`
-cache and a CDN in front of it, so an icon replaced at a stable path keeps being
-served from the edge: on 2026-09-07 visitors saw the previous mark for two days
-while the origin was correct. A versioned URL is a different cache key, and
-`tests/test_site.py` fails any icon reference that has none.
+and run `python3 Scripts/stamp-site-assets.py --write`. The origin now gives
+mutable assets a five-minute lifetime, and the content-derived query changes
+the cache key when bytes change. On 2026-09-07 the old week-long immutable
+rule let visitors see the previous mark for two days while the origin was
+correct. `tests/test_site.py` fails any reference whose stamp does not match
+the file's bytes.
 
 ## Color
 

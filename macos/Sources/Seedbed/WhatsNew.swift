@@ -48,6 +48,18 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.21",
+            date: "28 September 2026",
+            highlight: "Encrypted backup export reads the password you just entered.",
+            changes: [
+                WhatsNewChange(kind: .fixed, text:
+                    "Export now reads the latest text in the password confirmation field, "
+                    + "including when you press Export while that field is active."),
+                WhatsNewChange(kind: .improved, text:
+                    "If the passwords differ or are too short, you can try again without "
+                    + "choosing the backup destination a second time."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.20",
             date: "28 September 2026",
             highlight: "Back up your library and settings in one encrypted file.",

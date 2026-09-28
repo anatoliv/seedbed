@@ -39,6 +39,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PUBLISH_REPO = ROOT / "Scripts" / "publish-repo.sh"
 PUBLISH_SITE = ROOT / "Scripts" / "publish-site.sh"
+STAMP_SITE_ASSETS = ROOT / "Scripts" / "stamp-site-assets.py"
 PURGE_HISTORY = ROOT / "Scripts" / "purge-public-history.sh"
 
 GUARDS_START = 'bold "==> Secrets guard"'
@@ -236,6 +237,7 @@ class PublishSiteGuardRedacts(Redaction, unittest.TestCase):
         self.root = Path(tmp.name)
         (self.root / "Scripts").mkdir()
         shutil.copy2(PUBLISH_SITE, self.root / "Scripts" / "publish-site.sh")
+        shutil.copy2(STAMP_SITE_ASSETS, self.root / "Scripts" / "stamp-site-assets.py")
         self.site = self.root / "site"
         (self.site / "evidence").mkdir(parents=True)
         for name in self.FILES:
