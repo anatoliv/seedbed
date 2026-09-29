@@ -98,8 +98,8 @@ synced file by default.
 
 ## The MCP server
 
-Menu bar icon, then **Settings**, then **MCP**. Switch it on and press *Copy
-configuration*;
+Menu bar icon, then **Settings**, then **MCP**. Switch it on in **Connection**, then open **Client setup** and press
+*Copy configuration*;
 paste the result into Claude Code, Cursor or Claude Desktop. The snippet is a
 standard `mcpServers` entry carrying the root URL and bearer token. Clients that
 require the conventional `/mcp` path may use it; other paths are rejected.

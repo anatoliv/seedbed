@@ -48,6 +48,26 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.29",
+            date: "29 September 2026",
+            highlight: "Clearer settings and model setup, with steadier library rows.",
+            changes: [
+                WhatsNewChange(kind: .fixed, text:
+                    "Library rows keep the same height when their actions appear on hover."),
+                WhatsNewChange(kind: .added, text:
+                    "Model setup offers recent model suggestions and can find official "
+                    + "documentation to add to a model's guidance."),
+                WhatsNewChange(kind: .improved, text:
+                    "Models has a searchable browser with visibility controls beside each model "
+                    + "and a Save button that stays within reach."),
+                WhatsNewChange(kind: .improved, text:
+                    "General settings groups library, backup, clipboard, and diagnostics controls. "
+                    + "Building puts providers beside their connection settings and keeps Save and Test visible."),
+                WhatsNewChange(kind: .improved, text:
+                    "MCP separates Connection, Client setup, and Access tokens. "
+                    + "The Library editor, comparison headers, quick panel, and fill dialog have clearer action layouts."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.28",
             date: "28 September 2026",
             highlight: "Model rebuilds use the provider you selected after an app update.",

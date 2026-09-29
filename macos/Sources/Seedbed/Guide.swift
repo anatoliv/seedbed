@@ -424,7 +424,7 @@ extension Guide {
         """),
         GuidePage(id: "mcp-on", category: "For agents", title: "Turning it on",
                   body: """
-        Menu bar icon, then **Settings**, then **MCP**. Switch it on, press **Copy configuration**, and paste that into your client.
+        Menu bar icon, then **Settings**, then **MCP**. Switch it on in **Connection**. Open **Client setup**, press **Copy configuration**, and paste that into your client.
 
         The menu bar menu shows whether the server is actually listening, not merely whether the switch is on. A failed bind is otherwise silent, and a switch that says on over a server that never started is the worst of both.
 

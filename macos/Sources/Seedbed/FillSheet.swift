@@ -121,15 +121,16 @@ struct FillSheet: View {
     }
 
     private var footer: some View {
-        HStack(spacing: Tokens.Space.tight) {
-            Text("Blank values stay as {{NAME}} in the copied prompt")
-                .font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
-            Spacer()
-            Button("Cancel", action: onCancel)
-                .keyboardShortcut(.cancelAction)
-            Button(Paster.isEnabled ? "Copy & Paste" : "Copy") { onCopy() }
-                .keyboardShortcut(.defaultAction)
-                .seedbedProminent()
+        VStack(alignment: .leading, spacing: Tokens.Space.tight) {
+            Caption("Blank values stay as {{NAME}} in the copied prompt.")
+            HStack(spacing: Tokens.Space.tight) {
+                Text("\(model.filledCount) of \(model.names.count) filled")
+                    .font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
+                Spacer()
+                Button("Cancel", action: onCancel).keyboardShortcut(.cancelAction)
+                Button(Paster.isEnabled ? "Copy & Paste" : "Copy") { onCopy() }
+                    .keyboardShortcut(.defaultAction).seedbedProminent()
+            }
         }
         .chromeBar()
     }

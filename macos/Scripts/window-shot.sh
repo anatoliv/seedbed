@@ -4,6 +4,7 @@
 #
 #   Scripts/window-shot.sh                  every Seedbed window -> /tmp
 #   Scripts/window-shot.sh ~/Desktop        somewhere else
+#   SEEDBED_SHOT_PID=123 Scripts/window-shot.sh   only the isolated QA app
 #
 # WHY THIS EXISTS, AND WHY IT IS NOT `screencapture` ON ITS OWN.
 #
@@ -38,7 +39,7 @@ swiftc -O Scripts/support/window-id.swift -o "$HELPER" 2>/dev/null \
 # `mapfile` is bash 4; macOS ships bash 3.2 as /bin/bash, and this script has to
 # run on a stock Mac rather than only where Homebrew's bash is first on PATH.
 WINDOWS=()
-while IFS= read -r line; do [[ -n "$line" ]] && WINDOWS+=("$line"); done < <("$HELPER" "$APP" || true)
+while IFS= read -r line; do [[ -n "$line" ]] && WINDOWS+=("$line"); done < <("$HELPER" "$APP" "${SEEDBED_SHOT_PID:-}" || true)
 if [[ ${#WINDOWS[@]} -eq 0 ]]; then
     echo "No on-screen $APP window. Open one first:" >&2
     echo "  SEEDBED_OPEN_LIBRARY=help build/Seedbed.app/Contents/MacOS/Seedbed &" >&2

@@ -391,7 +391,6 @@ struct AboutPage: View {
             row("Signature", BuildProvenance.summary)
         }
         SeedbedDivider()
-        SeedbedDivider()
         support
         // Every network call this app can make, named. The previous wording said
         // there was none beyond the enhancer and the guidance fetch, which

@@ -374,10 +374,10 @@ class CrashReportingTests(unittest.TestCase):
                       "turning the toggle off no longer stops the SDK")
 
         settings = SETTINGS.read_text()
-        self.assertIn(
-            'Toggle("Send crash reports", isOn: $crashReporting)\n'
-            "                        .disabled(!CrashReporting.isConfigured)",
+        self.assertRegex(
             settings,
+            r'Toggle\("Send crash reports", isOn: \$crashReporting\)\s*'
+            r'\.disabled\(!CrashReporting\.isConfigured\)',
             "the toggle is offered on a build that cannot report, so it "
             "promises something it cannot do")
 
@@ -403,8 +403,8 @@ class CrashReportingTests(unittest.TestCase):
         artefact.
         """
         promises = [
-            (SETTINGS, ["a prompt, a render, a value you typed into a placeholder",
-                        "rewritten to a tilde"]),
+            (SETTINGS, ["Prompts, renders, placeholder values, and tokens are never sent.",
+                        "Home folder paths are shortened to a tilde."]),
             (GUIDE, ["none of it is captured", "replaced with a tilde"]),
             (DMG_README, ["never a prompt, a render, a value you filled in, "
                           "or an access token"]),

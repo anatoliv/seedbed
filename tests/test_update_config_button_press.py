@@ -155,6 +155,7 @@ class PressingTheButton(unittest.TestCase):
     def press(self, expect: str) -> subprocess.CompletedProcess:
         environment = dict(os.environ)
         environment["SEEDBED_OPEN_LIBRARY"] = "mcp"
+        environment["SEEDBED_MCP_PAGE"] = "clients"
         environment[VARIABLE] = str(self.target)
         app = subprocess.Popen([str(BINARY)], env=environment,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

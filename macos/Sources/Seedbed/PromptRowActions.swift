@@ -4,21 +4,11 @@ import SwiftUI
 /// hover. Two numbers, and they are here rather than inline so the icons stay
 /// square and evenly spaced wherever the strip is used.
 ///
-/// **There is deliberately no `gutter`, and that is the interesting part.**
-/// An overlaid picker would need one, because it would cover the
-/// row and whatever sits underneath has to be inset far enough to clear the
-/// icons. Seedbed's strip **replaces** the trailing slot instead: the HUD row
-/// shows the usage badge or the strip, never both (`HUDView.PromptRow`), and
-/// the library sidebar shows the staleness dot or the strip (`SidebarRow`).
-/// Nothing is underneath, so nothing has to move out of the way.
-///
-/// A `gutter` and a `maxCount` were ported across with the numbers and read by
-/// nothing for the life of the file, while the doc comment promised a coupling
-/// that did not exist — inherited along with the values, like the terracotta
-/// pair, without the layout that made it true. Removed rather than wired up: if
-/// this strip ever does start overlaying something, derive the inset then, from
-/// the layout that needs it.
+/// The library row reserves its metadata slot for this strip, keeping the same
+/// height and title width during hover. The HUD similarly reserves its trailing
+/// slot, so revealing actions changes opacity without changing row geometry.
 enum RowActions {
+    static let sidebarHeight: CGFloat = 42
     static let button: CGFloat = 17          // equal frames put the icons on one line
     static let spacing = Tokens.Space.tight  // product-specific density: up to six icons
 }

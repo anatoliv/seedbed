@@ -466,6 +466,14 @@ def _codex_action(args) -> int:
 
 def cmd_model(args, lib: Library, models: dict, cache: GuideCache) -> int:
     """Add, change or remove a target model in models.toml."""
+    if args.action in {"suggest", "discover"}:
+        from .model_discovery import suggestions, documentation
+        result = (suggestions(args.root, refresh=args.refresh) if args.action == "suggest"
+                  else documentation(args.id, args.name or "", args.family or ""))
+        print(json.dumps(result))
+        return 0
+    if not args.id:
+        return _fail("a model id is required")
     path = args.root / "models.toml"
 
     if args.action == "remove":
@@ -488,7 +496,7 @@ def cmd_model(args, lib: Library, models: dict, cache: GuideCache) -> int:
         id=args.id,
         name=args.name or (existing.name if existing else args.id),
         family=args.family if args.family is not None else (existing.family if existing else ""),
-        guides=args.guide if args.guide is not None else (existing.guides if existing else []),
+        guides=[] if args.clear_guides else (args.guide if args.guide is not None else (existing.guides if existing else [])),
         notes=args.notes if args.notes is not None else (existing.notes if existing else ""),
     )
     save_registry(path, models)
@@ -743,8 +751,10 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(func=cmd_enhancer)
 
     p = sub.add_parser("model", help="add, change or remove a target model")
-    p.add_argument("action", choices=["add", "set", "remove"])
-    p.add_argument("id")
+    p.add_argument("action", choices=["add", "set", "remove", "suggest", "discover"])
+    p.add_argument("id", nargs="?", default="")
+    p.add_argument("--refresh", action="store_true", help="refresh the public model catalog")
+    p.add_argument("--clear-guides", action="store_true", help="remove all guidance sources")
     p.add_argument("--name")
     p.add_argument("--family")
     p.add_argument("--guide", action="append", help="repeatable; URL or local path")

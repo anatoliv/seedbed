@@ -325,6 +325,7 @@ extension Tokens {
         static let sheet: CGFloat = 460
         /// A list column beside an editor.
         static let list: CGFloat = 200
+        static let settingsSidebar: CGFloat = 200
         /// The library window's own sidebar, and a deliberate exemption from
         /// `sidebar` above.
         ///
@@ -363,11 +364,11 @@ extension Tokens {
         /// lets it go to 760x420, so a reader on a small screen can put it
         /// beside the thing they are reading about.
         static let infoMin = CGSize(width: 760, height: 420)
-        static let settingsMin = CGSize(width: 620, height: 460)
+        static let settingsMin = CGSize(width: 820, height: 460)
         /// Wider than `info` because the Models pane is a two-column editor
         /// rather than prose. It was the one window size still written as a raw
         /// literal, in two files that had to agree and nothing making them.
-        static let settings = CGSize(width: 820, height: 620)
+        static let settings = CGSize(width: 1040, height: 680)
     }
 }
 
@@ -511,12 +512,25 @@ struct SettingsGroup<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.medium) {
-            Text(title.uppercased())
-                .font(scale.label.weight(.semibold))
-                .foregroundStyle(.secondary)
+            Text(title)
+                .font(scale.term.weight(.semibold))
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// A fixed title above a working pane, with task-specific controls in its footer.
+struct WorkingHeader: View {
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.row) {
+            Text(title).font(Tokens.FontScale.sectionHeader)
+            Text(subtitle).font(Tokens.FontScale.small).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }.chromeBar()
     }
 }
 

@@ -63,7 +63,7 @@ struct SettingsWindowView: View {
             }
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
-            .frame(width: Tokens.Width.sidebar)
+            .frame(width: Tokens.Width.settingsSidebar)
             SeedbedDivider()
             detail.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -121,163 +121,97 @@ struct GeneralSettings: View {
     @State private var automaticUpdates = Updater.shared?.automaticallyChecks ?? false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Tokens.Space.regular) {
-                SettingsGroup("Pasting") {
-                    Toggle("Paste into the app you came from", isOn: $pasteEnabled)
-                        .onChange(of: pasteEnabled) { _, new in
-                            Paster.isEnabled = new
-                            if new && !Paster.hasPermission { Paster.requestPermission() }
-                            hasAccessibility = Paster.hasPermission
-                        }
-                    SettingsBullets([
-                        ("Paste into the app you came from",
-                         "⏎ puts the prompt straight into whatever was frontmost when you "
-                         + "summoned the panel. Turn it off and ⏎ only copies, leaving you to "
-                         + "paste. Either way, holding ⇧ copies without pasting."),
-                        ("Accessibility permission",
-                         "sending ⌘V to another app is what macOS gates behind it, so this "
-                         + "setting cannot work without it. Seedbed asks the first time you "
-                         + "switch it on, and you grant it in System Settings."),
-                    ])
-                    if pasteEnabled && !hasAccessibility {
-                        HStack(alignment: .top, spacing: Tokens.Space.tight) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(Tokens.warning)
-                            VStack(alignment: .leading, spacing: Tokens.Space.row) {
-                                Text("Accessibility permission is not granted")
-                                    .font(Tokens.FontScale.small)
-                                Caption("Sending ⌘V to another app is exactly what that "
-                                        + "permission governs. Until it is granted, Seedbed "
-                                        + "copies and tells you why it did not paste.")
-                                Button("Open Privacy & Security…") {
-                                    Paster.openAccessibilitySettings()
-                                }
-                            }
-                        }
-                    }
-                }
-
-                SettingsGroup("Starting up") {
-                    Toggle("Open Seedbed at login", isOn: $launchAtLogin)
-                        .onChange(of: launchAtLogin) { _, new in
-                            if let problem = LaunchAtLogin.set(new) {
-                                launchProblem = problem
-                                launchAtLogin = LaunchAtLogin.isEnabled
-                            } else {
-                                launchProblem = ""
-                            }
-                        }
-                    if !launchProblem.isEmpty {
-                        Text(launchProblem)
-                            .font(Tokens.FontScale.small)
-                            .foregroundStyle(Tokens.danger)
+        VStack(spacing: 0) {
+            WorkingHeader(title: "General", subtitle: "Your library, clipboard, and app preferences.")
+            SeedbedDivider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: Tokens.Space.wide) {
+                    SettingsGroup("Library folder") {
+                        Caption("Your prompts, renders, model profiles, and building settings live here.")
+                        Text(libraryPath).font(Tokens.FontScale.monoSmall)
+                            .textSelection(.enabled).lineLimit(nil)
                             .fixedSize(horizontal: false, vertical: true)
-                    }
-                    SettingsBullets([
-                        ("Open Seedbed at login",
-                         "registers Seedbed as a macOS login item, so the menu bar icon is "
-                         + "there after a restart without you starting it. It opens to the "
-                         + "menu bar only: no window appears and nothing steals focus."),
-                    ])
-                }
-
-                SettingsGroup("Library folder") {
-                    Text(libraryPath)
-                        .font(Tokens.FontScale.monoSmall)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(Tokens.Space.row6)
-                        .background(RoundedRectangle(cornerRadius: Tokens.Radius.control)
-                            .fill(Tokens.Surface.sunken))
-                        .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.control)
-                            .stroke(Tokens.Surface.hairline, lineWidth: 0.5))
-                    HStack(spacing: Tokens.Space.tight) {
-                        Button("Reveal in Finder", action: onReveal)
-                        Button("Choose…", action: onChoose)
-                        Spacer()
-                    }
-                    SettingsBullets([
-                        ("The folder shown above",
-                         "holds your prompts, renders, model registry and enhancer settings. "
-                         + "An installed app uses a writable copy under Application Support; "
-                         + "you can choose a different library here."),
-                        ("Reveal in Finder", "opens that folder so you can inspect its files."),
-                        ("Choose…", "points Seedbed at a different library. Everything reloads "
-                         + "from the new folder, and settings you save afterwards, including "
-                         + "the model registry and the enhancer, are written into it rather "
-                         + "than the old one."),
-                    ])
-                }
-
-                SettingsGroup("Backup and restore") {
-                    HStack(spacing: Tokens.Space.tight) {
-                        Button("Export encrypted backup…", action: onExportBackup)
-                        Button("Import encrypted backup…", action: onImportBackup)
-                        Spacer()
-                    }
-                    SettingsBullets([
-                        ("Export encrypted backup…",
-                         "saves prompts, renders, model profiles, library settings, app settings, "
-                         + "and Seedbed's Keychain secrets in one password-protected file. Keep the "
-                         + "password separately; Seedbed cannot recover it."),
-                        ("Import encrypted backup…",
-                         "creates a new library folder and switches Seedbed to it. Your current "
-                         + "library stays untouched, and the backup's secrets and settings "
-                         + "become active on this Mac."),
-                    ])
-                }
-
-                if Updater.shared?.canCheck == true {
-                    SettingsGroup("Updates") {
-                        Toggle("Check for updates automatically", isOn: $automaticUpdates)
-                            .onChange(of: automaticUpdates) { _, new in
-                                Updater.shared?.automaticallyChecks = new
-                            }
-                        SettingsBullets([
-                            ("Check for updates automatically",
-                             "Seedbed asks seedbed.dev for the signed update feed on its own "
-                             + "schedule. The request says which version and which macOS you "
-                             + "are on, and nothing about you. Turn it off and nothing is "
-                             + "checked until you pick Check for Updates from the menu."),
-                            ("What an update has to prove",
-                             "every build is signed, and one that does not match the key this "
-                             + "copy was built with is refused rather than installed."),
-                        ])
-                    }
-                }
-
-                SettingsGroup("Diagnostics") {
-                    Toggle("Send crash reports", isOn: $crashReporting)
-                        .disabled(!CrashReporting.isConfigured)
-                        .onChange(of: crashReporting) { _, new in
-                            UserDefaults.standard.set(new, forKey: CrashReporting.enabledKey)
-                            CrashReporting.apply(enabled: new)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(Tokens.Space.tight).background(Tokens.Surface.sunken)
+                            .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.control))
+                        HStack(spacing: Tokens.Space.tight) {
+                            Button("Reveal in Finder", action: onReveal)
+                            Button("Choose library…", action: onChoose)
                         }
-                    if CrashReporting.isConfigured {
-                        SettingsBullets([
-                            ("Send crash reports",
-                             "off unless you turn it on. A crash then sends the stack trace, "
-                             + "the app version and the macOS version, so a fault that only "
-                             + "happens on your Mac can be found without you reporting it."),
-                            ("What is never sent",
-                             "a prompt, a render, a value you typed into a placeholder, or any "
-                             + "token. Your home folder path is rewritten to a tilde before "
-                             + "anything leaves this Mac, and there is no other telemetry and "
-                             + "no account."),
-                        ])
-                    } else {
-                        SettingsBullets([
-                            ("Send crash reports",
-                             "unavailable in this build, which was compiled without a reporting "
-                             + "address. Every locally built copy is one of these. Nothing is "
-                             + "sent whatever this is set to."),
-                        ])
+                        Caption("Choosing a folder switches libraries. Future edits and settings are saved there.")
+                    }
+                    SeedbedDivider()
+                    SettingsGroup("Backup and restore") {
+                        Caption("Export prompts, renders, models, settings, and Seedbed's Keychain secrets in one encrypted file.")
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: Tokens.Space.tight) { backupButtons }
+                            VStack(alignment: .leading, spacing: Tokens.Space.tight) { backupButtons }
+                        }
+                        DisclosureGroup("What to know before restoring") {
+                            SettingsBullets([
+                                ("Export encrypted backup…", "keep the password separately. Seedbed cannot recover it."),
+                                ("Import encrypted backup…", "creates a new library folder and activates the backup's settings and secrets on this Mac. Your current library stays on disk."),
+                            ]).padding(.top, Tokens.Space.tight)
+                        }.font(Tokens.FontScale.small)
+                    }
+                    SeedbedDivider()
+                    SettingsGroup("Clipboard and startup") {
+                        VStack(alignment: .leading, spacing: Tokens.Space.row) {
+                            Toggle("Paste into the app you came from", isOn: $pasteEnabled)
+                                .onChange(of: pasteEnabled) { _, new in
+                                    Paster.isEnabled = new
+                                    if new && !Paster.hasPermission { Paster.requestPermission() }
+                                    hasAccessibility = Paster.hasPermission
+                                }
+                            Caption("When enabled, Return copies and pastes. Hold Shift to copy only.")
+                        }
+                        if pasteEnabled && !hasAccessibility {
+                            Label("Accessibility permission is needed to paste. Copying still works.", systemImage: "exclamationmark.triangle")
+                                .font(Tokens.FontScale.small).foregroundStyle(Tokens.warning)
+                            Button("Open Privacy & Security…") { Paster.openAccessibilitySettings() }
+                        }
+                        VStack(alignment: .leading, spacing: Tokens.Space.row) {
+                            Toggle("Open Seedbed at login", isOn: $launchAtLogin)
+                                .onChange(of: launchAtLogin) { _, new in
+                                    if let problem = LaunchAtLogin.set(new) {
+                                        launchProblem = problem
+                                        launchAtLogin = LaunchAtLogin.isEnabled
+                                    } else { launchProblem = "" }
+                                }
+                            Caption("Starts in the menu bar after login, without opening a window.")
+                            if !launchProblem.isEmpty {
+                                Text(launchProblem).font(Tokens.FontScale.small).foregroundStyle(Tokens.danger)
+                            }
+                        }.padding(.top, Tokens.Space.tight)
+                    }
+                    SeedbedDivider()
+                    if Updater.shared?.canCheck == true {
+                        SettingsGroup("Updates") {
+                            Toggle("Check for updates automatically", isOn: $automaticUpdates)
+                                .onChange(of: automaticUpdates) { _, new in
+                                    Updater.shared?.automaticallyChecks = new
+                                }
+                            Caption("Checks seedbed.dev for a signed update. You can also check from the menu bar.")
+                        }
+                    }
+                    SettingsGroup("Diagnostics") {
+                        Toggle("Send crash reports", isOn: $crashReporting)
+                            .disabled(!CrashReporting.isConfigured)
+                            .onChange(of: crashReporting) { _, new in
+                                UserDefaults.standard.set(new, forKey: CrashReporting.enabledKey)
+                                CrashReporting.apply(enabled: new)
+                            }
+                        Caption(CrashReporting.isConfigured
+                            ? "Off by default. Reports include the stack trace, app version, and macOS version."
+                            : "Crash reporting is unavailable in this build.")
+                        Caption("Prompts, renders, placeholder values, and tokens are never sent. Home folder paths are shortened to a tilde.")
                     }
                 }
+                .font(Tokens.FontScale.body)
+                .frame(maxWidth: Tokens.Width.reading, alignment: .leading)
+                .padding(Tokens.Space.wide)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(Tokens.Space.pane)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onAppear {
             pasteEnabled = Paster.isEnabled
@@ -286,6 +220,11 @@ struct GeneralSettings: View {
             crashReporting = CrashReporting.isEnabled
             automaticUpdates = Updater.shared?.automaticallyChecks ?? false
         }
+    }
+
+    @ViewBuilder private var backupButtons: some View {
+        Button("Export encrypted backup…", action: onExportBackup)
+        Button("Import encrypted backup…", action: onImportBackup)
     }
 }
 
@@ -316,11 +255,7 @@ struct ModelsPane: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ModelVisibility(models: library.allModels, onChange: onReloadLibrary)
-            SeedbedDivider()
-            ModelsEditor(model: editor, onDone: nil)
-        }
+        ModelsEditor(model: editor, onDone: nil)
         .onChange(of: library.allModels) { _, fresh in editor.adopt(fresh) }
         // Saving a model writes models.toml. Which checkout it lands in has to
         // follow the library folder, not the moment this window first opened.
@@ -346,48 +281,5 @@ struct EnhancerPane: View {
     var body: some View {
         EnhancerEditor(model: editor, onDone: nil)
             .onChange(of: library.client.root) { _, _ in editor.retarget(to: library.client) }
-    }
-}
-
-struct ModelVisibility: View {
-    let models: [LibraryData.ModelRef]
-    var onChange: () -> Void
-    /// Bumped to redraw: `ModelFilter` lives in `UserDefaults`, not in state.
-    @State private var revision = 0
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Tokens.Space.medium) {
-            SettingsGroup("Shown in the picker") {
-                ForEach(models, id: \.id) { entry in
-                    Toggle(entry.name, isOn: Binding(
-                        get: { _ = revision; return ModelFilter.isVisible(entry.id) },
-                        set: { _ in
-                            ModelFilter.toggle(entry.id, allKnown: models.map(\.id))
-                            revision += 1
-                            onChange()
-                        }))
-                }
-                HStack(spacing: Tokens.Space.tight) {
-                    Button("Show all") {
-                        ModelFilter.showAll()
-                        revision += 1
-                        onChange()
-                    }
-                    Spacer()
-                }
-                SettingsBullets([
-                    ("The switches above",
-                     "which models the picker and the compare columns offer. Working with two "
-                     + "models today should not mean scrolling past seven."),
-                    ("Hiding is not deleting",
-                     "a hidden model keeps its entry in models.toml and keeps every render "
-                     + "already built for it, so changing your mind costs nothing and rebuilds "
-                     + "nothing. Remove one for good in the Models list below."),
-                    ("Show all", "brings every model in the registry back into the picker."),
-                ])
-            }
-        }
-        .padding(Tokens.Space.pane)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

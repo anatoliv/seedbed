@@ -82,6 +82,23 @@ from it by `Scripts/generate-help-docs.py` so the two cannot disagree, which is
 why they carry a banner asking you not to edit them directly. If you have the
 app, press `?` in the panel instead.
 
+## Manage models
+
+Settings → Models keeps the model list and editor together. Uncheck a model to
+hide it from the picker while keeping its renders. Search the list, select a
+model, and edit its prompting notes or guidance sources in the adjacent form.
+
+**Find documentation** matches the model against official vendor pages and
+suggests model documentation and prompting guides. Adding a new model starts
+that lookup automatically. Use a found source to append it to the draft, then
+save; existing notes and custom sources remain yours to edit.
+
+**Suggestions** shows recent text models from the public Models.dev catalog,
+with release dates and the last refresh date. Refresh fetches the current list;
+a saved copy remains available offline. Selecting a suggestion opens a draft
+for review before adding it to your library. These are target prompting
+profiles; they do not change the provider used to build prompts.
+
 ## Let an agent ask for a prompt
 
 The macOS app can run an **MCP server**, so Claude Code, Cursor or Claude Desktop

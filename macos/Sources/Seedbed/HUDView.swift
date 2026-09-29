@@ -626,8 +626,19 @@ struct HUDView: View {
     private var footer: some View {
         HStack(spacing: Tokens.Space.medium) {
             if model.status.isEmpty {
-                hint("↑↓", "move"); hint("⏎", "copy"); hint("⌘1–9", "model")
-                hint("⌘D", "pin"); hint("⌘L", "library"); hint("esc", "close")
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Tokens.Space.medium) {
+                        primaryHints
+                        hint("⌘D", "pin"); hint("⌘L", "library"); hint("esc", "close")
+                    }
+                    HStack(spacing: Tokens.Space.medium) {
+                        primaryHints
+                        Button { model.onOpenLibrary() } label: {
+                            Image(systemName: "books.vertical")
+                        }.buttonStyle(.plain).help("Open library (⌘L)")
+                            .accessibilityLabel("Open library")
+                    }
+                }
             } else {
                 Text(model.status)
                     .font(Tokens.FontScale.tiny.weight(model.statusIsGood ? .medium : .regular))
@@ -639,6 +650,10 @@ struct HUDView: View {
             if model.busy { ProgressView().controlSize(.small) }
         }
         .chromeBar()
+    }
+
+    @ViewBuilder private var primaryHints: some View {
+        hint("↑↓", "move"); hint("⏎", "copy"); hint("⌘1–9", "model")
     }
 
     private func hint(_ key: String, _ label: String) -> some View {
@@ -676,23 +691,24 @@ struct PromptRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.row) {
             HStack(spacing: Tokens.Space.row6) {
-                if prompt.pinned {
-                    Image(systemName: "pin.fill")
-                        .font(.system(size: Tokens.IconSize.tiny)).foregroundStyle(Tokens.accent)
-                }
+                Image(systemName: "pin.fill")
+                    .font(.system(size: Tokens.IconSize.tiny)).foregroundStyle(Tokens.accent)
+                    .frame(width: Tokens.IconSize.small).opacity(prompt.pinned ? 1 : 0)
+                    .accessibilityHidden(true)
                 Text(prompt.title).font(Tokens.FontScale.body.weight(.medium)).lineLimit(1)
                 Spacer(minLength: Tokens.Space.row)
-                ZStack(alignment: .trailing) {
-                    if prompt.uses > 0 {
-                        Text("\(prompt.uses)×").font(Tokens.FontScale.nano)
-                            .foregroundStyle(.tertiary)
-                            .opacity(hovering ? 0 : 1)
-                            .accessibilityHidden(true)
-                    }
-                    actions.opacity(hovering ? 1 : 0)
+                if prompt.uses > 0 {
+                    Text("\(prompt.uses)×").font(Tokens.FontScale.nano).foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                 }
             }
-            Text(prompt.body).font(Tokens.FontScale.tiny).foregroundStyle(.secondary).lineLimit(1)
+            ZStack(alignment: .trailing) {
+                Text(prompt.body).font(Tokens.FontScale.tiny).foregroundStyle(.secondary).lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading).opacity(hovering ? 0 : 1)
+                    .accessibilityHidden(hovering)
+                actions.opacity(hovering ? 1 : 0)
+                    .allowsHitTesting(hovering).accessibilityHidden(!hovering)
+            }.frame(height: RowActions.button)
             if selected { chips }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

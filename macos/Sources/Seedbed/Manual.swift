@@ -144,8 +144,8 @@ enum Manual {
             page: .help, section: "Letting an agent ask for a prompt",
             term: "Turning it on",
             detail: """
-                Settings, then MCP. Switch it on and press Copy configuration, then paste \
-                that into Claude Code, Cursor or Claude Desktop. The menu bar then carries \
+                Settings, then MCP. Switch it on in Connection. Open Client setup and press \
+                Copy configuration, then paste that into Claude Code, Cursor or Claude Desktop. The menu bar then carries \
                 a line saying the server is serving agents, or a warning if it is switched \
                 on and failed to start.
 
@@ -504,8 +504,8 @@ enum Manual {
                 If it is running, the client is nearly always holding a regenerated token, \
                 a port the server has since moved off, or a URL with an unsupported path. \
                 The root and `/mcp` both work. Copy the configuration again from Settings, \
-                then MCP, or press Update my client config. The server lives inside this \
-                app, so quitting Seedbed takes it down and the client sees a connection \
+                then MCP, then Client setup, or press Update my client config there. The server \
+                lives inside this app, so quitting Seedbed takes it down and the client sees a connection \
                 failure rather than a message.
                 """,
             example: """
@@ -550,8 +550,8 @@ enum Manual {
             page: .faq, section: "Letting an agent use the library",
             term: "How do I point a client at it?",
             detail: """
-                Settings, then MCP, then Copy configuration, then paste into the client's \
-                config file. That is the whole procedure.
+                Settings, then MCP, then Client setup. Press Copy configuration and paste into \
+                the client's config file. That is the whole procedure.
 
                 What you get is a standard mcpServers block with the URL and the bearer \
                 token already filled in. Nothing else needs setting up. The copied root \
@@ -719,8 +719,8 @@ enum Manual {
 
                 If it is running, the client is almost certainly using an old token, a \
                 port the server has moved off, or a URL with an unsupported path other than \
-                `/mcp`. Copy the configuration again from Settings, then MCP, or press \
-                Update my client config. If the menu says nothing at all, Seedbed is not \
+                `/mcp`. Copy the configuration again from Settings, then MCP, then Client setup, \
+                or press Update my client config. If the menu says nothing at all, Seedbed is not \
                 running: the server lives inside the app and goes down with it.
                 """,
             example: nil, key: nil),

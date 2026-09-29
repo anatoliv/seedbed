@@ -51,7 +51,7 @@ class SettingsSectionsAreExplained(unittest.TestCase):
                 continue
             for title, body in sections(path.read_text(encoding="utf-8"), pattern):
                 checked += 1
-                if "SettingsBullets" not in body and "note(" not in body:
+                if not any(component in body for component in ("SettingsBullets", "Caption(", "note(")):
                     missing.append(f"{path.name}: {title}")
         self.assertTrue(checked, "no Settings sections were found to check")
         self.assertEqual(missing, [], "these Settings sections explain nothing:\n"

@@ -1,12 +1,11 @@
 import CoreGraphics
 import Foundation
 
-// Bounds of every on-screen window belonging to one app. kCGWindowBounds needs
-// no Screen Recording permission (window TITLES do), so this gives a rect to
-// hand to `screencapture -R` without ever photographing the whole display —
-// which is the point: a full-screen grab of someone's Mac catches whatever else
-// they had open.
+// IDs and dimensions of on-screen windows belonging to one app, optionally
+// restricted to its QA process. Capturing by window ID keeps unrelated windows
+// out of the image, including an installed copy of the same app.
 let target = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "Seedbed"
+let targetPID = CommandLine.arguments.count > 2 ? Int(CommandLine.arguments[2]) : nil
 guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
                                             kCGNullWindowID) as? [[String: Any]] else {
     FileHandle.standardError.write("could not list windows\n".data(using: .utf8)!)
@@ -14,6 +13,7 @@ guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDeskto
 }
 for w in list {
     guard let owner = w[kCGWindowOwnerName as String] as? String, owner == target,
+          targetPID == nil || (w[kCGWindowOwnerPID as String] as? Int) == targetPID,
           let b = w[kCGWindowBounds as String] as? [String: CGFloat],
           // Layer 0 is an ordinary window. The ⌥⌘P panel is an NSPanel and
           // floats above that, so filtering to 0 silently skipped the one

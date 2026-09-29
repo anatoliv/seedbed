@@ -56,7 +56,7 @@ rendered/llama-3.3-70b/…         698 words, explicit structure
 
 ### Turning it on
 
-Settings, then MCP. Switch it on and press Copy configuration, then paste that into Claude Code, Cursor or Claude Desktop. The menu bar then carries a line saying the server is serving agents, or a warning if it is switched on and failed to start.
+Settings, then MCP. Switch it on in Connection. Open Client setup and press Copy configuration, then paste that into Claude Code, Cursor or Claude Desktop. The menu bar then carries a line saying the server is serving agents, or a warning if it is switched on and failed to start.
 
 The snippet is the only thing the client is handed, so its shape matters as much as its values. "type": "http" is required rather than decoration: a client left to guess the transport can dial the URL and never send the headers, and the far end sees an unauthenticated request. The symptom then looks like a bad token when the token was fine.
 
@@ -265,7 +265,7 @@ python3 -c 'import tomllib; print("ok")'
 
 Check the menu bar first. It says whether the server is running, or warns you that it is switched on and did not start.
 
-If it is running, the client is nearly always holding a regenerated token, a port the server has since moved off, or a URL with an unsupported path. The root and `/mcp` both work. Copy the configuration again from Settings, then MCP, or press Update my client config. The server lives inside this app, so quitting Seedbed takes it down and the client sees a connection failure rather than a message.
+If it is running, the client is nearly always holding a regenerated token, a port the server has since moved off, or a URL with an unsupported path. The root and `/mcp` both work. Copy the configuration again from Settings, then MCP, then Client setup, or press Update my client config there. The server lives inside this app, so quitting Seedbed takes it down and the client sees a connection failure rather than a message.
 
 ```
 The bearer token this client sent isn't the one Seedbed is using.

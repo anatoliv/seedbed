@@ -114,6 +114,14 @@ struct MCPSettings: View {
     @State private var confirmingRegenerate = false
     @State private var confirmingRegenerateReadOnly = false
     @State private var copied = ""
+    // The opt-in button-press harness opens directly on Client setup.
+    @State private var page = ProcessInfo.processInfo.environment["SEEDBED_MCP_PAGE"] == "clients"
+        ? ConnectionPage.clients : .connection
+
+    private enum ConnectionPage: String, CaseIterable, Identifiable {
+        case connection = "Connection", clients = "Client setup", tokens = "Access tokens"
+        var id: String { rawValue }
+    }
     /// What the last "Update my client config" press did, or nil before the
     /// first one. Shown in the pane rather than the footer, because it is
     /// several sentences and it needs to stay on screen while the person reads
@@ -158,15 +166,25 @@ struct MCPSettings: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             SeedbedDivider()
+            Picker("MCP section", selection: $page) {
+                ForEach(ConnectionPage.allCases) { Text($0.rawValue).tag($0) }
+            }.labelsHidden().pickerStyle(.segmented)
+                .padding(.horizontal, Tokens.Space.wide).padding(.vertical, Tokens.Space.snug)
+            SeedbedDivider()
             ScrollView {
-                VStack(alignment: .leading, spacing: Tokens.Space.regular) {
-                    intro
-                    serverSection
-                    tokenSection
-                    configSection
+                VStack(alignment: .leading, spacing: Tokens.Space.wide) {
+                    switch page {
+                    case .connection:
+                        intro
+                        serverSection
+                    case .clients: configSection
+                    case .tokens: tokenSection
+                    }
                 }
-                .padding(Tokens.Space.pane)
-            }
+                .frame(maxWidth: Tokens.Width.reading, alignment: .leading)
+                .padding(Tokens.Space.wide)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }.id(page)
             SeedbedDivider()
             footer
         }
@@ -212,11 +230,10 @@ struct MCPSettings: View {
 
     private var header: some View {
         HStack {
-            Text("MCP Server").font(Tokens.FontScale.title)
+            WorkingHeader(title: "MCP", subtitle: "Connect an agent on this Mac to your prompt library.")
             Spacer()
             if let onDone { Button("Done", action: onDone).keyboardShortcut(.defaultAction) }
         }
-        .padding(.horizontal, Tokens.Space.pane).padding(.vertical, Tokens.Space.snug)
     }
 
     private var intro: some View {
@@ -228,8 +245,8 @@ struct MCPSettings: View {
                 Text("Claude Code, Cursor and Claude Desktop can search this library by "
                      + "description and read a prompt's tailored version, instead of you "
                      + "copying one out of the panel. The server binds to this Mac only, "
-                     + "and every request has to carry the access token below. Both, not "
-                     + "either.")
+                     + "and every request needs an access token. Client setup has ready-to-copy "
+                     + "configuration; Access tokens has the keys.")
                     .font(Tokens.FontScale.small).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -249,7 +266,8 @@ struct MCPSettings: View {
             }
             statusRow
             diagnosticRows
-            SettingsBullets([
+            DisclosureGroup("Connection and security details") {
+                SettingsBullets([
                 ("Run the MCP server",
                  "starts a small HTTP server on this Mac that an agent can call. It only runs "
                  + "while Seedbed is running."),
@@ -261,7 +279,7 @@ struct MCPSettings: View {
                  + "the one your client must dial."),
                 ("After changing the port or a token",
                  "every client you already configured is now pointing at the old one and will "
-                 + "fail to connect. Copy the configuration below again and replace the entry "
+                 + "fail to connect. Open Client setup, copy the configuration again and replace the entry "
                  + "in that client. A stale entry reports an authentication error even when "
                  + "the real problem is the address, so when a refused client is looping "
                  + "Seedbed says so above rather than leaving you the bare error."),
@@ -270,7 +288,8 @@ struct MCPSettings: View {
                  + "every request must still carry a token. Both, not either. Ten wrong tokens "
                  + "in a row start a lockout that doubles from one minute to fifteen, while a "
                  + "correct token is always served, so a looping client cannot lock you out."),
-            ])
+                ]).padding(.top, Tokens.Space.tight)
+            }.font(Tokens.FontScale.small)
         }
     }
 
@@ -365,15 +384,11 @@ struct MCPSettings: View {
                     .fill(Tokens.Surface.sunken))
                 .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.control)
                     .stroke(Tokens.Surface.hairline, lineWidth: 0.5))
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Tokens.Space.tight) { copyConfigurationButtons }
+                VStack(alignment: .leading, spacing: Tokens.Space.tight) { copyConfigurationButtons }
+            }
             HStack(spacing: Tokens.Space.tight) {
-                Button("Copy configuration") {
-                    copy(MCPClientSnippet.entry(name: "seedbed", url: url, token: token),
-                         as: "configuration")
-                }
-                Button("Copy read-only configuration") {
-                    copy(MCPClientSnippet.entry(name: "seedbed", url: url, token: readOnlyToken),
-                         as: "read-only configuration")
-                }
                 // The read-only token, never the full one. A client this button
                 // configures has not been trusted with anything: it was never
                 // asked about, so it gets the token that cannot spend money.
@@ -414,7 +429,7 @@ struct MCPSettings: View {
                 .font(Tokens.FontScale.small).foregroundStyle(.secondary)
             Spacer()
         }
-        .padding(.horizontal, Tokens.Space.pane).padding(.vertical, Tokens.Space.tight)
+        .chromeBar()
     }
 
     // MARK: - Pieces
@@ -423,9 +438,7 @@ struct MCPSettings: View {
         _ title: String, @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: Tokens.Space.medium) {
-            Text(title.uppercased())
-                .font(Tokens.FontScale.tiny)
-                .foregroundStyle(.secondary)
+            Text(title).font(Tokens.FontScale.body.weight(.semibold))
             content()
         }
     }
@@ -484,5 +497,14 @@ struct MCPSettings: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(value, forType: .string)
         copied = label
+    }
+
+    @ViewBuilder private var copyConfigurationButtons: some View {
+        Button("Copy configuration") {
+            copy(MCPClientSnippet.entry(name: "seedbed", url: url, token: token), as: "configuration")
+        }
+        Button("Copy read-only configuration") {
+            copy(MCPClientSnippet.entry(name: "seedbed", url: url, token: readOnlyToken), as: "read-only configuration")
+        }
     }
 }

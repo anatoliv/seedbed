@@ -251,13 +251,14 @@ These are Seedbed layout decisions rather than shared visual tokens.
 | `Width.paged` | 1028 computed |
 | `Width.sheet` | 460 |
 | `Width.list` | 200 |
+| `Width.settingsSidebar` | 200 |
 | `Width.librarySidebar` | 240 |
 | `Size.library` | 900 × 540 |
 | `Size.panel` | 420 × 260 |
 | `Size.info` | 1040 × 660 |
 | `Size.infoMin` | 760 × 420 |
-| `Size.settings` | 820 × 620 |
-| `Size.settingsMin` | 620 × 460 |
+| `Size.settings` | 1040 × 680 |
+| `Size.settingsMin` | 820 × 460 |
 
 ## Web adapter
 
@@ -309,3 +310,38 @@ other.
 - `macos/Scripts/window-shot.sh` captures the app window itself. Review the HUD,
   Library, Info, and Settings in light and dark appearances at their actual
   opening sizes; compilation is not visual evidence.
+
+### Model management and stable sidebar rows
+
+Settings uses a 200pt navigation sidebar and a 220pt model browser so the
+selected model's form stays visible beside the list. Visibility is a checkbox
+on each model row, rather than a separate list above the editor. The editor
+keeps its save action in a fixed footer; documentation and notes scroll.
+These dimensions are Seedbed product decisions, not shared Reference tokens.
+
+Library prompt rows are 42pt tall. Hover reveals actions in the existing
+metadata slot with no geometry change, so titles and neighboring rows stay
+still. Model browser rows are 48pt tall in both browse modes.
+
+### Working screens
+
+General, Building, and MCP use a fixed title and short summary above scrolling
+controls. General groups library and backup tasks before app preferences.
+Settings groups use sentence-case, semibold headings; concise help sits beside
+its control, with longer explanations in disclosures.
+
+Building follows Models with a 220pt provider browser and an adjacent connection
+form. Save and Test stay in a fixed footer. MCP separates Connection, Client
+setup, and Access tokens into tabs, with configuration copy actions wrapping
+vertically when needed. Token visibility and the server's security behavior
+are unchanged; do not capture MCP for visual QA.
+
+Library editing groups seed text, working context, and target models. Save and
+Rebuild all stay in the bottom action bar; the top bar holds navigation and
+library actions. Compare headers reserve 116pt so status, placeholders, and
+actions align between columns. Prompt text uses the 12pt reading role.
+
+The quick panel reserves its second row for preview text or hover actions,
+leaving the title's width stable. Its footer prioritizes navigation, copy, and
+model shortcuts at narrow widths. The fill dialog keeps its explanation above
+the action row, with the count of filled values at the left.

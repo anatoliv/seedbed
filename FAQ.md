@@ -18,7 +18,7 @@ The practical difference: you stop being the thing that carries prompts from the
 
 ### How do I point a client at it?
 
-Settings, then MCP, then Copy configuration, then paste into the client's config file. That is the whole procedure.
+Settings, then MCP, then Client setup. Press Copy configuration and paste into the client's config file. That is the whole procedure.
 
 What you get is a standard mcpServers block with the URL and the bearer token already filled in. Nothing else needs setting up. The copied root URL is preferred; `/mcp` is also accepted for clients that require it.
 
@@ -111,7 +111,7 @@ Connect to the address shown in Seedbed → MCP Server.
 
 Open the menu bar menu first. It says whether the server is running, or warns you that it is switched on and did not start.
 
-If it is running, the client is almost certainly using an old token, a port the server has moved off, or a URL with an unsupported path other than `/mcp`. Copy the configuration again from Settings, then MCP, or press Update my client config. If the menu says nothing at all, Seedbed is not running: the server lives inside the app and goes down with it.
+If it is running, the client is almost certainly using an old token, a port the server has moved off, or a URL with an unsupported path other than `/mcp`. Copy the configuration again from Settings, then MCP, then Client setup, or press Update my client config. If the menu says nothing at all, Seedbed is not running: the server lives inside the app and goes down with it.
 
 ## The library itself
 

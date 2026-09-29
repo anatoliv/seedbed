@@ -1,11 +1,43 @@
 import SwiftUI
 
+struct ModelCatalog: Decodable {
+    struct Entry: Decodable, Identifiable {
+        let id: String
+        let name: String
+        let family: String
+        let provider: String
+        let released: String
+    }
+    let models: [Entry]
+    let updated: String
+    let source: String
+    let cached: Bool
+    let warning: String
+}
+
+struct ModelDocumentation: Decodable {
+    struct Source: Decodable, Identifiable {
+        let url: String
+        let kind: String
+        var id: String { url }
+    }
+    let sources: [Source]
+    let provider: String
+    let warning: String
+}
+
+enum ModelsMetrics {
+    static let listWidth: CGFloat = 220
+    static let rowHeight: CGFloat = 48
+    static let guidanceHeight: CGFloat = 84
+}
+
 /// Adding and configuring target models.
 ///
 /// A model here is a prompting profile, not an API connection: an id, a display
 /// name, the documentation that says how to prompt it, and a note. Nothing in
-/// this sheet causes a call to that vendor — the enhancer is configured
-/// separately — so adding one is cheap and reversible.
+/// this sheet runs the model — the enhancer is configured separately.
+/// Documentation discovery reads public vendor pages.
 @MainActor
 final class ModelsEditorModel: ObservableObject {
     @Published var models: [LibraryData.ModelRef]
@@ -20,6 +52,90 @@ final class ModelsEditorModel: ObservableObject {
     @Published var draftNotes = ""
     @Published var draftGuides = ""
     @Published var isNew = false
+    @Published var catalog: ModelCatalog?
+    @Published var loadingCatalog = false
+    @Published var catalogError = ""
+    @Published var documentation: ModelDocumentation?
+    @Published var findingDocumentation = false
+    @Published var documentationError = ""
+    private var discoveryRevision = 0
+
+    var hasChanges: Bool {
+        if isNew { return !draftID.isEmpty || !draftName.isEmpty || !draftFamily.isEmpty || !draftGuides.isEmpty || !draftNotes.isEmpty }
+        guard let entry = models.first(where: { $0.id == selection }) else { return false }
+        return draftName != entry.name || draftFamily != entry.family
+            || draftNotes != entry.notes || draftGuides != entry.guides.joined(separator: "\n")
+    }
+
+    var discoveryKey: String { [draftID, draftName, draftFamily].joined(separator: "|") }
+
+    func clearDiscovery() {
+        discoveryRevision += 1
+        documentation = nil
+        documentationError = ""
+        findingDocumentation = false
+    }
+
+    func loadSuggestions(refresh: Bool = false) {
+        guard !loadingCatalog else { return }
+        loadingCatalog = true
+        catalogError = ""
+        Task.detached { [client] in
+            do {
+                let result = try client.modelSuggestions(refresh: refresh)
+                await MainActor.run {
+                    self.catalog = result
+                    self.loadingCatalog = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.catalogError = error.localizedDescription
+                    self.loadingCatalog = false
+                }
+            }
+        }
+    }
+
+    func useSuggestion(_ entry: ModelCatalog.Entry) {
+        startNew()
+        draftID = entry.id
+        draftName = entry.name
+        draftFamily = entry.family
+    }
+
+    func findDocumentation() {
+        guard !draftID.isEmpty || !draftName.isEmpty else { return }
+        discoveryRevision += 1
+        let revision = discoveryRevision
+        let key = discoveryKey
+        let (id, name, family) = (draftID, draftName, draftFamily)
+        findingDocumentation = true
+        documentationError = ""
+        documentation = nil
+        Task.detached { [client] in
+            do {
+                let result = try client.modelDocumentation(id: id, name: name, family: family)
+                await MainActor.run {
+                    guard revision == self.discoveryRevision, key == self.discoveryKey else { return }
+                    self.documentation = result
+                    self.findingDocumentation = false
+                }
+            } catch {
+                await MainActor.run {
+                    guard revision == self.discoveryRevision, key == self.discoveryKey else { return }
+                    self.documentationError = error.localizedDescription
+                    self.findingDocumentation = false
+                }
+            }
+        }
+    }
+
+    func addDocumentation(_ urls: [String]) {
+        var sources = draftGuides.split(whereSeparator: \.isNewline).map(String.init)
+        for url in urls where !sources.contains(url) { sources.append(url) }
+        draftGuides = sources.joined(separator: "\n")
+    }
+
 
     /// `var` for the same reason as `EnhancerEditorModel.client`: saving a model
     /// writes `models.toml`, and which checkout that lands in must follow the
@@ -47,11 +163,12 @@ final class ModelsEditorModel: ObservableObject {
         models = fresh
         if isNew { return }
         if let selection, fresh.contains(where: { $0.id == selection }) { return }
-        if let first = fresh.first { select(first.id) } else { selection = nil }
+        if let first = fresh.first { select(first.id) } else { startNew() }
     }
 
     func select(_ id: String) {
         guard let entry = models.first(where: { $0.id == id }) else { return }
+        clearDiscovery()
         selection = id
         isNew = false
         draftID = entry.id
@@ -62,14 +179,16 @@ final class ModelsEditorModel: ObservableObject {
     }
 
     func startNew() {
+        clearDiscovery()
         selection = nil
         isNew = true
         draftID = ""; draftName = ""; draftFamily = ""; draftNotes = ""; draftGuides = ""
     }
 
     var canSave: Bool {
-        !draftID.trimmingCharacters(in: .whitespaces).isEmpty
+        draftID.range(of: "^[a-zA-Z0-9][a-zA-Z0-9._-]*$", options: .regularExpression) != nil
             && !draftName.trimmingCharacters(in: .whitespaces).isEmpty
+            && (!isNew || !models.contains { $0.id == draftID })
             && !busy
     }
 
@@ -117,6 +236,7 @@ final class ModelsEditorModel: ObservableObject {
                 self.models = data.models
                 if let id, data.models.contains(where: { $0.id == id }) { self.select(id) }
                 else if let first = data.models.first { self.select(first.id) }
+                else { self.startNew() }
             }
         }
     }
@@ -130,109 +250,274 @@ final class ModelsEditorModel: ObservableObject {
 
 struct ModelsEditor: View {
     @ObservedObject var model: ModelsEditorModel
-    /// Nil when this is a pane in the Settings window rather than a sheet:
-    /// a window with a close button does not also need a Done button.
     var onDone: (() -> Void)?
+    @State private var query = ""
+    @State private var browsingSuggestions = false
+    @State private var visibilityRevision = 0
+    @State private var confirmDiscard = false
+    @State private var confirmRemove = false
+    @State private var pendingAction: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            HStack(spacing: Tokens.Space.tight) {
                 Text("Models").font(Tokens.FontScale.sectionHeader)
                 Spacer()
-                if let onDone { Button("Done", action: onDone).keyboardShortcut(.defaultAction) }
+                Button { changeDraft { model.startNew() } } label: {
+                    Label("Add model", systemImage: "plus")
+                }
+                .accessibilityIdentifier("models.add")
+                if let onDone { Button("Done", action: onDone) }
             }
             .chromeBar()
             SeedbedDivider()
-
             HStack(spacing: 0) {
-                list.frame(width: Tokens.Width.list)
+                browser.frame(width: ModelsMetrics.listWidth)
                 SeedbedDivider()
-                form.frame(maxWidth: .infinity)
+                editor.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-
-            SeedbedDivider()
-            HStack(spacing: Tokens.Space.tight) {
-                if model.busy { ProgressView().controlSize(.small) }
-                Text(model.status)
-                    .font(Tokens.FontScale.small)
-                    .foregroundStyle(model.statusIsError ? Tokens.danger : .secondary)
-                    .lineLimit(1)
-                Spacer()
-            }
-            .chromeBar()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var list: some View {
-        VStack(spacing: 0) {
-            List(model.models, selection: Binding(
-                get: { model.selection },
-                set: { if let id = $0 { model.select(id) } })
-            ) { entry in
-                VStack(alignment: .leading, spacing: Tokens.Space.row) {
-                    Text(entry.name).font(Tokens.FontScale.body.weight(.medium)).lineLimit(1)
-                    Text(entry.id).font(Tokens.FontScale.monoTiny)
-                        .foregroundStyle(.secondary).lineLimit(1)
-                }
-                .tag(entry.id)
-            }
-            SeedbedDivider()
-            HStack(spacing: Tokens.Space.tight) {
-                Button { model.startNew() } label: { Image(systemName: "plus") }
-                Button { model.remove() } label: { Image(systemName: "minus") }
-                    .disabled(model.selection == nil || model.busy)
-                Spacer()
-            }
-            .buttonStyle(.borderless)
-            .chromeBar()
+        .environment(\.textScale, .compact)
+        .alert("Discard unsaved changes?", isPresented: $confirmDiscard) {
+            Button("Cancel", role: .cancel) { pendingAction = nil }
+            Button("Discard changes", role: .destructive) { pendingAction?(); pendingAction = nil }
+        } message: { Text("Your saved model stays available. Changes in this form will be discarded.") }
+        .alert("Remove this model?", isPresented: $confirmRemove) {
+            Button("Cancel", role: .cancel) { }
+            Button("Remove model", role: .destructive) { model.remove() }
+        } message: { Text("Existing renders are kept. You can add this model again later.") }
+        .task(id: model.discoveryKey) {
+            model.clearDiscovery()
+            guard model.isNew, !model.draftID.isEmpty, !model.draftName.isEmpty else { return }
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            guard !Task.isCancelled else { return }
+            model.findDocumentation()
         }
     }
 
-    private var form: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Tokens.Space.snug) {
-                FormField("Model id, used in file paths and on the chips") {
-                    TextField("claude-opus-5", text: $model.draftID)
-                        .textFieldStyle(.roundedBorder)
-                        .disabled(!model.isNew)
-                        .font(Tokens.FontScale.monoSmall)
-                }
-                FormField("Display name") {
-                    TextField("Claude Opus 5", text: $model.draftName)
-                        .textFieldStyle(.roundedBorder)
-                }
-                FormField("Family: free text that groups related models") {
-                    TextField("claude", text: $model.draftFamily)
-                        .textFieldStyle(.roundedBorder).frame(maxWidth: Tokens.Width.list)
-                }
-                FormField("Prompting guidance: one URL or file path per line") {
-                    TextEditor(text: $model.draftGuides)
-                        .font(Tokens.FontScale.monoSmall)
-                        .frame(height: 70)
-                        .padding(Tokens.Space.row)
-                        .background(Tokens.Surface.sunken)
-                        .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card)
-                            .stroke(Tokens.Surface.hairline, lineWidth: 1))
-                }
-                FormField("Notes, always part of this model's guidance") {
-                    TextEditor(text: $model.draftNotes)
-                        .font(Tokens.FontScale.small)
-                        .frame(height: 60)
-                        .padding(Tokens.Space.row)
-                        .background(Tokens.Surface.sunken)
-                        .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card)
-                            .stroke(Tokens.Surface.hairline, lineWidth: 1))
-                }
-                HStack {
-                    Button(model.isNew ? "Add model" : "Save changes") { model.save() }
-                        .disabled(!model.canSave)
-                        .seedbedProminent()
-                    Text("Changing guidance or notes makes every render for this model stale.")
-                        .font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
+    private func changeDraft(_ action: @escaping () -> Void) {
+        if model.hasChanges { pendingAction = action; confirmDiscard = true }
+        else { action() }
+    }
+
+    private var browser: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: Tokens.Space.tight) {
+                Picker("Browse models", selection: $browsingSuggestions) {
+                    Text("My models").tag(false)
+                    Text("Suggestions").tag(true)
+                }.pickerStyle(.segmented).labelsHidden()
+                TextField("Search models", text: $query)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("models.search")
+            }.padding(Tokens.Space.snug)
+            SeedbedDivider()
+            ScrollView {
+                LazyVStack(spacing: Tokens.Space.row) {
+                    if browsingSuggestions { suggestions }
+                    else {
+                        ForEach(model.models.filter { matches($0.name, $0.id, $0.family) }) { entry in
+                            HStack(spacing: Tokens.Space.tight) {
+                                Toggle("Show \(entry.name) in the picker", isOn: Binding(
+                                    get: { _ = visibilityRevision; return ModelFilter.isVisible(entry.id) },
+                                    set: { _ in
+                                        ModelFilter.toggle(entry.id, allKnown: model.models.map(\.id))
+                                        visibilityRevision += 1
+                                        model.onChange()
+                                    }))
+                                    .labelsHidden().toggleStyle(.checkbox)
+                                Button { changeDraft { model.select(entry.id) } } label: {
+                                    modelLabel(entry.name, detail: entry.family.isEmpty ? entry.id : entry.family)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .contentShape(Rectangle())
+                                }.buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, Tokens.Space.tight)
+                            .frame(height: ModelsMetrics.rowHeight)
+                            .background(model.selection == entry.id ? Tokens.Fill.selected : .clear,
+                                        in: RoundedRectangle(cornerRadius: Tokens.Radius.card))
+                        }
+                        if model.models.isEmpty {
+                            Text("Add a model, or choose one from Suggestions.")
+                                .font(Tokens.FontScale.small).foregroundStyle(.secondary)
+                                .padding(Tokens.Space.snug)
+                        }
+                    }
+                }.padding(Tokens.Space.row6)
+            }
+            .id(browsingSuggestions)
+            SeedbedDivider()
+            VStack(alignment: .leading, spacing: Tokens.Space.row6) {
+                if browsingSuggestions {
+                    HStack {
+                        Button("Refresh") { model.loadSuggestions(refresh: true) }
+                            .disabled(model.loadingCatalog)
+                        if model.loadingCatalog { ProgressView().controlSize(.small) }
+                        Spacer()
+                        Link("Models.dev", destination: URL(string: "https://models.dev")!)
+                    }
+                    Text(model.catalog.map { "Updated " + String($0.updated.prefix(10)) } ?? "Refreshable public catalog")
+                    Text(model.catalogError.isEmpty ? (model.catalog?.warning ?? "") : model.catalogError)
+                        .foregroundStyle(Tokens.warning).lineLimit(3)
+                } else {
+                    HStack {
+                        Text("\(model.models.filter { ModelFilter.isVisible($0.id) }.count) of \(model.models.count) shown")
+                        Spacer()
+                        Button("Show all") {
+                            ModelFilter.showAll(); visibilityRevision += 1; model.onChange()
+                        }
+                    }
+                    Text("Uncheck to hide. Your renders stay available.")
                 }
             }
-            .padding(Tokens.Space.pane)
+            .font(Tokens.FontScale.tiny).foregroundStyle(.secondary).chromeBar()
+        }
+        .onChange(of: browsingSuggestions) { _, value in
+            query = ""
+            if value && model.catalog == nil { model.loadSuggestions() }
+        }
+    }
+
+    @ViewBuilder private var suggestions: some View {
+        if let catalog = model.catalog {
+            ForEach(catalog.models.filter { matches($0.name, $0.id, $0.provider) }) { entry in
+                let existing = model.models.contains { $0.id == entry.id }
+                Button {
+                    changeDraft {
+                        if existing { model.select(entry.id) }
+                        else { model.useSuggestion(entry) }
+                    }
+                } label: {
+                    HStack(spacing: Tokens.Space.row6) {
+                        modelLabel(entry.name, detail: "\(entry.provider) · \(entry.released)")
+                        Spacer(minLength: 0)
+                        Image(systemName: existing ? "checkmark" : "plus")
+                            .foregroundStyle(existing ? Tokens.positive : Tokens.accent)
+                    }
+                    .padding(.horizontal, Tokens.Space.tight)
+                    .frame(height: ModelsMetrics.rowHeight)
+                    .contentShape(Rectangle())
+                }.buttonStyle(.plain)
+            }
+        } else if !model.loadingCatalog {
+            Text("Refresh to find recent text models.")
+                .font(Tokens.FontScale.small).foregroundStyle(.secondary).padding(Tokens.Space.snug)
+        }
+    }
+
+    private func matches(_ values: String...) -> Bool {
+        query.isEmpty || values.contains { $0.localizedCaseInsensitiveContains(query) }
+    }
+
+    private func modelLabel(_ name: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.row) {
+            Text(name).font(Tokens.FontScale.body.weight(.medium)).lineLimit(1)
+            Text(detail).font(Tokens.FontScale.tiny).foregroundStyle(.secondary).lineLimit(1)
+        }
+    }
+
+    private var editor: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Tokens.Space.wide) {
+                    VStack(alignment: .leading, spacing: Tokens.Space.row6) {
+                        Text(model.isNew ? "New model" : (model.draftName.isEmpty ? "Choose a model" : model.draftName))
+                            .font(Tokens.FontScale.sectionHeader)
+                        Text("Choose how prompts are written for this model.")
+                            .font(Tokens.FontScale.small).foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: Tokens.Space.snug) {
+                        FormField("Display name") {
+                            TextField("Model name", text: $model.draftName).textFieldStyle(.roundedBorder)
+                        }
+                        HStack(alignment: .top, spacing: Tokens.Space.snug) {
+                            FormField("Model id") {
+                                TextField("model-id", text: $model.draftID).textFieldStyle(.roundedBorder)
+                                    .disabled(!model.isNew).font(Tokens.FontScale.monoSmall)
+                            }
+                            FormField("Family") {
+                                TextField("e.g. openai", text: $model.draftFamily).textFieldStyle(.roundedBorder)
+                            }.frame(maxWidth: ModelsMetrics.listWidth / 2)
+                        }
+                        if model.isNew {
+                            Text(model.models.contains { $0.id == model.draftID }
+                                 ? "This id is already in your library. Choose it from My models."
+                                 : "Use letters, numbers, dots, hyphens, or underscores for the id.")
+                                .font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: Tokens.Space.snug) {
+                        HStack {
+                            Text("Documentation").font(Tokens.FontScale.body.weight(.semibold))
+                            Spacer()
+                            Button("Find documentation") { model.findDocumentation() }
+                                .disabled(model.findingDocumentation || model.draftName.isEmpty)
+                                .accessibilityIdentifier("models.findDocumentation")
+                        }
+                        if model.findingDocumentation {
+                            HStack { ProgressView().controlSize(.small); Text("Checking official vendor pages…") }
+                                .font(Tokens.FontScale.small).foregroundStyle(.secondary)
+                        }
+                        if let documentation = model.documentation {
+                            ForEach(documentation.sources) { source in
+                                HStack(alignment: .top, spacing: Tokens.Space.tight) {
+                                    VStack(alignment: .leading, spacing: Tokens.Space.row) {
+                                        Text(source.kind).font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
+                                        if let url = URL(string: source.url) {
+                                            Link(destination: url) {
+                                                Text(source.url).font(Tokens.FontScale.small)
+                                                    .multilineTextAlignment(.leading).lineLimit(2)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                            }.buttonStyle(.plain).foregroundStyle(Tokens.accent)
+                                        }
+                                    }
+                                    Spacer(minLength: 0)
+                                    let added = model.draftGuides.split(whereSeparator: \.isNewline).contains(Substring(source.url))
+                                    Button(added ? "Added" : "Use") { model.addDocumentation([source.url]) }
+                                        .disabled(added)
+                                }
+                            }
+                            if !documentation.warning.isEmpty {
+                                Text(documentation.warning).font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
+                            }
+                        }
+                        if !model.documentationError.isEmpty {
+                            Text(model.documentationError).font(Tokens.FontScale.small).foregroundStyle(Tokens.danger)
+                        }
+                        FormField("Guidance sources · one URL or local path per line") {
+                            TextEditor(text: $model.draftGuides).font(Tokens.FontScale.monoSmall)
+                                .frame(height: ModelsMetrics.guidanceHeight)
+                                .padding(Tokens.Space.row).background(Tokens.Surface.sunken)
+                                .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card)
+                                    .stroke(Tokens.Surface.hairline, lineWidth: 1))
+                        }
+                    }
+                    FormField("Prompting notes") {
+                        TextEditor(text: $model.draftNotes).font(Tokens.FontScale.small)
+                            .frame(height: ModelsMetrics.guidanceHeight)
+                            .padding(Tokens.Space.row).background(Tokens.Surface.sunken)
+                            .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.card)
+                                .stroke(Tokens.Surface.hairline, lineWidth: 1))
+                    }
+                    Text("Changing guidance or notes makes this model’s renders stale.")
+                        .font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
+                }.padding(Tokens.Space.wide)
+            }
+            SeedbedDivider()
+            HStack(spacing: Tokens.Space.tight) {
+                Button(model.isNew ? "Add model" : "Save changes") { model.save() }
+                    .disabled(!model.canSave || (!model.isNew && !model.hasChanges)).seedbedProminent()
+                if model.busy { ProgressView().controlSize(.small) }
+                Text(model.status).font(Tokens.FontScale.tiny)
+                    .foregroundStyle(model.statusIsError ? Tokens.danger : .secondary).lineLimit(2)
+                Spacer(minLength: 0)
+                if !model.isNew && model.selection != nil {
+                    Button { confirmRemove = true } label: { Image(systemName: "trash") }
+                        .help("Remove model").accessibilityLabel("Remove model")
+                        .disabled(model.busy).buttonStyle(.borderless)
+                }
+            }.chromeBar()
         }
     }
 }

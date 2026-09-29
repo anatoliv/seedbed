@@ -605,11 +605,23 @@ struct LibraryClient {
         var arguments = [isNew ? "add" : "set", id, "--name", name,
                          "--family", family, "--notes", notes]
         for guide in guides where !guide.isEmpty { arguments += ["--guide", guide] }
+        if guides.isEmpty { arguments.append("--clear-guides") }
         return try run(["model"] + arguments).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func removeModel(id: String) throws -> String {
         try run(["model", "remove", id]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func modelSuggestions(refresh: Bool = false) throws -> ModelCatalog {
+        var arguments = ["model", "suggest"]
+        if refresh { arguments.append("--refresh") }
+        return try JSONDecoder().decode(ModelCatalog.self, from: Data(run(arguments).utf8))
+    }
+
+    func modelDocumentation(id: String, name: String, family: String) throws -> ModelDocumentation {
+        let text = try run(["model", "discover", id, "--name", name, "--family", family])
+        return try JSONDecoder().decode(ModelDocumentation.self, from: Data(text.utf8))
     }
 
     /// The enhancer configuration. Key VALUES never cross this boundary — the

@@ -217,201 +217,176 @@ final class EnhancerEditorModel: ObservableObject {
 
 struct EnhancerEditor: View {
     @ObservedObject var model: EnhancerEditorModel
-    /// Nil when this is a pane in the Settings window rather than a sheet:
-    /// a window with a close button does not also need a Done button.
     var onDone: (() -> Void)?
+
+    private var selectedPreset: String? {
+        model.data?.presets.first {
+            $0.auth == model.auth && $0.endpoint == model.endpoint && $0.model == model.model
+        }?.id
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                VStack(alignment: .leading, spacing: Tokens.Space.row) {
-                    Text("Build with").font(Tokens.FontScale.sectionHeader)
-                    Text("The model that writes your prompts. The only thing here that spends money")
-                        .font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
-                }
-                Spacer()
-                if let onDone { Button("Done", action: onDone).keyboardShortcut(.defaultAction) }
+                WorkingHeader(title: "Building", subtitle: "Choose the provider that writes your prompts.")
+                if let onDone { Button("Done", action: onDone).padding(.trailing, Tokens.Space.wide) }
             }
-            .chromeBar()
             SeedbedDivider()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: Tokens.Space.snug) {
-                    FormField("Provider preset, which fills the rest in") {
-                        Menu {
-                            ForEach(model.data?.presets ?? []) { preset in
-                                Button(preset.name) { model.apply(preset: preset) }
-                            }
-                        } label: {
-                            Text(model.data?.presets.first { $0.auth == model.auth
-                                 && ($0.endpoint == model.endpoint || $0.endpoint.isEmpty) }?.name
-                                 ?? "Custom")
-                        }
-                        .frame(maxWidth: 420, alignment: .leading)
-                    }
-
-                    SettingsBullets([
-                        ("Provider preset",
-                         "a starting point, not a lock. Picking one fills in the fields below "
-                         + "and you can then change any of them; the menu reads Custom once "
-                         + "they no longer match a preset."),
-                        ("Running a model on another machine",
-                         "pick Custom / your own server. It fills in a placeholder address for "
-                         + "you to replace with yours, since the one thing Seedbed cannot know "
-                         + "is where your server is. Plain http is accepted for a .local name "
-                         + "or a private address; anything on the public internet must be "
-                         + "https."),
-                        ("Enhancer against target",
-                         "this pane picks the model that WRITES your prompts. Which models a "
-                         + "prompt is written FOR is the Models pane. Choosing OpenAI here does "
-                         + "not change who your prompts are tailored for, and targeting GPT "
-                         + "there does not call OpenAI."),
-                    ])
-
-                    FormField("Authentication") {
-                        Picker("", selection: $model.auth) {
-                            Text("Claude Code CLI (no key)").tag("cli")
-                            Text("Anthropic SDK").tag("sdk")
-                            Text("API key / local server").tag("api_key")
-                            Text("Azure OpenAI (api-key header)").tag("azure_api_key")
-                            Text("ChatGPT sign-in (no API key)").tag("chatgpt_oauth")
-                        }
-                        .labelsHidden().pickerStyle(.radioGroup)
-                        SettingsBullets([
-                            ("Claude Code CLI",
-                             "the default, and the reason Seedbed works out of the box. It "
-                             + "shells out to the claude binary already on this Mac, so it "
-                             + "needs no key and spends nothing beyond the subscription you "
-                             + "already pay for."),
-                            ("Anthropic SDK",
-                             "uses ANTHROPIC_API_KEY or an existing ant login, rather than a "
-                             + "key typed here."),
-                            ("API key / local server",
-                             "anything that speaks the OpenAI chat-completions shape, whether "
-                             + "that is a paid provider or a model server of your own."),
-                            ("Azure OpenAI",
-                             "the same shape, but the key travels in an api-key header instead "
-                             + "of a bearer token, which is why it is its own mode."),
-                            ("ChatGPT sign-in",
-                             "builds through a Plus or Pro subscription with no API key. Opens "
-                             + "your browser; the tokens go to your login Keychain."),
-                        ])
-                    }
-
-                    if model.auth == "chatgpt_oauth" {
-                        FormField("ChatGPT account") {
-                            VStack(alignment: .leading, spacing: Tokens.Space.row) {
-                                Text(model.codexAccount ?? "Not signed in")
-                                    .font(Tokens.FontScale.body)
-                                    .foregroundStyle(model.codexAccount == nil
-                                                     ? Color.secondary : .primary)
-                                HStack(spacing: Tokens.Space.tight) {
-                                    Button(model.codexAccount == nil
-                                           ? "Sign in with ChatGPT…" : "Sign in again…") {
-                                        model.codexLogin()
+            HStack(spacing: 0) {
+                providers.frame(width: ModelsMetrics.listWidth)
+                SeedbedDivider()
+                VStack(spacing: 0) {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: Tokens.Space.wide) {
+                            SettingsGroup("Connection") {
+                                FormField("Authentication") {
+                                    Picker("Authentication", selection: $model.auth) {
+                                        Text("Claude Code CLI").tag("cli")
+                                        Text("Anthropic SDK").tag("sdk")
+                                        Text("API key / local server").tag("api_key")
+                                        Text("Azure OpenAI").tag("azure_api_key")
+                                        Text("ChatGPT sign-in").tag("chatgpt_oauth")
+                                    }.labelsHidden().pickerStyle(.menu)
+                                    Caption(authenticationHelp)
+                                }
+                                if model.auth == "chatgpt_oauth" { account }
+                                if model.needsEndpoint {
+                                    FormField("Endpoint") {
+                                        TextField("https://api.openai.com/v1/chat/completions", text: $model.endpoint)
+                                            .textFieldStyle(.roundedBorder).font(Tokens.FontScale.monoSmall)
                                     }
-                                    .disabled(model.busy)
-                                    if model.codexAccount != nil {
-                                        Button("Sign out") { model.codexLogout() }
-                                            .disabled(model.busy)
+                                    Caption("Use HTTPS for public providers. HTTP works for localhost or a server on your LAN.")
+                                }
+                                FormField(model.auth == "azure_api_key" ? "Deployment / model id" : "Model id") {
+                                    TextField(model.needsEndpoint ? "Your provider's model id" : "opus", text: $model.model)
+                                        .textFieldStyle(.roundedBorder)
+                                }
+                                if model.needsKey {
+                                    FormField("API key") {
+                                        SecureField(model.data?.hasKey == true ? "Stored key (leave blank to keep)" : "Enter API key", text: $model.key)
+                                            .textFieldStyle(.roundedBorder)
+                                        Caption("Stored in your login Keychain. Enter a new key to replace it.")
                                     }
                                 }
-                                Caption("Opens your browser. The tokens go straight to "
-                                        + "your login Keychain and never into a file.")
+                            }
+                            SeedbedDivider()
+                            DisclosureGroup("Fallback connection") {
+                                VStack(alignment: .leading, spacing: Tokens.Space.snug) {
+                                    Caption("Tried once after a rate limit or server error. Authentication and model errors stay on the primary connection.")
+                                    FormField("Fallback endpoint") {
+                                        TextField("https://…", text: $model.fallbackEndpoint)
+                                            .textFieldStyle(.roundedBorder).font(Tokens.FontScale.monoSmall)
+                                    }
+                                    FormField("Fallback model id") {
+                                        TextField("Model id", text: $model.fallbackModel).textFieldStyle(.roundedBorder)
+                                    }
+                                    FormField("Fallback API key") {
+                                        SecureField(model.data?.hasFallbackKey == true ? "Stored key (leave blank to keep)" : "Enter API key", text: $model.fallbackKey)
+                                            .textFieldStyle(.roundedBorder)
+                                    }
+                                }.padding(.top, Tokens.Space.snug)
+                            }
+                            FormField("Request timeout") {
+                                HStack(spacing: Tokens.Space.tight) {
+                                    TextField("300", value: $model.timeout, format: .number)
+                                        .textFieldStyle(.roundedBorder).frame(width: 80)
+                                    Text("seconds").foregroundStyle(.secondary)
+                                }
+                                Caption("Allow more time for a slow local model or a large prompt.")
+                            }
+                            DisclosureGroup("Help with providers and testing") {
+                                SettingsBullets([
+                                    ("Provider", "fills the connection fields as a starting point. Changes are applied when you save."),
+                                    ("Custom / your own server", "works with a compatible model running on another machine. Replace the endpoint with its address."),
+                                    ("Models", "chooses the target profiles your prompts are written for. This Building pane chooses who writes them."),
+                                    ("Test", "saves this connection and makes one real model call. Your provider may charge for it."),
+                                    ("Save", "writes the connection settings without making a model call."),
+                                ]).padding(.top, Tokens.Space.snug)
                             }
                         }
+                        .font(Tokens.FontScale.body)
+                        .frame(maxWidth: Tokens.Width.reading, alignment: .leading)
+                        .padding(Tokens.Space.wide)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-
-                    if model.needsEndpoint {
-                        FormField("Endpoint: https, or http only to localhost or your LAN") {
-                            TextField("https://api.openai.com/v1/chat/completions",
-                                      text: $model.endpoint)
-                                .textFieldStyle(.roundedBorder)
-                                .font(Tokens.FontScale.monoSmall)
-                        }
-                        FormField("Model") {
-                            TextField("gpt-4o-mini", text: $model.model)
-                                .textFieldStyle(.roundedBorder).frame(maxWidth: 280)
-                        }
-                    } else {
-                        FormField("Model") {
-                            TextField("opus", text: $model.model)
-                                .textFieldStyle(.roundedBorder).frame(maxWidth: 280)
-                        }
-                    }
-
-                    if model.needsKey {
-                        FormField(model.data?.hasKey == true
-                              ? "API key: one is stored, type to replace it"
-                              : "API key, stored in the login Keychain and never in a file") {
-                            SecureField(model.data?.hasKey == true ? "••••••••" : "sk-…",
-                                        text: $model.key)
-                                .textFieldStyle(.roundedBorder).frame(maxWidth: 360)
-                        }
-                    }
-
-                    DisclosureGroup("Fallback, tried once if the primary fails retryably") {
-                        VStack(alignment: .leading, spacing: Tokens.Space.medium) {
-                            TextField("Fallback endpoint", text: $model.fallbackEndpoint)
-                                .textFieldStyle(.roundedBorder)
-                                .font(Tokens.FontScale.monoSmall)
-                            HStack(spacing: Tokens.Space.tight) {
-                                TextField("Fallback model", text: $model.fallbackModel)
-                                    .textFieldStyle(.roundedBorder).frame(maxWidth: 220)
-                                SecureField(model.data?.hasFallbackKey == true ? "••••••••" : "Fallback key",
-                                            text: $model.fallbackKey)
-                                    .textFieldStyle(.roundedBorder).frame(maxWidth: 220)
-                            }
-                            Text("A rate limit or a 5xx moves to the fallback; a 401 or 404 does not, "
-                                 + "because the same body would fail there too.")
-                                .font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
-                        }
-                        .padding(.top, Tokens.Space.tight)
-                    }
-                    .font(Tokens.FontScale.small)
-
-                    FormField("Timeout in seconds. A build is one long request") {
-                        TextField("300", value: $model.timeout, format: .number)
-                            .textFieldStyle(.roundedBorder).frame(maxWidth: 90)
-                    }
-
-                    SettingsBullets([
-                        ("Model",
-                         "the exact id the endpoint expects, spelled its way. A local server "
-                         + "usually names whatever you have loaded; a provider publishes its "
-                         + "own list."),
-                        ("API key",
-                         "kept in your login Keychain, never written into a file in the "
-                         + "library, so it is not something a git push can carry away."),
-                        ("Fallback",
-                         "tried once when the primary fails in a way a retry could fix. A rate "
-                         + "limit or a 5xx moves to it; a 401 or a 404 does not, because the "
-                         + "same request would fail there for the same reason."),
-                        ("Timeout",
-                         "a build is one long request rather than a stream, so this is the "
-                         + "whole call. Raise it for a slow local model on a large prompt."),
-                        ("Test against Save",
-                         "Test saves and then makes one real call, so it spends whatever one "
-                         + "build costs and proves the endpoint, the key and the model id all "
-                         + "work together. Save only writes the settings."),
-                    ])
+                    SeedbedDivider()
+                    HStack(spacing: Tokens.Space.tight) {
+                        Button("Save") { model.save() }.disabled(model.busy).seedbedProminent().fixedSize()
+                        Button("Test") { model.save(thenTest: true) }.disabled(model.busy).fixedSize()
+                            .help("Saves and makes one real model call; your provider may charge for it.")
+                        if model.busy { ProgressView().controlSize(.small) }
+                        Text(model.status).font(Tokens.FontScale.tiny)
+                            .foregroundStyle(model.statusIsError ? Tokens.danger : .secondary)
+                            .lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+                    }.chromeBar()
                 }
-                .padding(Tokens.Space.pane)
             }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
 
+    private var providers: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Providers").font(Tokens.FontScale.small.weight(.semibold))
+                .padding(Tokens.Space.snug)
             SeedbedDivider()
-            HStack(spacing: Tokens.Space.tight) {
-                if model.busy { ProgressView().controlSize(.small) }
-                Text(model.status).font(Tokens.FontScale.small)
-                    .foregroundStyle(model.statusIsError ? Tokens.danger : .secondary)
-                    .lineLimit(2)
-                Spacer()
-                Button("Test") { model.save(thenTest: true) }.disabled(model.busy)
-                Button("Save") { model.save() }
-                    .disabled(model.busy).seedbedProminent()
+            ScrollView {
+                LazyVStack(spacing: Tokens.Space.row) {
+                    ForEach(model.data?.presets ?? []) { preset in
+                        Button { model.apply(preset: preset) } label: {
+                            VStack(alignment: .leading, spacing: Tokens.Space.row) {
+                                Text(preset.name.components(separatedBy: " (").first ?? preset.name)
+                                    .font(Tokens.FontScale.body.weight(.medium)).lineLimit(1)
+                                Text(authLabel(preset.auth)).font(Tokens.FontScale.tiny).foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, Tokens.Space.tight)
+                            .frame(height: ModelsMetrics.rowHeight)
+                            .background(selectedPreset == preset.id ? Tokens.Fill.selected : .clear,
+                                        in: RoundedRectangle(cornerRadius: Tokens.Radius.card))
+                            .contentShape(Rectangle())
+                        }.buttonStyle(.plain).help(preset.name)
+                    }
+                }.padding(Tokens.Space.row6)
             }
-            .chromeBar()
+            SeedbedDivider()
+            Caption("Select a provider, then review and save its connection.")
+                .font(Tokens.FontScale.tiny).padding(Tokens.Space.snug)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var account: some View {
+        FormField("ChatGPT account") {
+            Text(model.codexAccount ?? "Not signed in")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Tokens.Space.tight) { accountButtons }
+                VStack(alignment: .leading, spacing: Tokens.Space.tight) { accountButtons }
+            }
+        }
+    }
+
+    @ViewBuilder private var accountButtons: some View {
+        Button(model.codexAccount == nil ? "Sign in with ChatGPT…" : "Sign in again…") { model.codexLogin() }
+            .disabled(model.busy)
+        if model.codexAccount != nil { Button("Sign out") { model.codexLogout() }.disabled(model.busy) }
+    }
+
+    private func authLabel(_ auth: String) -> String {
+        switch auth {
+        case "cli": "CLI · no API key"
+        case "sdk": "Anthropic SDK"
+        case "chatgpt_oauth": "ChatGPT subscription"
+        case "azure_api_key": "Azure API key"
+        default: "API key / local server"
+        }
+    }
+
+    private var authenticationHelp: String {
+        switch model.auth {
+        case "cli": "Uses the Claude Code CLI installed on this Mac and its existing sign-in."
+        case "sdk": "Uses ANTHROPIC_API_KEY or an existing ant login."
+        case "azure_api_key": "Uses your Azure endpoint and deployment with an api-key header."
+        case "chatgpt_oauth": "Uses your ChatGPT subscription. Sign-in opens a browser; tokens stay in Keychain."
+        default: "Connects to an OpenAI-compatible provider or your own model server."
+        }
     }
 }
