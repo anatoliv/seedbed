@@ -20,7 +20,6 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import builder
-from .enhance import DEFAULT_BACKEND
 from .guides import GuideCache, load_registry
 from .store import FormatError, Library, Seed
 from .usage import Usage
@@ -34,7 +33,7 @@ ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 class State:
     """Everything the handlers share. One per server."""
 
-    def __init__(self, root: Path, enhancer: str = DEFAULT_BACKEND):
+    def __init__(self, root: Path, enhancer: str | None = None):
         self.root = root
         self.lib = Library(root)
         self.cache = GuideCache(root)
@@ -210,7 +209,7 @@ def _slug(text: str) -> str:
     return slug[:48].strip("-") or "prompt"
 
 
-def serve(root: Path, port: int = 8765, enhancer: str = DEFAULT_BACKEND) -> None:
+def serve(root: Path, port: int = 8765, enhancer: str | None = None) -> None:
     handler = type("BoundHandler", (Handler,), {"state": State(root, enhancer)})
     httpd = ThreadingHTTPServer(("127.0.0.1", port), handler)
     print(f"prompt-library on http://127.0.0.1:{port}  (ctrl-c to stop)")

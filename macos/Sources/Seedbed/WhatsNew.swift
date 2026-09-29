@@ -48,6 +48,18 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.27",
+            date: "28 September 2026",
+            highlight: "Model rebuilds use your configured building provider.",
+            changes: [
+                WhatsNewChange(kind: .fixed, text:
+                    "Rebuilding a prompt no longer silently switches to the Claude Code CLI "
+                    + "when you selected another provider in Settings → Building."),
+                WhatsNewChange(kind: .fixed, text:
+                    "Live copy and builds from the local web page also use the saved provider. "
+                    + "An explicit command-line override still applies to that one call."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.23",
             date: "28 September 2026",
             highlight: "Azure OpenAI setup and test feedback are clearer.",

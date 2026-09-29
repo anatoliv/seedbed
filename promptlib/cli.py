@@ -16,7 +16,7 @@ from datetime import date
 from pathlib import Path
 
 from . import builder, compare as compare_mod, match as match_mod
-from .enhance import DEFAULT_BACKEND, EnhancerError, enhance
+from .enhance import EnhancerError, enhance
 from .enhancer import (PRESETS, AUTH_MODES, EnhancerConfig, KEYCHAIN_SERVICE,
                        FALLBACK_KEYCHAIN_SERVICE, keychain_set, preset as find_preset)
 from .guides import GuideCache, Model, load_registry, save_registry
@@ -763,11 +763,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--toggle", action="store_true", help="flip the current state")
     p.set_defaults(func=cmd_pin)
 
+    # An omitted --enhancer stays None so build paths use enhancer.toml.
+    # Supplying the flag is an explicit override for just that invocation.
     p = sub.add_parser("copy", help="put a render on the clipboard")
     p.add_argument("id")
     p.add_argument("--model", required=True)
     p.add_argument("--live", action="store_true", help="re-render before copying")
-    p.add_argument("--enhancer", default=DEFAULT_BACKEND)
+    p.add_argument("--enhancer", help="override the configured enhancer for this call")
     p.add_argument("--force", action="store_true")
     p.add_argument("--refresh", action="store_true")
     p.set_defaults(func=cmd_copy)
@@ -779,13 +781,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--refresh", action="store_true", help="re-fetch guidance first")
     p.add_argument("--allow-degraded", action="store_true",
                    help="build even when a guidance source could not be read")
-    p.add_argument("--enhancer", default=DEFAULT_BACKEND)
+    p.add_argument("--enhancer", help="override the configured enhancer for this build")
     p.set_defaults(func=cmd_build)
 
     p = sub.add_parser("serve", help="local web UI: list, dropdown, copy")
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--open", action="store_true", help="open a browser too")
-    p.add_argument("--enhancer", default=DEFAULT_BACKEND)
+    p.add_argument("--enhancer", help="override the configured enhancer for this server")
     p.set_defaults(func=cmd_serve)
 
     p = sub.add_parser("guides", help="refresh cached prompting guidance")

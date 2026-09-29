@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from .enhance import DEFAULT_BACKEND, EnhancerError, enhance
+from .enhance import EnhancerError, enhance
 from .enhancer import EnhancerConfig
 from .guides import GuideCache, Model
 from .store import CONTEXTS, Library, Render, Seed
