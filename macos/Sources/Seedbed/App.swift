@@ -180,6 +180,29 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)   // menu bar only, no Dock tile
 
+        // The release gate launches the assembled app against a throwaway
+        // pre-update library. This exercises the binary's runtime selection,
+        // which a direct Python invocation cannot verify.
+        if let rawRoot = ProcessInfo.processInfo.environment["SEEDBED_VERIFY_REBUILD_ROOT"] {
+            let root = URL(fileURLWithPath: rawRoot).standardizedFileURL
+            let temporary = FileManager.default.temporaryDirectory.standardizedFileURL.path
+            guard root.path.hasPrefix(temporary + "/") else {
+                fputs("release verification requires a temporary library\n", stderr)
+                exit(2)
+            }
+            Task.detached {
+                do {
+                    try LibraryClient(root: root).rebuild(id: "sample", model: "grok")
+                    print("app rebuilt sample/grok using its packaged runtime")
+                    exit(0)
+                } catch {
+                    fputs("app rebuild failed: \(error)\n", stderr)
+                    exit(1)
+                }
+            }
+            return
+        }
+
         // AppKit does not reliably honor AppleInterfaceStyle from the argument
         // domain for accessory applications. Keep visual QA process-scoped and
         // deterministic without changing the user's system appearance.

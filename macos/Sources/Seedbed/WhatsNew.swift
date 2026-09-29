@@ -48,6 +48,15 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.28",
+            date: "28 September 2026",
+            highlight: "Model rebuilds use the provider you selected after an app update.",
+            changes: [
+                WhatsNewChange(kind: .fixed, text:
+                    "The app now runs its packaged Python core, so an older library copy "
+                    + "cannot override updated build behavior."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.27",
             date: "28 September 2026",
             highlight: "Model rebuilds use your configured building provider.",

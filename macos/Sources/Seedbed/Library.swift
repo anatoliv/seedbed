@@ -253,9 +253,13 @@ enum LibraryError: LocalizedError {
     }
 }
 
-/// Runs `python3 -m promptlib …` inside the selected library folder.
+/// Runs the app's packaged Python core against the selected writable library.
 struct LibraryClient {
     var root: URL
+    /// Tests can point at a staged runtime. Installed apps use their bundle.
+    var runtimeRoot: URL? = nil
+    /// A throwaway environment keeps integration tests away from live Keychain items.
+    var environmentOverride: [String: String]? = nil
 
     /// The writable library is local app data. The repository still carries a
     /// starter snapshot, but edits made by the app do not change that checkout.
@@ -316,23 +320,17 @@ struct LibraryClient {
         return commonRoot
     }
 
-    /// Why a library folder needs the Python package, not only prompts.
+    /// Why older library folders also carry a Python package.
     ///
-    /// `promptlib/cli.py` sets its root from its OWN location
-    /// (`Path(__file__).resolve().parent.parent`), and this app never passes
-    /// `--root`. It sets the working directory instead, which works only because
-    /// `python3 -m promptlib` puts the cwd on `sys.path`: the cwd decides which
-    /// COPY of the package is imported, and that copy's location decides the
-    /// library. So a folder without `promptlib/` is not a library, and pointing
-    /// at one used to fail with `No module named promptlib` three actions later,
-    /// which says nothing about what you did wrong.
+    /// Data libraries created before the packaged-runtime release contain a
+    /// promptlib/ copy. Keep accepting that format, but never execute that copy
+    /// from an installed app: updating the app did not update the library and
+    /// left old build behavior active after a successful Sparkle update.
     ///
     /// A symlinked `promptlib` is refused, and the reason is worth reading.
-    /// `cli.py` resolves its root with `Path(__file__).resolve()`, which follows
-    /// symlinks. So a folder whose `promptlib` is a link to another checkout
-    /// reads and WRITES that other checkout while this app believes the library
-    /// is here. Accepting it would be the retargeting failure through a different
-    /// door.
+    /// A symlinked package is still refused for legacy libraries and for CLI
+    /// users who run the data folder directly: that package can resolve and
+    /// write to another checkout while the app believes the library is here.
     ///
     /// **`FileManager.fileExists(atPath:isDirectory:)` does not catch that**: it
     /// follows the link and reports the target's type, so a symlinked package
@@ -485,9 +483,28 @@ struct LibraryClient {
         }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: python)
-        process.arguments = ["-m", "promptlib"] + arguments
+        let bundled = runtimeRoot ?? (Bundle.main.bundleIdentifier == "net.amnesia.seedbed"
+            ? Bundle.main.resourceURL?.appendingPathComponent("Python", isDirectory: true)
+            : nil)
+        if let bundled {
+            let entry = bundled.appendingPathComponent("seedbed_runtime.py")
+            guard FileManager.default.fileExists(atPath: entry.path),
+                  FileManager.default.fileExists(
+                    atPath: bundled.appendingPathComponent("promptlib/cli.py").path) else {
+                throw LibraryError.commandFailed(
+                    "This Seedbed app is missing its packaged Python core. Reinstall Seedbed.")
+            }
+            // A script's own directory leads sys.path, ahead of the writable
+            // library's older promptlib/ copy. --root still selects the data.
+            // Never write __pycache__ into the signed app bundle.
+            process.arguments = ["-B", entry.path, "--root", usableRoot.path] + arguments
+        } else {
+            // Running the Swift package directly during development still uses
+            // the checkout's package, as before there was an assembled bundle.
+            process.arguments = ["-m", "promptlib"] + arguments
+        }
         process.currentDirectoryURL = usableRoot
-        process.environment = Self.childEnvironment
+        process.environment = environmentOverride ?? Self.childEnvironment
 
         let out = Pipe(), err = Pipe()
         process.standardOutput = out

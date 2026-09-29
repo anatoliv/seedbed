@@ -43,12 +43,14 @@ already in `/Applications` from a DMG, add `--force` to let the cask take it
 over, since otherwise Homebrew refuses rather than overwrite an app it did not
 install.
 
-Seedbed is a front end and does not carry the prompts. On first launch, it
+Seedbed carries its Python core but does not carry your prompts. On first launch, it
 copies the starter library from an existing Seedbed checkout, or downloads it
 from the public repository, into `~/Library/Application Support/Seedbed/LibraryData`.
 That writable copy has no Git metadata, so edits stay local. An older library
 at `~/Library/Application Support/Seedbed/Library` or `~/Projects/seedbed` is
-copied without changing it. A library chosen in Settings still wins. A fresh
+copied without changing it. An installed app runs its bundled Python core against
+the writable library, so app updates also update build behavior without replacing
+prompts, models, settings or secrets. A library chosen in Settings still wins. A fresh
 download needs an internet connection and Git. Python 3.11 or newer runs the library.
 
 macOS 14 (Sonoma) or later, Apple silicon or Intel. The cask is marked

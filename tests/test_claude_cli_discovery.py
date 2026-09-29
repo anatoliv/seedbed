@@ -79,7 +79,8 @@ class ClaudeCLIDiscovery(unittest.TestCase):
         # The other half: the app spawns the package, so the package's lookup
         # only helps if the app has not stripped the environment first.
         swift = LIBRARY.read_text(encoding="utf-8")
-        self.assertIn("process.environment = Self.childEnvironment", swift)
+        self.assertIn("process.environment = environmentOverride ?? Self.childEnvironment", swift)
+        self.assertIn("var environmentOverride: [String: String]? = nil", swift)
         self.assertIn("childEnvironment", swift)
         for path in ("/.local/bin", "/opt/homebrew/bin", "/usr/local/bin"):
             self.assertIn(path, swift)

@@ -660,7 +660,7 @@ def cmd_new(args, lib: Library, models: dict, cache: GuideCache) -> int:
         body=args.body or "describe the task in one line",
         context=args.context,
     ).write(path)
-    print(f"created {path.relative_to(ROOT)}. Edit it, then build")
+    print(f"created {path.relative_to(args.root)}. Edit it, then build")
     return 0
 
 

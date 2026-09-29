@@ -224,8 +224,10 @@ a different thing, and lives in the Edit tab.
 
 ## How it fits together
 
-**This app is a front end. `promptlib` (Python, in the parent directory) owns
-the library.** The app shells out to it for three things: `json` to list,
+**This app is a front end. `promptlib` owns the library.** An installed app
+runs the Python core shipped in its own bundle against the writable library;
+running the Swift package directly uses the checkout's copy. The app shells
+out to it for three things: `json` to list,
 `show` to fetch a rendered prompt, `build` to render a missing one. Staleness,
 the guidance cache and the enhancer therefore have exactly one implementation,
 shared with the CLI and the web UI. Parsing the markdown here as well would
@@ -240,8 +242,10 @@ Two consequences worth knowing:
   `defaults write net.amnesia.seedbed PythonPath /path/to/python3`
 - **It needs a library.** First launch copies an older checkout or downloads
   the starter snapshot into `~/Library/Application Support/Seedbed/LibraryData`.
-  This writable copy has no Git metadata. A fresh download needs internet
-  access and Git. Change the library from the menu-bar menu.
+  This writable copy has no Git metadata. Its older `promptlib/` files are kept
+  as user data, but an installed app runs its bundled core so a Sparkle update
+  updates behavior without replacing prompts or settings. A fresh download
+  needs internet access and Git. Change the library from the menu-bar menu.
 
 ## Check for Updates…
 

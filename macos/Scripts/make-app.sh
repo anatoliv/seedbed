@@ -181,6 +181,29 @@ cp ../assets/brand/Seedbed.icns "$APP/Contents/Resources/Seedbed.icns"
 cp ../assets/brand/seedbed-menu-template.png "$APP/Contents/Resources/SeedbedMenuBar.png"
 cp ../assets/brand/seedbed-menu-template@2x.png "$APP/Contents/Resources/SeedbedMenuBar@2x.png"
 
+# The app executes this versioned Python core against the user's writable
+# LibraryData. A Sparkle update replaces the .app, not LibraryData, so running
+# LibraryData/promptlib silently kept old build code after the app updated.
+# Copy tracked source only: ignored caches or machine-local files cannot enter
+# a signed release through this path.
+PYTHON_RESOURCES="$APP/Contents/Resources/Python"
+mkdir -p "$PYTHON_RESOURCES"
+cp Packaging/seedbed_runtime.py "$PYTHON_RESOURCES/seedbed_runtime.py"
+while IFS= read -r -d '' tracked_file; do
+    target="$PYTHON_RESOURCES/$tracked_file"
+    mkdir -p "$(dirname "$target")"
+    cp "../$tracked_file" "$target"
+done < <(git -C .. ls-files -z -- promptlib)
+for asset in favicon.svg favicon-32.png apple-touch-icon.png seedbed-mark.svg; do
+    mkdir -p "$PYTHON_RESOURCES/assets/brand"
+    cp "../assets/brand/$asset" "$PYTHON_RESOURCES/assets/brand/$asset"
+done
+[[ -f "$PYTHON_RESOURCES/promptlib/cli.py" \
+    && -f "$PYTHON_RESOURCES/seedbed_runtime.py" ]] || {
+    echo "error: packaged Python core is incomplete" >&2
+    exit 1
+}
+
 # Inject Crashbox or reporting-disabled without ever printing a DSN. The helper
 # refuses any stale hosted-Sentry input rather than reviving the retired route.
 Scripts/configure-crash-reporting.sh "$APP"

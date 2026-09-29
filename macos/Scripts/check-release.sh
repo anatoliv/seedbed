@@ -221,6 +221,9 @@ if [[ "$APP_VERSION" != "$VERSION" || "$APP_BUILD" != "$BUILD_NUM" ]]; then
     exit 1
 fi
 
+echo "==> Packaged Python core"
+Scripts/verify-packaged-python.sh "$APP"
+
 # The bundle must be built from the CURRENT sources, not merely carry the right
 # version number. `swift build` updates .build; `make-app.sh` assembles the app.
 # Running the first and shipping the second gives you a bundle whose Info.plist
