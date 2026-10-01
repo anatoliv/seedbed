@@ -227,7 +227,7 @@ CURL = "#!/bin/sh\nprintf 200\n"
                      "Scripts/publish-site.sh is private ops tooling, excluded from "
                      "the public snapshot")
 class PublishSiteGuardRedacts(Redaction, unittest.TestCase):
-    FILES = ("privacy.html", "site.css", "supporters.json", "og.png", "favicon.svg",
+    FILES = ("privacy.html", "404.html", "site.css", "supporters.json", "og.png", "favicon.svg",
              "favicon-32.png", "apple-touch-icon.png", "seedbed-mark.svg",
              "seedbed-app-icon.svg")
 

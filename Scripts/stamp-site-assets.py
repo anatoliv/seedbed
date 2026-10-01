@@ -11,7 +11,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site"
-PAGES = (SITE / "index.html", SITE / "privacy.html", SITE / "evidence/index.html")
+PAGES = (
+    SITE / "index.html", SITE / "privacy.html", SITE / "evidence/index.html", SITE / "404.html",
+)
 ASSETS = (
     "og.png", "favicon.svg", "favicon-32.png", "apple-touch-icon.png",
     "site.css", "seedbed-mark.svg", "seedbed-app-icon.svg",

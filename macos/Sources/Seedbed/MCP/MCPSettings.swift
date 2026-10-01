@@ -302,7 +302,7 @@ struct MCPSettings: View {
                 // The port the listener actually holds, not the field above:
                 // the two differ for the moment between a move and the field
                 // catching up, and the one a client must dial is this one.
-                Text("Running at http://127.0.0.1:\(server.boundPort)").font(Tokens.FontScale.small)
+                Self.runningStatus(port: server.boundPort).font(Tokens.FontScale.small)
             } else if let error = server.lastError {
                 Text(error).font(Tokens.FontScale.small).foregroundStyle(Tokens.danger)
             } else {
@@ -311,6 +311,12 @@ struct MCPSettings: View {
             }
             Spacer()
         }
+    }
+
+    /// A port is an address component, not a localized quantity. SwiftUI's
+    /// numeric interpolation adds locale-specific grouping separators.
+    static func runningStatus(port: UInt16) -> Text {
+        Text(verbatim: "Running at http://127.0.0.1:\(port)")
     }
 
     /// What the server learned from the requests it turned away, said here

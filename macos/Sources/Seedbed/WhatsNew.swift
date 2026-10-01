@@ -48,6 +48,15 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.30",
+            date: "30 September 2026",
+            highlight: "MCP addresses display ports as plain digits.",
+            changes: [
+                WhatsNewChange(kind: .fixed, text:
+                    "The running MCP server's address no longer adds commas or other "
+                    + "number separators to its port, regardless of your region settings."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.29",
             date: "29 September 2026",
             highlight: "Clearer settings and model setup, with steadier library rows.",

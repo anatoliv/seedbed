@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Nothing planted here | Seedbed</title>
+<meta name="theme-color" content="#f7f5f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0e11" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg?v=8007fde2beef" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png?v=886905d9ccc4" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2c74ea7d0a4f">
+<link rel="stylesheet" href="/site.css?v=1b1319a47c2d">
+<style>
+  /* The 404: a seed tray with one bare cell, and a five-word seed that grows into the way out.
+     Served for every missing path, so every URL here is absolute. No script: the host's CSP has no script-src. */
+  .lost { padding: clamp(40px, 7vw, 88px) 0 clamp(32px, 5vw, 56px); }
+  .lost-grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: clamp(28px, 5vw, 72px); align-items: center; }
+  @media (max-width: 900px) { .lost-grid { grid-template-columns: 1fr; } }
+  .lost .t-lede { margin-top: 20px; }
+  .lost .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+
+  /* The tray. Colours come from the page palette so it follows light and dark. */
+  .tray { margin: 0; --clay: #c7693d; --clay-dark: #a3522c; --soil: #5b4133; --soil-shade: #3d2a20; --crumb: #7d5d4a; --stake: #fcfbfa; --stake-line: #c9c3bb; --can: #62727b; --can-dark: #4b585f; --water: #5f9fc4; --sprout: var(--leaf); }
+  .tray svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .tray figcaption { margin-top: 12px; text-align: center; font-size: 13px; color: var(--faint); }
+  .tray .shadow { fill: var(--ink); opacity: 0.08; }
+  .tray .body { fill: var(--clay); }
+  .tray .lip { fill: var(--clay-dark); }
+  .tray .cells rect { fill: var(--soil); }
+  .tray .shade rect { fill: var(--soil-shade); opacity: 0.6; }
+  .tray .crumbs circle { fill: var(--crumb); }
+  .tray .lip-text { fill: #fff; opacity: 0.78; font: 600 11px var(--font-mono); letter-spacing: 0.18em; }
+  .tray .sp { color: var(--sprout); transform-box: view-box; transform-origin: 0 0; animation: sway 3.8s ease-in-out infinite alternate; }
+  .tray .sp.t2 { color: color-mix(in srgb, var(--sprout) 78%, #fff); }
+  .tray .sp.t3 { color: color-mix(in srgb, var(--sprout) 82%, #000); }
+  .tray .sprouts g:nth-child(3n) .sp { animation-duration: 4.6s; animation-delay: -1.2s; }
+  .tray .sprouts g:nth-child(3n+1) .sp { animation-duration: 3.4s; animation-delay: -2.1s; }
+  .tray .sprouts g:nth-child(4n) .sp { animation-direction: alternate-reverse; }
+  .tray .vacant { fill: none; stroke: var(--stake); stroke-width: 2; stroke-dasharray: 6 6; opacity: 0.55; }
+  .tray .dent { fill: var(--soil-shade); opacity: 0.7; }
+  .tray .stake { transform-box: fill-box; transform-origin: 50% 100%; transform: rotate(-7deg); transition: transform 400ms cubic-bezier(.2,.9,.3,1.4); }
+  .tray:hover .stake { transform: rotate(5deg); }
+  .tray .stake-card { fill: var(--stake); stroke: var(--stake-line); stroke-width: 1.5; }
+  .tray .stake-404 { fill: var(--accent); font: 700 19px var(--font-mono); }
+  .tray .stake-sub { fill: var(--faint); font: 600 7.5px var(--font-mono); letter-spacing: 0.12em; }
+  .tray .can { fill: var(--can); }
+  .tray .can-line { fill: none; stroke: var(--can); stroke-width: 9; stroke-linecap: round; }
+  .tray .can-band { fill: var(--can-dark); }
+  .tray .can-rose { fill: var(--can-dark); }
+  .tray .drop { fill: var(--water); opacity: 0; animation: fall 1.5s cubic-bezier(.5,0,.9,.6) infinite; }
+  .tray .drop:nth-child(2) { animation-delay: 0.5s; }
+  .tray .drop:nth-child(3) { animation-delay: 1s; }
+  .tray .drop:nth-child(4) { animation-delay: 0.25s; }
+  .tray .drop:nth-child(5) { animation-delay: 0.75s; }
+  .tray .soak { fill: var(--water); opacity: 0.18; animation: soak 1.5s ease-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
+  @keyframes sway { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
+  @keyframes fall { 0% { opacity: 0; transform: translateY(0); } 12% { opacity: 0.95; } 80% { opacity: 0.9; } 100% { opacity: 0; transform: translateY(84px); } }
+  @keyframes soak { 0%, 60% { transform: scale(0.6); opacity: 0; } 75% { opacity: 0.28; } 100% { transform: scale(1.25); opacity: 0; } }
+  @media (prefers-color-scheme: dark) {
+    .tray { --clay: #a5552f; --clay-dark: #7f3f21; --soil: #2e221c; --soil-shade: #17100c; --crumb: #4a3a31; --stake: #2c2c31; --stake-line: #48423e; --can: #8797a0; --can-dark: #6a7880; --water: #7fbde0; }
+    .tray .shadow { fill: #000; opacity: 0.4; }
+    .tray .lip-text { fill: #f3efe9; opacity: 0.6; }
+  }
+
+  /* The seed that grows into the way out: the home page's growth, with links for lines. */
+  .wayout { padding: clamp(24px, 4vw, 48px) 0 clamp(56px, 8vw, 96px); }
+  .wayout-grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: clamp(28px, 5vw, 72px); align-items: start; }
+  @media (max-width: 900px) { .wayout-grid { grid-template-columns: 1fr; } }
+  .wayout .t-lede { margin-top: 14px; }
+  .grow { position: relative; display: grid; }
+  .seedcard, .rendercard { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sheet); box-shadow: var(--shadow); }
+  .seedcard { padding: 16px 18px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: center; width: fit-content; max-width: 100%; }
+  .seedcard .k, .rendercard .k { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+  .seedcard code { font-size: 15px; background: none; border: 0; padding: 0; color: var(--ink); overflow-wrap: anywhere; }
+  .seedcard .meta { grid-column: 2; font-size: 12px; color: var(--faint); }
+  .stem { height: 64px; margin-left: 40px; position: relative; }
+  .stem svg { position: absolute; left: 0; top: -4px; height: 72px; width: 64px; overflow: visible; }
+  .stem path { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 120; stroke-dashoffset: 120; animation: draw 900ms 500ms ease-out forwards; }
+  .stem .leaf { fill: var(--leaf); stroke: none; transform-origin: 0 100%; transform: scale(0); animation: unfurl 600ms 1100ms cubic-bezier(.2,.9,.3,1.2) forwards; }
+  .stem .tag { position: absolute; left: 78px; top: 20px; font-size: 12px; color: var(--dim); display: grid; gap: 2px; opacity: 0; animation: fade 500ms 900ms ease-out forwards; }
+  .stem .tag b { color: var(--ink); font-weight: 600; }
+  .rendercard { padding: 0; overflow: hidden; }
+  .rendercard header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; background: var(--chrome); border-bottom: 1px solid var(--line); font-size: 12px; color: var(--dim); }
+  .rendercard header .k { color: var(--accent); }
+  .rendercard header .path { font-family: var(--font-mono); font-size: 11.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rendercard ol { list-style: none; margin: 0; padding: 14px 16px 16px; display: grid; gap: 10px; }
+  .ln { font-size: 14px; line-height: 1.5; color: var(--ink); opacity: 0; transform: translateY(6px); animation: sprout 480ms ease-out forwards; animation-delay: 1300ms; }
+  .ln:nth-child(2) { animation-delay: 1510ms; }
+  .ln:nth-child(3) { animation-delay: 1720ms; }
+  .ln:nth-child(4) { animation-delay: 1930ms; }
+  .ln:nth-child(5) { animation-delay: 2140ms; }
+  .ln:nth-child(6) { animation-delay: 2350ms; }
+  .ln:nth-child(7) { animation-delay: 2560ms; }
+  .ln.dim { color: var(--dim); }
+  .ln a { font-weight: 600; }
+  .rendercard footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 10px; padding: 9px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--faint); background: var(--chrome); }
+  .rendercard footer b { color: var(--leaf); font-weight: 600; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes unfurl { to { transform: scale(1); } }
+  @keyframes fade { to { opacity: 1; } }
+  @keyframes sprout { to { opacity: 1; transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tray .sp, .tray .soak { animation: none; }
+    .tray .drop { animation: none; opacity: 0.9; }
+    .tray .stake, .tray:hover .stake { transition: none; transform: rotate(-7deg); }
+    .stem path { stroke-dashoffset: 0; animation: none; }
+    .stem .leaf { transform: none; animation: none; }
+    .stem .tag, .ln { opacity: 1; transform: none; animation: none; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="shell">
+    <div class="bar">
+      <a class="lockup" href="/" aria-label="Seedbed home"><img src="/seedbed-mark.svg?v=34a05e9541e0" alt="" width="30" height="30">Seedbed</a>
+      <nav class="nav" aria-label="Site">
+        <a class="link" href="/#idea">How it works</a>
+        <a class="link" href="/#agents">Agents</a>
+        <a class="link" href="/evidence/">Evidence</a>
+        <a class="link" href="https://github.com/anatoliv/seedbed" rel="noopener">Source</a>
+        <a class="btn btn-primary btn-small" href="/#install">Download</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="lost" aria-labelledby="lost-title">
+    <div class="shell">
+      <div class="lost-grid">
+        <div>
+          <div class="cue"><span class="rows" aria-hidden="true"><i></i><i></i><i></i></span><span class="n">404</span><span>One empty cell</span></div>
+          <h1 id="lost-title" class="t-display">Nothing planted <em>here.</em></h1>
+          <p class="t-lede">There is no page at this address. The link may be mistyped, or the page has moved. We checked every cell in the tray.</p>
+          <div class="row">
+            <a class="btn btn-primary" href="/#install">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M7 12l5 5 5-5"/><path d="M5 21h14"/></svg>
+              Download Seedbed
+            </a>
+            <a class="btn btn-ghost" href="/">Back to the home page</a>
+          </div>
+        </div>
+
+        <figure class="tray">
+          <svg viewBox="0 0 600 500" role="img" aria-labelledby="tray-title">
+            <title id="tray-title">A seed tray of twelve cells. Eleven hold a sprout. The twelfth is bare soil with a plant label reading 404, and a watering can is patiently watering it anyway.</title>
+            <defs>
+              <symbol id="sb-sprout" viewBox="300 220 510 440">
+                <path fill="currentColor" d="M522 486c22-139 121-236 274-254-4 132-84 221-213 240-24 4-43 14-61 35Z"/>
+                <path fill="currentColor" d="M498 531c-19-89-89-145-186-151 8 88 65 143 151 148 14 1 26 7 36 18Z"/>
+                <path fill="none" stroke="currentColor" stroke-width="48" stroke-linecap="round" d="M532 442c-9 39-20 74-24 111-3 26-1 50 4 76"/>
+              </symbol>
+            </defs>
+            <ellipse class="shadow" cx="300" cy="482" rx="286" ry="14"/>
+            <rect class="body" x="20" y="130" width="560" height="344" rx="20"/>
+            <path class="lip" d="M20 440h560v14a20 20 0 0 1-20 20H40a20 20 0 0 1-20-20Z"/>
+            <text class="lip-text" x="300" y="462" text-anchor="middle">SEEDBED · 11 OF 12 SPROUTED</text>
+            <g class="cells"><rect x="38" y="146" width="122" height="88" rx="10"/><rect x="172" y="146" width="122" height="88" rx="10"/><rect x="306" y="146" width="122" height="88" rx="10"/><rect x="440" y="146" width="122" height="88" rx="10"/><rect x="38" y="246" width="122" height="88" rx="10"/><rect x="172" y="246" width="122" height="88" rx="10"/><rect x="306" y="246" width="122" height="88" rx="10"/><rect x="440" y="246" width="122" height="88" rx="10"/><rect x="38" y="346" width="122" height="88" rx="10"/><rect x="172" y="346" width="122" height="88" rx="10"/><rect x="306" y="346" width="122" height="88" rx="10"/><rect x="440" y="346" width="122" height="88" rx="10"/></g>
+            <g class="shade"><rect x="38" y="146" width="122" height="16" rx="8"/><rect x="172" y="146" width="122" height="16" rx="8"/><rect x="306" y="146" width="122" height="16" rx="8"/><rect x="440" y="146" width="122" height="16" rx="8"/><rect x="38" y="246" width="122" height="16" rx="8"/><rect x="172" y="246" width="122" height="16" rx="8"/><rect x="306" y="246" width="122" height="16" rx="8"/><rect x="440" y="246" width="122" height="16" rx="8"/><rect x="38" y="346" width="122" height="16" rx="8"/><rect x="172" y="346" width="122" height="16" rx="8"/><rect x="306" y="346" width="122" height="16" rx="8"/><rect x="440" y="346" width="122" height="16" rx="8"/></g>
+            <g class="crumbs"><circle cx="72" cy="217" r="2.5"/><circle cx="145" cy="201" r="1.5"/><circle cx="108" cy="193" r="2.5"/><circle cx="65" cy="212" r="2"/><circle cx="69" cy="205" r="1.5"/><circle cx="195" cy="223" r="1.5"/><circle cx="215" cy="222" r="1.5"/><circle cx="273" cy="195" r="2"/><circle cx="234" cy="187" r="2.5"/><circle cx="282" cy="220" r="1.5"/><circle cx="333" cy="187" r="2"/><circle cx="322" cy="193" r="1.5"/><circle cx="371" cy="216" r="1.5"/><circle cx="333" cy="215" r="2"/><circle cx="385" cy="216" r="2"/><circle cx="499" cy="202" r="2.5"/><circle cx="489" cy="202" r="1.5"/><circle cx="457" cy="196" r="2.5"/><circle cx="550" cy="194" r="2.5"/><circle cx="520" cy="201" r="2"/><circle cx="93" cy="319" r="2.5"/><circle cx="57" cy="293" r="1.5"/><circle cx="117" cy="312" r="1.5"/><circle cx="63" cy="317" r="2.5"/><circle cx="75" cy="299" r="2.5"/><circle cx="226" cy="307" r="1.5"/><circle cx="251" cy="314" r="1.5"/><circle cx="261" cy="294" r="1.5"/><circle cx="235" cy="290" r="2.5"/><circle cx="193" cy="295" r="2"/><circle cx="369" cy="321" r="1.5"/><circle cx="366" cy="320" r="1.5"/><circle cx="352" cy="320" r="1.5"/><circle cx="346" cy="291" r="1.5"/><circle cx="400" cy="288" r="1.5"/><circle cx="538" cy="318" r="2"/><circle cx="519" cy="314" r="2.5"/><circle cx="501" cy="323" r="2"/><circle cx="459" cy="317" r="2"/><circle cx="524" cy="312" r="1.5"/><circle cx="105" cy="405" r="1.5"/><circle cx="97" cy="416" r="2.5"/><circle cx="72" cy="424" r="2.5"/><circle cx="125" cy="409" r="2.5"/><circle cx="142" cy="402" r="2.5"/><circle cx="234" cy="409" r="2.5"/><circle cx="229" cy="420" r="2.5"/><circle cx="278" cy="387" r="2"/><circle cx="207" cy="388" r="2.5"/><circle cx="252" cy="402" r="2.5"/><circle cx="334" cy="388" r="2.5"/><circle cx="358" cy="421" r="1.5"/><circle cx="413" cy="400" r="1.5"/><circle cx="372" cy="412" r="2.5"/><circle cx="345" cy="414" r="2.5"/><circle cx="484" cy="393" r="2"/><circle cx="524" cy="412" r="1.5"/><circle cx="498" cy="396" r="2"/><circle cx="462" cy="408" r="1.5"/><circle cx="486" cy="412" r="1.5"/></g>
+            <g class="sprouts"><g transform="translate(100.0 220.1)"><use class="sp t3" href="#sb-sprout" x="-30.7" y="-59.3" width="73.9" height="63.7"/></g>
+  <g transform="translate(229.0 220.0)"><use class="sp t2" href="#sb-sprout" x="-26.8" y="-51.8" width="64.5" height="55.7"/></g>
+  <g transform="translate(506.0 220.0)"><use class="sp t3" href="#sb-sprout" x="-27.2" y="-52.4" width="65.4" height="56.4"/></g>
+  <g transform="translate(97.0 320.0)"><use class="sp" href="#sb-sprout" x="-32.7" y="-63.2" width="78.8" height="67.9"/></g>
+  <g transform="translate(239.0 320.0)"><use class="sp" href="#sb-sprout" x="-27.0" y="-52.2" width="65.1" height="56.1"/></g>
+  <g transform="translate(366.0 320.0)"><use class="sp t3" href="#sb-sprout" x="-27.7" y="-53.4" width="66.6" height="57.5"/></g>
+  <g transform="translate(496.0 320.0)"><use class="sp" href="#sb-sprout" x="-29.0" y="-56.0" width="69.8" height="60.2"/></g>
+  <g transform="translate(105.0 420.1)"><use class="sp" href="#sb-sprout" x="-27.6" y="-53.4" width="66.5" height="57.3"/></g>
+  <g transform="translate(234.0 420.0)"><use class="sp t3" href="#sb-sprout" x="-32.5" y="-62.7" width="78.2" height="67.5"/></g>
+  <g transform="translate(366.0 420.0)"><use class="sp" href="#sb-sprout" x="-28.5" y="-54.9" width="68.5" height="59.1"/></g>
+  <g transform="translate(496.0 419.9)"><use class="sp t2" href="#sb-sprout" x="-29.1" y="-56.1" width="70.0" height="60.4"/></g></g>
+            <rect class="vacant" x="310" y="150" width="114" height="80" rx="8"/>
+            <ellipse class="dent" cx="367" cy="206" rx="34" ry="9"/>
+            <ellipse class="soak" cx="394" cy="210" rx="16" ry="5"/>
+            <g class="stake">
+              <path class="stake-card" d="M339 150h48a4 4 0 0 1 4 4v38a4 4 0 0 1-4 4h-18l-6 22-6-22h-18a4 4 0 0 1-4-4v-38a4 4 0 0 1 4-4Z"/>
+              <text class="stake-404" x="363" y="177" text-anchor="middle">404</text>
+              <text class="stake-sub" x="363" y="189" text-anchor="middle">EMPTY</text>
+            </g>
+            <g class="drops">
+              <path class="drop" d="M386 112c2 4 4 7 4 9a4 4 0 0 1-8 0c0-2 2-5 4-9Z"/>
+              <path class="drop" d="M396 110c2 4 4 7 4 9a4 4 0 0 1-8 0c0-2 2-5 4-9Z"/>
+              <path class="drop" d="M391 114c2 4 4 7 4 9a4 4 0 0 1-8 0c0-2 2-5 4-9Z"/>
+              <path class="drop" d="M401 113c2 4 4 7 4 9a4 4 0 0 1-8 0c0-2 2-5 4-9Z"/>
+              <path class="drop" d="M381 115c2 4 4 7 4 9a4 4 0 0 1-8 0c0-2 2-5 4-9Z"/>
+            </g>
+            <g transform="rotate(-24 500 75)">
+              <path class="can-line" d="M470 42c2-34 58-34 60 0"/>
+              <path class="can-line" d="M552 56c26 0 26 44 0 44"/>
+              <path class="can" d="M452 86 390 52l-5 10 65 42Z"/>
+              <path class="can-rose" d="M391 54 386 42 372 64 385 63Z"/>
+              <rect class="can" x="450" y="38" width="104" height="74" rx="12"/>
+              <rect class="can-band" x="450" y="56" width="104" height="8"/>
+            </g>
+          </svg>
+          <figcaption>Eleven of twelve cells came up. This address is the twelfth.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <div class="shell"><hr class="hr"></div>
+
+  <section class="wayout" aria-labelledby="wayout-title">
+    <div class="shell">
+      <div class="wayout-grid">
+        <div>
+          <div class="cue"><span class="rows" aria-hidden="true"><i></i><i></i><i></i></span><span class="n">Seed</span><span>Plant one instead</span></div>
+          <h2 id="wayout-title" class="t-h2">Five words in, <em>a way out.</em></h2>
+          <p class="t-lede">Every prompt in Seedbed starts as a short seed and grows into the long version a model wants. Here is one for this page.</p>
+        </div>
+
+        <div class="grow">
+          <div class="seedcard">
+            <span class="k">Seed</span>
+            <code>take me somewhere useful instead</code>
+            <span class="meta">5 words · prompts/not-found.md</span>
+          </div>
+          <div class="stem" aria-hidden="true">
+            <svg viewBox="0 0 64 72">
+              <path d="M18 2 C 14 24, 30 34, 24 58 L 24 70"/>
+              <path class="leaf" d="M25 40 c 4 -12, 14 -18, 26 -18 c -1 12 -8 19 -20 20 c -2 0 -4 1 -6 3 Z"/>
+            </svg>
+            <div class="tag"><b>+ this site's guidance</b><span>+ one missing page</span></div>
+          </div>
+          <div class="rendercard">
+            <header>
+              <span class="k">Rendered</span>
+              <span class="path">rendered/seedbed.dev/not-found.md</span>
+            </header>
+            <ol>
+              <li class="ln">You followed a link to seedbed.dev and found an empty cell. Go somewhere that grew:</li>
+              <li class="ln"><a href="/">Start at the home page</a>, which shows a seed becoming a prompt on one screen.</li>
+              <li class="ln"><a href="/#install">Download Seedbed</a> for macOS 14 or later. It is free, open source, and updates itself.</li>
+              <li class="ln"><a href="/#idea">Read how it works</a>: a seed, plus a model's guidance, plus an enhancer, makes one file per model.</li>
+              <li class="ln"><a href="/evidence/">Check the evidence</a>, including the model where tailoring did not help.</li>
+              <li class="ln"><a href="/privacy.html">See what leaves your Mac</a>, and when.</li>
+              <li class="ln dim">Done means: you are on a page that exists.</li>
+            </ol>
+            <footer><span>5 words in · 5 links out</span><span><b>current</b> · this cell is still empty</span></footer>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="shell">
+    <div class="foot">
+      <span>Seedbed · a seedbed is where you raise seeds into what you actually plant out</span>
+      <nav aria-label="Footer">
+        <a href="/">Home</a>
+        <a href="/evidence/">Evidence</a>
+        <a href="https://github.com/anatoliv/seedbed">GitHub</a>
+        <a href="https://github.com/anatoliv/seedbed/blob/main/LICENSE">MIT</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

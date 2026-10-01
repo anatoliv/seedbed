@@ -19,7 +19,8 @@ SITE = ROOT / "site"
 INDEX = SITE / "index.html"
 EVIDENCE = SITE / "evidence" / "index.html"
 PRIVACY = SITE / "privacy.html"
-PAGES = (INDEX, EVIDENCE, PRIVACY)
+NOT_FOUND = SITE / "404.html"
+PAGES = (INDEX, EVIDENCE, PRIVACY, NOT_FOUND)
 CASK = ROOT / "Casks" / "seedbed.rb"
 
 # The design notes behind the site list what it must not claim, each because a
@@ -128,6 +129,15 @@ class SiteContent(unittest.TestCase):
             for phrase in FORBIDDEN_CLAIMS:
                 with self.subTest(page=page.name, phrase=phrase):
                     self.assertNotIn(phrase, lower)
+
+    def test_not_found_page_works_at_any_depth_and_stays_out_of_search(self) -> None:
+        # nginx serves 404.html for every missing path, nested ones included, so a
+        # relative URL on it would resolve against whatever address was mistyped.
+        html = text_of(NOT_FOUND)
+        self.assertIn('<meta name="robots" content="noindex, nofollow">', html)
+        for ref in re.findall(r'(?:href|src)="([^"#]+)', html):
+            with self.subTest(ref=ref):
+                self.assertTrue(ref.startswith(("/", "https://")), f"{ref} is relative")
 
     def test_the_negative_result_is_published_beside_the_positive(self) -> None:
         # Publishing the Opus result that did not support the tool is what makes
