@@ -227,6 +227,7 @@ class CrashReportingTests(unittest.TestCase):
             "options.sendClientReports = false",
             "options.maxBreadcrumbs = 0",
             "options.maxCacheItems = UInt(perLaunchBudget)",
+            "options.urlSession = transportSession()",
         ):
             self.assertIn(setting, source)
         self.assertIn("static let perLaunchBudget = 20", source)
@@ -239,7 +240,7 @@ class CrashReportingTests(unittest.TestCase):
         self.assertIn("static let initializationWait: TimeInterval = 1", source)
         self.assertIn("static let canaryFlushTimeout: TimeInterval = 2", source)
         self.assertIn("SentrySDK.flush(timeout: canaryFlushTimeout)", source)
-        self.assertEqual(source.count("SentrySDK.start {"), 1)
+        self.assertEqual(source.count("SentrySDK.start(options:"), 1)
         self.assertIn("captureTestEvent { NSApp.terminate(nil) }", app)
 
     # ------------------------------------------------------------------

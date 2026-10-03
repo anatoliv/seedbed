@@ -503,6 +503,8 @@ extension Guide {
         What is sent is the stack trace and the versions. What is never sent is your library: prompts, renders and the values you have filled in are the entire content of this app and none of it is captured. Your home folder path is replaced with a tilde before anything is sent, and anything shaped like an access token is redacted.
 
         At most twenty events per launch, so a crash loop cannot turn into a flood.
+
+        Turning reports on means Seedbed will try to send a report after a crash, and it does not confirm that the report arrived.
         """),
     ]
 }

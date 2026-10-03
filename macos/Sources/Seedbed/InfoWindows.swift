@@ -1,6 +1,22 @@
 import AppKit
 import SwiftUI
 
+/// Keep native chrome in sync when the sidebar, search, or menu changes pages.
+struct InfoWindowTitle: NSViewRepresentable {
+    let title: String
+
+    final class TitleView: NSView {
+        var title = "" { didSet { window?.title = title } }
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            window?.title = title
+        }
+    }
+
+    func makeNSView(context: Context) -> TitleView { TitleView() }
+    func updateNSView(_ view: TitleView, context: Context) { view.title = title }
+}
+
 /// Presents the app's windows that are read rather than worked in.
 ///
 /// One presenter, and now one window: the manual used to be five separate ones
@@ -81,6 +97,7 @@ struct ManualPage: View {
                     VStack(alignment: .leading, spacing: Tokens.Space.element) {
                         ForEach(section.topics) { topic in
                             ManualTopicView(topic: topic)
+                                .id(topic.id)
                         }
                     }
                 }

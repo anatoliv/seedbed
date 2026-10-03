@@ -10,10 +10,16 @@ has to guarantee: every advertised file is uploaded before the feed, files
 already served are not uploaded again, a file that does not arrive fails the
 publish and says it was served as nothing, and a feed naming a file dist/ does
 not have stops before anything is uploaded.
+
+Republishing must keep complete live bytes visible while a copy is in progress,
+preserve existing open readers, and keep the prior feed if its copy fails.
 """
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
+import json
 import os
 import plistlib
 import shutil
@@ -49,7 +55,7 @@ FEED = f"""<?xml version="1.0" encoding="utf-8"?>
 </rss>
 """
 
-# scp SRC HOST:/tmp/.seedbed-publish-NAME -> stage it in the fake host's /tmp.
+# scp SRC HOST:/tmp/.seedbed-publish-RANDOM -> stage it in the fake host's /tmp.
 SCP = """#!/usr/bin/env python3
 import os, shutil, sys
 args = [a for a in sys.argv[1:] if a != "-q"]
@@ -59,18 +65,56 @@ shutil.copyfile(src, os.path.join(os.environ["FAKE_HOST_TMP"], name))
 open(os.environ["FAKE_LOG"], "a").write(f"scp {name}\\n")
 """
 
-# ssh HOST "sudo install ... '/tmp/.x' 'DOCROOT/NAME' && rm -f '/tmp/.x'"
-# FAKE_DROP names a file whose install silently does nothing.
+# Run the remote shell locally, with a sudo shim that does not change ownership.
+# Uploads in the remote /tmp are mapped into the fake host's private directory.
 SSH = """#!/usr/bin/env python3
-import os, shlex, shutil, sys
-words = shlex.split(sys.argv[2])
-staged, target = [w for w in words if w.startswith("/tmp/.seedbed-publish-")][0], None
-target = words[words.index(staged) + 1]
+import os, subprocess, sys
+command = sys.argv[2].replace("/tmp/.seedbed-publish-",
+                              os.environ["FAKE_HOST_TMP"] + "/.seedbed-publish-")
+sys.exit(subprocess.run(["bash", "-c", command]).returncode)
+"""
+
+SUDO = """#!/usr/bin/env python3
+import json, os, shutil, subprocess, sys
+args = sys.argv[1:]
+if args[0] == "mv" and os.path.basename(args[-1]) == os.environ.get("FAKE_DROP"):
+    os.unlink(args[-2])
+    sys.exit(0)
+if args[0] != "install" or "-d" in args:
+    # Exercise an actual rename, mktemp, directory creation and cleanup.
+    if args[0] == "install":
+        for option in ("-o", "-g"):
+            i = args.index(option)
+            del args[i:i + 2]
+    sys.exit(subprocess.run(args).returncode)
+src, target = args[-2:]
 name = os.path.basename(target)
-if name != os.environ.get("FAKE_DROP"):
-    shutil.copyfile(os.path.join(os.environ["FAKE_HOST_TMP"], os.path.basename(staged)),
-                    os.path.join(os.environ["FAKE_DOCROOT"], name))
+if "/.publish-staging/" in target:
+    name = os.path.basename(target).rsplit(".", 1)[0]
+with open(src, "rb") as incoming, open(target, "wb") as outgoing:
+    outgoing.write(incoming.read(1))
+    outgoing.flush()
+    if os.environ.get("FAKE_OBSERVE"):
+        for public in ("Seedbed_1.9_universal.dmg", "appcast.xml"):
+            path = os.path.join(os.environ["FAKE_DOCROOT"], public)
+            data = open(path, "rb").read() if os.path.exists(path) else None
+            with open(os.environ["FAKE_LOG"], "a") as log:
+                log.write("observe " + json.dumps([public, data.hex() if data is not None else None]) + "\\n")
+    if name == os.environ.get("FAKE_FAIL_INSTALL"):
+        sys.exit(1)
+    shutil.copyfileobj(incoming, outgoing)
+os.chmod(target, 0o644)
 open(os.environ["FAKE_LOG"], "a").write(f"install {name}\\n")
+"""
+
+# The fake host runs on macOS; the deployment host has GNU stat.
+STAT = """#!/usr/bin/env python3
+import os, sys
+path = sys.argv[-1]
+device = os.stat(path).st_dev
+if os.environ.get("FAKE_CROSS_DEVICE") and "/.publish-staging/" in path:
+    device += 1
+print(device)
 """
 
 # curl [-fsSL|-fsSI] [--max-time N] [-o FILE] URL, served from the fake docroot.
@@ -134,10 +178,10 @@ class PublishAgainstAFakeHost(unittest.TestCase):
         self.log.write_text("")
         bin_dir = root / "bin"
         bin_dir.mkdir()
-        for name, body in (("scp", SCP), ("ssh", SSH), ("curl", CURL)):
+        for name, body in (("scp", SCP), ("ssh", SSH), ("sudo", SUDO), ("stat", STAT), ("curl", CURL)):
             self.stub(bin_dir / name, body)
         self.env = dict(os.environ, PATH=f"{bin_dir}:{os.environ['PATH']}",
-                        PUBLISH_HOST="fake-host", PUBLISH_DIR="/srv/site", APPCAST_BASE=BASE,
+                        PUBLISH_HOST="fake-host", PUBLISH_DIR=str(self.docroot), APPCAST_BASE=BASE,
                         FAKE_BASE=BASE, FAKE_DOCROOT=str(self.docroot),
                         FAKE_HOST_TMP=str(self.host_tmp), FAKE_LOG=str(self.log))
 
@@ -161,6 +205,66 @@ class PublishAgainstAFakeHost(unittest.TestCase):
                          "the delta was not uploaded, or the feed went up before it")
         self.assertEqual((self.docroot / DELTA).read_bytes(), b"dlt")
         self.assertIn("every file the feed advertises is served as built (3)", result.stdout)
+
+    def test_republish_never_exposes_partial_bytes_or_rewrites_open_readers(self) -> None:
+        old_dmg, old_feed = b"previous complete download", b"previous complete feed"
+        (self.docroot / DMG).write_bytes(old_dmg)
+        (self.docroot / "appcast.xml").write_bytes(old_feed)
+        with (self.docroot / DMG).open("rb") as reader:
+            result = self.publish(FAKE_OBSERVE="1")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(reader.read(), old_dmg,
+                             "publishing rewrote an inode an existing reader was serving")
+        expected = {DMG: {old_dmg.hex(), b"new".hex()},
+                    "appcast.xml": {old_feed.hex(), FEED.encode().hex()}}
+        observations = [json.loads(event.removeprefix("observe "))
+                        for event in self.events() if event.startswith("observe ")]
+        self.assertTrue(observations, "the fake host did not observe writes in progress")
+        for name, data in observations:
+            self.assertIn(data, expected[name], f"a reader saw partial bytes for {name}")
+        self.assertEqual((self.docroot / DMG).read_bytes(), b"new")
+        self.assertEqual((self.docroot / "appcast.xml").read_text(), FEED)
+        self.assertEqual((self.docroot / ".publish-staging").stat().st_mode & 0o777, 0o700)
+
+    def test_failed_copy_keeps_the_complete_live_feed_and_cleans_staging(self) -> None:
+        old_feed = b"previous complete feed"
+        (self.docroot / "appcast.xml").write_bytes(old_feed)
+        result = self.publish(FAKE_FAIL_INSTALL="appcast.xml")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((self.docroot / "appcast.xml").read_bytes(), old_feed)
+        self.assertEqual(list(self.host_tmp.iterdir()), [], "upload staging leaked")
+        staging = self.docroot / ".publish-staging"
+        self.assertEqual(list(staging.iterdir()), [], "document-root staging leaked")
+
+    def test_a_different_staging_filesystem_fails_without_replacing_the_live_file(self) -> None:
+        old_dmg = b"previous complete download"
+        (self.docroot / DMG).write_bytes(old_dmg)
+        result = self.publish(FAKE_CROSS_DEVICE="1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((self.docroot / DMG).read_bytes(), old_dmg)
+        self.assertEqual(list(self.host_tmp.iterdir()), [])
+        self.assertEqual(list((self.docroot / ".publish-staging").iterdir()), [])
+
+    def test_document_root_with_shell_metacharacters(self) -> None:
+        quoted = self.docroot.with_name("docroot with a 'quote'")
+        self.docroot.rename(quoted)
+        self.docroot = quoted
+        self.env.update(PUBLISH_DIR=str(quoted), FAKE_DOCROOT=str(quoted))
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.docroot / DMG).read_bytes(), b"new")
+
+    def test_concurrent_uploads_have_distinct_temporary_paths(self) -> None:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda _: self.publish(), range(2)))
+        for result in results:
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        uploads = [event.split()[1] for event in self.events() if event.startswith("scp ")]
+        self.assertEqual(len(uploads), len(set(uploads)), "concurrent uploads shared a path")
+        self.assertEqual((self.docroot / DMG).read_bytes(), b"new")
+        self.assertEqual((self.docroot / "appcast.xml").read_text(), FEED)
+        self.assertEqual(list(self.host_tmp.iterdir()), [])
+        self.assertEqual(list((self.docroot / ".publish-staging").iterdir()), [])
 
     def test_a_file_already_served_is_not_uploaded_again(self) -> None:
         result = self.publish()

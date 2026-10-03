@@ -227,6 +227,11 @@ inter-card gap, 16pt inset, 6pt radius, `primary` at 4% for the fill, and
 entry uses Reference's solid positive Latest badge, while New / Improved / Fixed
 retain the positive, secondary-accent, and warning palette.
 
+Help search includes Help topics, FAQ topics, and every guide page. Results open
+the matching guide or scroll to the matching topic. Explicit page navigation
+keeps the query while leaving results; the native window title follows the
+visible destination, including sidebar and search navigation.
+
 The information window keeps one deliberate Seedbed brand layer over that
 shared structure: page-header glyphs and the selected What's New navigation
 glyph use the contrast-safe terracotta `accent`; headings and release copy keep

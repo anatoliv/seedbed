@@ -116,6 +116,9 @@ struct GeneralSettings: View {
     /// Same reason as `pasteEnabled`: `CrashReporting` owns the default, which
     /// is off, so `@AppStorage` here would be a second source for one setting.
     @State private var crashReporting = CrashReporting.isEnabled
+    /// Re-read when a start attempt settles, which happens off the main thread
+    /// after the toggle has already moved.
+    @State private var crashStatus = CrashReporting.currentStatus
     /// Same shape again: Sparkle owns this value and persists it, so mirroring
     /// it into `@AppStorage` would be a second source for one setting.
     @State private var automaticUpdates = Updater.shared?.automaticallyChecks ?? false
@@ -200,7 +203,12 @@ struct GeneralSettings: View {
                             .onChange(of: crashReporting) { _, new in
                                 UserDefaults.standard.set(new, forKey: CrashReporting.enabledKey)
                                 CrashReporting.apply(enabled: new)
+                                crashStatus = CrashReporting.currentStatus
                             }
+                        if let notice = CrashReporting.settingsNotice(for: crashStatus) {
+                            Label(notice, systemImage: "exclamationmark.triangle")
+                                .font(Tokens.FontScale.small).foregroundStyle(Tokens.warning)
+                        }
                         Caption(CrashReporting.isConfigured
                             ? "Off by default. Reports include the stack trace, app version, and macOS version."
                             : "Crash reporting is unavailable in this build.")
@@ -218,7 +226,11 @@ struct GeneralSettings: View {
             launchAtLogin = LaunchAtLogin.isEnabled
             hasAccessibility = Paster.hasPermission
             crashReporting = CrashReporting.isEnabled
+            crashStatus = CrashReporting.currentStatus
             automaticUpdates = Updater.shared?.automaticallyChecks ?? false
+        }
+        .onReceive(NotificationCenter.default.publisher(for: CrashReporting.statusDidChange)) { _ in
+            crashStatus = CrashReporting.currentStatus
         }
     }
 

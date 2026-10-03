@@ -62,6 +62,22 @@ enum InfoPage: String, CaseIterable, Identifiable {
     var sidebarSymbol: String {
         self == .whatsNew ? "megaphone" : symbol
     }
+
+    var windowTitle: String {
+        switch self {
+        case .about: return "About Seedbed"
+        case .help: return "Seedbed Help"
+        case .faq: return "Seedbed FAQ"
+        case .whatsNew: return "What's New in Seedbed"
+        case .gettingStarted: return "Getting Started with Seedbed"
+        }
+    }
+}
+
+enum InfoDestination: Equatable {
+    case page(InfoPage)
+    case guide(String)
+    case topic(page: InfoPage, id: String)
 }
 
 /// Which page is showing. A published object rather than view state, because
@@ -98,17 +114,43 @@ final class InfoModel: ObservableObject {
     /// thirty guide pages share one sidebar, so exactly one of these is in
     /// force: setting either clears the other.
     @Published var guide: String?
+    /// The matching Help/FAQ entry to scroll into view after a result opens.
+    @Published var topic: String?
+
+    var searching: Bool {
+        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !browsing
+    }
+
+    var windowTitle: String {
+        if searching { return "Search Seedbed Help" }
+        if let guide, let entry = Guide.pages.first(where: { $0.id == guide }) {
+            return "\(entry.title) · Seedbed Guide"
+        }
+        return page.windowTitle
+    }
 
     /// Go to a page and read it, keeping the query for when you want it back.
     func open(_ page: InfoPage) {
         self.page = page
         self.guide = nil
+        topic = nil
         browsing = true
     }
 
     func open(guide id: String) {
         self.guide = id
+        topic = nil
         browsing = true
+    }
+
+    func open(_ destination: InfoDestination) {
+        switch destination {
+        case .page(let page): open(page)
+        case .guide(let id): open(guide: id)
+        case .topic(let page, let id):
+            open(page)
+            topic = id
+        }
     }
 
     /// What the sidebar's selection binds to. A guide id and an `InfoPage`
@@ -144,16 +186,21 @@ struct InfoWindowView: View {
     /// The scrolling half of a page, under the fixed header.
     @ViewBuilder private func pageBody<C: View>(
         maxWidth: CGFloat = Tokens.Width.reading,
-        @ViewBuilder _ content: () -> C
+        @ViewBuilder _ content: @escaping () -> C
     ) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Tokens.Space.regular) {
-                content()
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: Tokens.Space.regular) {
+                    content()
+                }
+                .frame(maxWidth: maxWidth, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Tokens.Space.pane)
+                .padding(.vertical, Tokens.Space.wide)
             }
-            .frame(maxWidth: maxWidth, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Tokens.Space.pane)
-            .padding(.vertical, Tokens.Space.wide)
+            .task(id: model.topic) {
+                if let id = model.topic { proxy.scrollTo(id, anchor: .top) }
+            }
         }
     }
 
@@ -204,7 +251,7 @@ struct InfoWindowView: View {
             .frame(width: Tokens.Width.sidebar)
             SeedbedDivider()
             Group {
-                if searching {
+                if model.searching {
                     PageHeader(title: "Search",
                                symbol: "magnifyingglass",
                                badge: "\(resultCount ?? 0) result\(resultCount == 1 ? "" : "s")",
@@ -245,14 +292,7 @@ struct InfoWindowView: View {
                maxHeight: .infinity)
         .background(Tokens.Surface.canvas)
         .tint(Tokens.accent)
-    }
-
-    /// A query of only whitespace is not a search, and blanking the page for one
-    /// looks like the window broke. `browsing` is the other half: the reader has
-    /// gone to a page, and their query is being kept rather than acted on.
-    private var searching: Bool {
-        !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !model.browsing
+        .background(InfoWindowTitle(title: model.windowTitle).frame(width: 0, height: 0))
     }
 
     /// Only computed while a page is showing over a live query, which is the one

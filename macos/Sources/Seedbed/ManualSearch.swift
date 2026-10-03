@@ -130,17 +130,51 @@ enum ManualSearch {
         return 0.6 * overlap + 0.4 * dice(askTrigrams, trigrams(value))
     }
 
-    /// One topic with the evidence for it.
+    /// Searchable prose and the exact destination it opens.
+    struct Entry: Identifiable {
+        let id: String
+        let title: String
+        let category: String
+        let body: String
+        let kind: String
+        let symbol: String
+        let destination: InfoDestination
+
+        init(topic: ManualTopic) {
+            id = topic.id
+            title = topic.term
+            category = topic.section
+            body = [topic.detail, topic.example ?? ""].joined(separator: "\n")
+            kind = topic.page.title
+            symbol = topic.page.symbol
+            destination = .topic(page: topic.page, id: topic.id)
+        }
+
+        init(guide: GuidePage) {
+            id = "guide|\(guide.id)"
+            title = guide.title
+            category = guide.category
+            body = guide.body
+            kind = "Guide"
+            symbol = Guide.symbol(for: guide.category)
+            destination = .guide(guide.id)
+        }
+    }
+
+    static let entries = Manual.topics.map { Entry(topic: $0) }
+        + Guide.pages.map { Entry(guide: $0) }
+
+    /// One destination with the evidence for it.
     struct Hit: Identifiable {
-        let topic: ManualTopic
+        let entry: Entry
         let score: Double
         /// The field that contributed most, so a result can say what matched.
         let matchedOn: String
-        var id: String { topic.id }
+        var id: String { entry.id }
     }
 
     /// Every topic scored against the ask, best first, noise dropped.
-    static func rank(_ ask: String, in topics: [ManualTopic] = Manual.topics) -> [Hit] {
+    static func rank(_ ask: String, in entries: [Entry] = ManualSearch.entries) -> [Hit] {
         let trimmed = ask.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
         let askTokens = tokens(trimmed)
@@ -148,11 +182,11 @@ enum ManualSearch {
         let weightTotal = FIELD_WEIGHTS.values.reduce(0, +)
 
         var hits: [Hit] = []
-        for topic in topics {
+        for entry in entries {
             let values = [
-                "title": topic.term,
-                "category": topic.section,
-                "body": [topic.detail, topic.example ?? ""].joined(separator: "\n"),
+                "title": entry.title,
+                "category": entry.category,
+                "body": entry.body,
             ]
             var fields: [String: Double] = [:]
             for (name, value) in values {
@@ -165,18 +199,18 @@ enum ManualSearch {
             let best = fields.max { lhs, rhs in
                 lhs.value == rhs.value ? lhs.key > rhs.key : lhs.value < rhs.value
             }
-            hits.append(Hit(topic: topic, score: score, matchedOn: best?.key ?? ""))
+            hits.append(Hit(entry: entry, score: score, matchedOn: best?.key ?? ""))
         }
         // Ties break on id so the order is stable between runs.
-        hits.sort { $0.score == $1.score ? $0.topic.id < $1.topic.id : $0.score > $1.score }
+        hits.sort { $0.score == $1.score ? $0.id < $1.id : $0.score > $1.score }
         return hits
     }
 }
 
 extension ManualSearch {
     /// What the window shows: the ranking, with the tail of weak hits cut.
-    static func results(for ask: String, in topics: [ManualTopic] = Manual.topics) -> [Hit] {
-        let hits = rank(ask, in: topics)
+    static func results(for ask: String, in entries: [Entry] = ManualSearch.entries) -> [Hit] {
+        let hits = rank(ask, in: entries)
         guard let best = hits.first else { return [] }
         return hits.filter { $0.score >= best.score * RELATIVE_CUTOFF }
     }
@@ -204,12 +238,8 @@ struct ManualSearchField: View {
         HStack(spacing: Tokens.Space.row6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
-            // Short enough for the sidebar it now lives in. "Search Help and the
-            // FAQ" fit the 560pt reading column and truncates to "Search Help
-            // and the" at 178pt, which reads as a bug in the field rather than
-            // as a label that is too long. Reference uses "Search Help & FAQ" for
-            // the same reason.
-            TextField("Search Help & FAQ", text: $query)
+            TextField("Search Help & Guide", text: $query)
+                .accessibilityLabel("Search Help, FAQ, and guide")
                 .textFieldStyle(.plain)
                 .font(Tokens.FontScale.body)
                 .focused($focused)
@@ -258,9 +288,9 @@ struct ManualSearchField: View {
 /// What the reading column shows while the search field has something in it.
 struct ManualSearchResults: View {
     let query: String
-    /// Called with the page a result lives on, so a hit is one click from being
+    /// Called with the matching topic or guide, so a hit is one click from being
     /// read in place.
-    var open: (InfoPage) -> Void
+    var open: (InfoDestination) -> Void
 
     private var hits: [ManualSearch.Hit] { ManualSearch.results(for: query) }
 
@@ -270,27 +300,28 @@ struct ManualSearchResults: View {
                 SectionHeader("Nothing matches \"\(query)\"")
                 Caption("Help covers the keys, the words this app uses, and what to do when "
                         + "something looks wrong. The FAQ covers the MCP server and the "
-                        + "library itself. Try a shorter word, or open a page and read it.")
+                        + "library itself. The guide covers each workflow. Try a shorter word, "
+                        + "or open a page and read it.")
             }
         } else {
             SectionHeader(hits.count == 1 ? "1 result" : "\(hits.count) results")
             VStack(alignment: .leading, spacing: Tokens.Space.medium) {
                 ForEach(hits) { hit in
-                    Button { open(hit.topic.page) } label: {
+                    Button { open(hit.entry.destination) } label: {
                         VStack(alignment: .leading, spacing: Tokens.Space.row) {
                             HStack(spacing: Tokens.Space.row6) {
-                                Image(systemName: hit.topic.page.symbol)
+                                Image(systemName: hit.entry.symbol)
                                     .font(Tokens.FontScale.nano)
                                     .foregroundStyle(Tokens.accent)
-                                Text("\(hit.topic.page.title) · \(hit.topic.section)")
+                                Text("\(hit.entry.kind) · \(hit.entry.category)")
                                     .font(Tokens.FontScale.tiny)
                                     .foregroundStyle(.secondary)
                             }
-                            Text(hit.topic.term)
+                            Text(hit.entry.title)
                                 .font(Tokens.FontScale.small)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                            Caption(Self.snippet(hit.topic.detail))
+                            Caption(Self.snippet(hit.entry.body))
                         }
                         .padding(.vertical, Tokens.Space.row)
                         .contentShape(Rectangle())

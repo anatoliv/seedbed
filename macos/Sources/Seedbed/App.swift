@@ -287,6 +287,14 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         buildStatusItem()
         buildPanel()
 
+        // Check the real menu targets and upgrade route in this bundle, without
+        // screen coordinates or starting the MCP server. The normal launch path
+        // stays separate so welcome/upgrade announcements cannot race the check.
+        if ProcessInfo.processInfo.environment["SEEDBED_CHECK_INFO_NAVIGATION"] == "1" {
+            checkInfoNavigationForQA()
+            return
+        }
+
         mcp = MCPServer(client: LibraryClient(root: root))
         syncMCPServer()
 
@@ -365,8 +373,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             print("ask: \(ask)   (\(ManualSearch.decision), \(hits.count) hits)")
             for hit in hits {
                 print(String(format: "  %.3f  [%@ · %@]  %@  (matched on %@)",
-                             hit.score, hit.topic.page.title, hit.topic.section,
-                             hit.topic.term, hit.matchedOn))
+                             hit.score, hit.entry.kind, hit.entry.category,
+                             hit.entry.title, hit.matchedOn))
             }
             NSApp.terminate(nil)
             return
@@ -402,8 +410,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // keystrokes reached another session's prompt during the build, which is
         // a real hazard and not a theoretical one.
         case "search":
-            infoModel.query = ProcessInfo.processInfo.environment["SEEDBED_MANUAL_QUERY"] ?? "token"
             openHelp()
+            infoModel.query = ProcessInfo.processInfo.environment["SEEDBED_MANUAL_QUERY"] ?? "token"
+            infoModel.browsing = false
         // Searches, then navigates to a page, which is the state the search's
         // "the query survives a page change" is actually about. The first
         // implementation cleared the query here and claimed it did not; this
@@ -420,8 +429,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case "guide":
             let id = ProcessInfo.processInfo.environment["SEEDBED_GUIDE_ID"]
                 ?? Guide.pages.first?.id ?? ""
-            infoModel.open(guide: id)
             openInfo(.help)
+            infoModel.open(guide: id)
         case "gettingstarted": openInfo(.gettingStarted)
         case "about":        openInfo(.about)
         // Opens Settings → Building, then swaps the library out from under it
@@ -829,24 +838,11 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func openEnhancerEditor() { openSettings(.building) }
     @objc private func openMCPSettings() { openSettings(.mcp) }
 
-    /// What the title bar says for each page. macOS names these windows after
-    /// what is in them — "Seedbed Help", "About Seedbed" — and one title for
-    /// five pages is how a user loses track of where they are.
-    private static func infoWindowTitle(for page: InfoPage) -> String {
-        switch page {
-        case .about:          return "About Seedbed"
-        case .help:           return "Seedbed Help"
-        case .faq:            return "Seedbed FAQ"
-        case .whatsNew:       return "What's New in Seedbed"
-        case .gettingStarted: return "Getting Started with Seedbed"
-        }
-    }
-
     /// The manual: one window, five pages, opened on whichever one was asked
     /// for. It used to be five separate windows at four different widths.
     func openInfo(_ page: InfoPage) {
-        infoModel.page = page
-        InfoWindows.shared.show("info", title: Self.infoWindowTitle(for: page),
+        infoModel.open(page)
+        InfoWindows.shared.show("info", title: infoModel.windowTitle,
                                 size: NSSize(width: Tokens.Size.info.width,
                                              height: Tokens.Size.info.height),
                                 minSize: NSSize(width: Tokens.Size.infoMin.width,
@@ -869,6 +865,53 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func openHelp() { openInfo(.help) }
     @objc private func openFAQ() { openInfo(.faq) }
     @objc private func openWhatsNew() { openInfo(.whatsNew) }
+
+    private func checkInfoNavigationForQA() {
+        let destinations: [(InfoPage, String?)] = [
+            (.help, "Help & FAQ"), (.about, "About Seedbed"), (.whatsNew, nil)
+        ]
+        let scenarios = [false, true].flatMap { searching in
+            destinations.map { (searching, $0.0, $0.1) }
+        }
+        let query = "Nothing about the seed changes"
+        func check(_ index: Int) {
+            guard index < scenarios.count else {
+                print("Info navigation: all 6 routes passed")
+                NSApp.terminate(nil)
+                return
+            }
+            let (searching, page, menuTitle) = scenarios[index]
+            infoModel.query = query
+            infoModel.open(guide: "what-it-is")
+            if searching { infoModel.browsing = false }
+            if let menuTitle {
+                let menu = NSMenu()
+                populate(menu)
+                let matches = menu.items.indices.filter { menu.items[$0].title == menuTitle }
+                guard matches.count == 1 else {
+                    print("FAIL: expected one menu item for \(menuTitle)")
+                    exit(1)
+                }
+                menu.performActionForItem(at: matches[0])
+            } else {
+                openWhatsNew()
+            }
+            // Give SwiftUI a render pass before reading the native title.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                guard self.infoModel.page == page, self.infoModel.guide == nil,
+                      self.infoModel.topic == nil, self.infoModel.browsing,
+                      self.infoModel.query == query,
+                      NSApp.windows.contains(where: { $0.isVisible && $0.title == page.windowTitle })
+                else {
+                    print("FAIL: \(searching ? "search" : "guide") -> \(page.rawValue)")
+                    exit(1)
+                }
+                print("PASS: \(searching ? "search" : "guide") -> \(page.rawValue), query kept, title \(page.windowTitle)")
+                check(index + 1)
+            }
+        }
+        check(0)
+    }
 
     @objc private func toggleLaunchAtLogin() {
         if let problem = LaunchAtLogin.set(!LaunchAtLogin.isEnabled) {

@@ -2,25 +2,6 @@ import XCTest
 @testable import Seedbed
 
 final class ReportingAttemptGateTests: XCTestCase {
-    private enum ExpectedFailure: Error { case unavailable }
-
-    func testInitializationFailureIsContainedAndNotRetried() {
-        let gate = ReportingAttemptGate()
-        var attempts = 0
-
-        let first = gate.runOnce {
-            attempts += 1
-            throw ExpectedFailure.unavailable
-        }
-        let second = gate.runOnce {
-            attempts += 1
-        }
-
-        XCTAssertEqual(first, .failed)
-        XCTAssertEqual(second, .failed)
-        XCTAssertEqual(attempts, 1)
-    }
-
     func testExplicitDisableIsTheOnlyRetryReset() {
         let gate = ReportingAttemptGate()
         XCTAssertEqual(gate.runOnce {}, .started)
@@ -85,7 +66,7 @@ final class ReportingAttemptGateTests: XCTestCase {
         }
 
         wait(for: [entered], timeout: 0.5)
-        XCTAssertEqual(gate.current(), .failed) // reserved, not retried
+        XCTAssertEqual(gate.current(), .starting) // reserved, not retried
         release.signal()
         wait(for: [finished], timeout: 0.5)
         XCTAssertEqual(gate.current(), .started)

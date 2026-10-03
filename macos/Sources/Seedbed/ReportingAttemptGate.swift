@@ -3,11 +3,13 @@ import Foundation
 /// A one-attempt fuse around optional diagnostics initialization.
 ///
 /// An endpoint outage must not turn application launch into a retry loop. The
-/// first caller owns initialization; a thrown error is contained and leaves the
-/// gate failed until an explicit user disable/enable cycle resets it.
+/// first caller owns initialization. A start that did not come up
+/// (`CrashReporting.startReporter` throws) leaves the gate failed, which is the
+/// unavailable state, until an explicit user disable/enable cycle resets it.
 final class ReportingAttemptGate: @unchecked Sendable {
     enum Outcome: Equatable {
         case idle
+        case starting
         case started
         case failed
     }
@@ -22,33 +24,28 @@ final class ReportingAttemptGate: @unchecked Sendable {
             lock.unlock()
             return existing
         }
-        // Reserve the only attempt before running user code. A concurrent call
-        // sees failed and returns instead of initializing a second SDK client.
-        outcome = .failed
+        // Reserve the only attempt before running it. A concurrent call sees
+        // starting and returns instead of initializing a second SDK client.
+        outcome = .starting
         lock.unlock()
 
         do {
             try initialize()
-            lock.lock()
-            outcome = .started
-            lock.unlock()
+            lock.withLock { outcome = .started }
             return .started
         } catch {
+            lock.withLock { outcome = .failed }
             return .failed
         }
     }
 
     func current() -> Outcome {
-        lock.lock()
-        defer { lock.unlock() }
-        return outcome
+        lock.withLock { outcome }
     }
 
     /// Only a direct user action may permit another attempt. There is no timer,
     /// network callback, or automatic fallback path that invokes this method.
     func resetAfterExplicitDisable() {
-        lock.lock()
-        outcome = .idle
-        lock.unlock()
+        lock.withLock { outcome = .idle }
     }
 }

@@ -41,6 +41,16 @@ enum CrashReporting {
     static let perLaunchBudget = 20
     static let initializationWait: TimeInterval = 1
     static let canaryFlushTimeout: TimeInterval = 2
+    /// The bound on one send, start to finish. It is the only timeout that
+    /// applies: sentry-cocoa 8.58.4 builds every request with its own 15 s
+    /// `timeoutInterval` (`SentryURLRequestFactory`), which overrides the
+    /// session's request timeout. Measured against a collector that accepts and
+    /// never answers, 5 s gives up in about 6 s.
+    static let resourceTimeout: TimeInterval = 5
+    /// The ceiling on waiting for the SDK's main-thread setup to run after
+    /// `SentrySDK.start`. Normally it runs within milliseconds; only a main
+    /// thread stuck this long reaches it. The wait runs on `queue`.
+    static let setupWait: TimeInterval = 10
 
     private static let budgetLock = NSLock()
     private static var sentThisLaunch = 0
@@ -63,6 +73,46 @@ enum CrashReporting {
     /// The Settings pane says so, because a toggle that does nothing is worse
     /// than an absent one.
     static var isConfigured: Bool { configuration != nil }
+
+    /// What the Settings pane says about reporting in this session.
+    enum Status: Equatable {
+        case notConfigured
+        case off
+        case on
+        case unavailable
+    }
+
+    /// `.unavailable` means the reporter did not come up in this session (the
+    /// gate recorded `.failed`, see `startReporter`). It says nothing about the
+    /// collector: an unreachable Crashbox still reads `.on`, because finding
+    /// that out would take traffic Seedbed does not send. A start still in
+    /// progress also reads `.on`.
+    static func status(enabled: Bool, configured: Bool, outcome: ReportingAttemptGate.Outcome) -> Status {
+        guard configured else { return .notConfigured }
+        guard enabled else { return .off }
+        return outcome == .failed ? .unavailable : .on
+    }
+
+    /// The line Settings shows under the toggle for `status`, or nil for none.
+    /// Only a start that failed this session gets one; the remedy is the one
+    /// `ReportingAttemptGate` allows, an explicit off and on.
+    static func settingsNotice(for status: Status) -> String? {
+        status == .unavailable ? "Crash reporting could not start. Turn it off and on to try again." : nil
+    }
+
+    static var currentStatus: Status {
+        status(enabled: isEnabled, configured: isConfigured, outcome: attemptGate.current())
+    }
+
+    /// Posted on the main queue whenever a start attempt settles or the user
+    /// turns reporting off, so an open Settings pane can re-read `currentStatus`.
+    static let statusDidChange = Notification.Name("net.amnesia.seedbed.crashReportingStatusDidChange")
+
+    private static func announceStatusChange() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: statusDidChange, object: nil)
+        }
+    }
 
     struct Configuration: Equatable {
         let dsn: String
@@ -123,57 +173,137 @@ enum CrashReporting {
             queue.async { startSDKOnce(configuration) }
         } else {
             queue.async {
-                SentrySDK.close()
+                // A start that timed out can still finish later on the main
+                // thread, so close whatever is running, not only a recorded start.
+                if attemptGate.current() == .started || SentrySDK.isEnabled { SentrySDK.close() }
                 attemptGate.resetAfterExplicitDisable()
                 log.info("crash reporting disabled by user")
+                announceStatusChange()
             }
         }
     }
 
-    /// Runs on the private utility queue. `ReportingAttemptGate` catches any
-    /// recoverable adapter failure and permanently fuses automatic retries for
-    /// this enable cycle. The application and its UI never wait for this work.
+    /// The transport every send goes through, instead of the SDK's default
+    /// session (15 s idle, 7-day resource), under which a collector that
+    /// accepts and never answers holds the only send slot for days.
+    /// Ephemeral, so nothing about a send is kept: no URL cache, no cookies, no
+    /// credentials. `waitsForConnectivity` off, so an offline Mac fails a send
+    /// at once rather than queueing it. `timeoutIntervalForRequest` is left
+    /// alone on purpose; see `resourceTimeout` for why it would do nothing.
+    static func transportSession() -> URLSession {
+        let settings = URLSessionConfiguration.ephemeral
+        settings.waitsForConnectivity = false
+        settings.timeoutIntervalForResource = resourceTimeout
+        settings.requestCachePolicy = .reloadIgnoringLocalCacheData
+        settings.urlCache = nil
+        settings.httpCookieStorage = nil
+        settings.httpShouldSetCookies = false
+        settings.urlCredentialStorage = nil
+        return URLSession(configuration: settings)
+    }
+
+    /// The options as shipped, on a real `Options`. A named function so a test
+    /// can assert what is wired in without starting the SDK.
+    static func configure(_ options: Options, configuration: Configuration) {
+        options.dsn = configuration.dsn
+        // SDK diagnostics are explicit, never a production default.
+        options.debug = ProcessInfo.processInfo.environment["SEEDBED_SENTRY_DEBUG"] == "1"
+        options.sendDefaultPii = false      // no IP, user ids, or bodies
+        options.releaseName = configuration.release
+        options.environment = configuration.environment
+        options.shutdownTimeInterval = 0
+        options.tracesSampleRate = 0.0      // crashes and errors only
+        options.configureProfiling = { profiling in
+            profiling.sessionSampleRate = 0
+            profiling.profileAppStarts = false
+        }
+        options.enableAutoSessionTracking = false
+        options.enableWatchdogTerminationTracking = false
+        options.enableAppHangTracking = false
+        options.enableAutoPerformanceTracing = false
+        options.enableNetworkTracking = false
+        options.enableFileIOTracing = false
+        options.enableCoreDataTracing = false
+        options.enableTimeToFullDisplayTracing = false
+        options.enableAutoBreadcrumbTracking = false
+        options.sendClientReports = false
+        options.maxBreadcrumbs = 0
+        options.maxCacheItems = UInt(perLaunchBudget)
+        options.urlSession = transportSession()
+        options.beforeSend = { event in
+            // Budget first: an event dropped here costs nothing, and
+            // scrubbing is wasted work on something nobody will read.
+            guard withinBudget() else { return nil }
+            return scrub(event)
+        }
+        options.beforeBreadcrumb = { redact($0) }
+    }
+
+    /// Why the reporter is unavailable in this session.
+    enum StartFailure: Error, Equatable {
+        /// The SDK's own DSN parser refused the configuration, so the SDK was not started.
+        case configurationRejected
+        /// The SDK's main-thread setup did not run within `setupWait`.
+        case setupTimedOut
+        /// The SDK's setup ran but left no client running.
+        case didNotEnable
+    }
+
+    /// Starts the reporter and reports whether it actually came up.
+    /// `SentrySDK.start` cannot throw and, called off the main thread, finishes
+    /// its setup asynchronously on the main queue, so success is judged by the
+    /// result rather than by the call returning. It fails when
+    /// - the SDK parses the DSN itself and refuses it (checked before starting,
+    ///   so a refused configuration never starts a client), or
+    /// - the SDK's main-thread setup does not run within `setupWait`, or
+    /// - it ran and no client is running (`SentrySDK.isEnabled` is false).
+    /// It deliberately does not contact the collector: whether Crashbox is
+    /// reachable is not knowable without traffic. `start`, `waitForSetup` and
+    /// `isEnabled` are injected so tests drive this exact decision with the
+    /// SDK's real `Options` and parser without starting an SDK; production
+    /// passes the real SDK and `mainQueueCaughtUp`.
+    static func startReporter(_ configuration: Configuration,
+                              start: (Options) -> Void,
+                              waitForSetup: () -> Bool,
+                              isEnabled: () -> Bool) throws {
+        let options = Options()
+        configure(options, configuration: configuration)
+        guard options.enabled, options.parsedDsn != nil else { throw StartFailure.configurationRejected }
+        start(options)
+        guard waitForSetup() else { throw StartFailure.setupTimedOut }
+        guard isEnabled() else { throw StartFailure.didNotEnable }
+    }
+
+    /// `SentrySDK.start` called off the main thread queues its setup with
+    /// `dispatch_async` on the main queue, which is FIFO. A marker queued after
+    /// it runs only once that setup has, so reading `isEnabled` then is neither
+    /// early nor a guess about timing. On the main thread the SDK sets up inline.
+    static func mainQueueCaughtUp(within wait: TimeInterval) -> Bool {
+        if Thread.isMainThread { return true }
+        let marker = DispatchSemaphore(value: 0)
+        DispatchQueue.main.async { marker.signal() }
+        return marker.wait(timeout: .now() + wait) == .success
+    }
+
+    /// Runs on the private utility queue. `ReportingAttemptGate` records a start
+    /// that did not come up as failed (unavailable) and fuses automatic retries
+    /// for this enable cycle. The application and its UI never wait for this work.
     private static func startSDKOnce(_ configuration: Configuration) {
         let outcome = attemptGate.runOnce {
-            SentrySDK.start { options in
-                options.dsn = configuration.dsn
-                // SDK diagnostics are explicit, never a production default.
-                options.debug = ProcessInfo.processInfo.environment["SEEDBED_SENTRY_DEBUG"] == "1"
-                options.sendDefaultPii = false      // no IP, user ids, or bodies
-                options.releaseName = configuration.release
-                options.environment = configuration.environment
-                options.shutdownTimeInterval = 0
-                options.tracesSampleRate = 0.0      // crashes and errors only
-                options.configureProfiling = { profiling in
-                    profiling.sessionSampleRate = 0
-                    profiling.profileAppStarts = false
-                }
-                options.enableAutoSessionTracking = false
-                options.enableWatchdogTerminationTracking = false
-                options.enableAppHangTracking = false
-                options.enableAutoPerformanceTracing = false
-                options.enableNetworkTracking = false
-                options.enableFileIOTracing = false
-                options.enableCoreDataTracing = false
-                options.enableTimeToFullDisplayTracing = false
-                options.enableAutoBreadcrumbTracking = false
-                options.sendClientReports = false
-                options.maxBreadcrumbs = 0
-                options.maxCacheItems = UInt(perLaunchBudget)
-                options.beforeSend = { event in
-                    // Budget first: an event dropped here costs nothing, and
-                    // scrubbing is wasted work on something nobody will read.
-                    guard withinBudget() else { return nil }
-                    return scrub(event)
-                }
-                options.beforeBreadcrumb = { redact($0) }
+            do {
+                try startReporter(configuration, start: { SentrySDK.start(options: $0) },
+                                  waitForSetup: { mainQueueCaughtUp(within: setupWait) },
+                                  isEnabled: { SentrySDK.isEnabled })
+            } catch {
+                log.error("crash reporting unavailable (\(String(describing: error), privacy: .public)); application continues")
+                throw error
             }
         }
         switch outcome {
         case .started: log.info("crash reporting started")
-        case .failed: log.error("crash reporting unavailable; application continues")
-        case .idle: break
+        case .failed, .idle, .starting: break
         }
+        announceStatusChange()
     }
 
     /// Everything the promise on the download page says a report does not

@@ -211,7 +211,7 @@ class ThePreparationIsBounded(unittest.TestCase):
 
     def test_the_trigger_did_not_add_a_second_sdk_start(self) -> None:
         """One client, one start call, still."""
-        self.assertEqual(1, self.reporting.count("SentrySDK.start {"))
+        self.assertEqual(1, self.reporting.count("SentrySDK.start(options:"))
 
 
 if __name__ == "__main__":

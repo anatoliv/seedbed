@@ -48,6 +48,24 @@ struct WhatsNewRelease: Identifiable {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "0.1.31",
+            date: "2 October 2026",
+            highlight: "Reliable Help navigation and clearer crash-reporting status.",
+            changes: [
+                WhatsNewChange(kind: .fixed, text:
+                    "Help, About, and What's New open the page you choose even after a guide "
+                    + "or search result. Search results now open the matching guide."),
+                WhatsNewChange(kind: .fixed, text:
+                    "Crash reporting checks whether its reporter started. Settings shows "
+                    + "when it could not start and explains how to retry."),
+                WhatsNewChange(kind: .fixed, text:
+                    "Crash-report uploads give up after a short timeout when the reporting "
+                    + "service does not respond."),
+                WhatsNewChange(kind: .improved, text:
+                    "Help and the privacy page explain that enabling reports makes Seedbed "
+                    + "try to send them, without confirming delivery."),
+            ]),
+        WhatsNewRelease(
             version: "0.1.30",
             date: "30 September 2026",
             highlight: "MCP addresses display ports as plain digits.",
